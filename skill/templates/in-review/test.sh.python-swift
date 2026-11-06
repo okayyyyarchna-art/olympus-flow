@@ -1,0 +1,196 @@
+#!/usr/bin/env bash
+set -uo pipefail
+
+usage() {
+    echo "usage: $0 --output_path <file> base|new" >&2
+    exit 2
+}
+
+output_path=""
+mode=""
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --output_path)
+            [ $# -ge 2 ] || usage
+            output_path="$2"
+            shift 2
+            ;;
+        base|new)
+            [ -z "$mode" ] || usage
+            mode="$1"
+            shift
+            ;;
+        *)
+            usage
+            ;;
+    esac
+done
+[ -n "$output_path" ] && [ -n "$mode" ] || usage
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+case "$output_path" in
+    /*) ;;
+    *) output_path="$(pwd)/$output_path" ;;
+esac
+mkdir -p "$(dirname "$output_path")"
+rm -f "$output_path"
+
+# The object servers keep metadata in extended attributes larger than the
+# overlay filesystem under /tmp accepts, so their scratch space lives in
+# shared memory. The local servers must not go through any HTTP proxy.
+scratch="$(mktemp -d /dev/shm/cw.XXXXXX)"
+export TMPDIR="$scratch"
+export NO_PROXY=localhost,127.0.0.1,::1 no_proxy=localhost,127.0.0.1,::1
+
+# Run from a copy of the pinned commit's tests and sample configs (kept in the
+# image at /opt/swift-pristine) against the code in this tree, so the existing
+# tests are the ones the repository ships.
+tree="$(mktemp -d /tmp/cw-tree.XXXXXX)"
+if [ -d /opt/swift-pristine/test ]; then
+    cp -a /opt/swift-pristine/. "$tree/"
+else
+    cp -a "$repo_root/test" "$repo_root/etc" "$repo_root/tox.ini" "$tree/"
+fi
+cp "$repo_root/test/functional/s3api/test_conditional_write_00915c.py" \
+    "$tree/test/functional/s3api/"
+cd "$tree"
+deselect=()
+
+# Both modes run the in-process cluster with a 3 s backend connect timeout
+# (the sample's 0.5 s can expire on a busy machine and leave a container
+# listing behind a write, which fails tests at random).
+if [ "$mode" = "new" ]; then
+    # S3 requests through the repository's in-process functional cluster:
+    # the sample proxy config with s3api (s3_acl on) and object versioning
+    # allowed, as the repository's in-process setup always runs them.
+    # Multipart parts may be small, so the tests can upload multipart
+    # objects of several parts quickly.
+    export SWIFT_TEST_IN_PROCESS=1
+    mkdir -p "$scratch/conf"
+    sed -e '/^\[filter:s3api\]/a min_segment_size = 1' \
+        -e '/^\[app:proxy-server\]/a conn_timeout = 3' \
+        etc/proxy-server.conf-sample >"$scratch/conf/proxy-server.conf"
+    export SWIFT_TEST_IN_PROCESS_CONF_DIR="$scratch/conf"
+    targets=(test/functional/s3api/test_conditional_write_00915c.py)
+else
+    # The S3 middleware, object versioning (both modes), copy, bulk and
+    # request helper unit suites the change touches, and the functional
+    # suites for S3 object writes and object versioning on the in-process
+    # cluster (of the S3 object suite only the boto3 class runs; its boto 2
+    # classes skip because boto 2 is not installed). The functional suites
+    # go first: they start their own in-process cluster, which the unit
+    # suites' module-level fakes would otherwise disturb.
+    export SWIFT_TEST_IN_PROCESS=1
+    mkdir -p "$scratch/conf"
+    sed -e '/^\[app:proxy-server\]/a conn_timeout = 3' \
+        etc/proxy-server.conf-sample >"$scratch/conf/proxy-server.conf"
+    export SWIFT_TEST_IN_PROCESS_CONF_DIR="$scratch/conf"
+    targets=(
+        test/functional/s3api/test_object.py
+        test/functional/test_object_versioning.py
+        test/functional/test_versioned_writes.py
+        test/unit/common/middleware/s3api
+        test/unit/common/middleware/test_object_versioning.py
+        test/unit/common/middleware/test_versioned_writes.py
+        test/unit/common/middleware/test_copy.py
+        test/unit/common/middleware/test_bulk.py
+        test/unit/common/test_request_helpers.py
+    )
+    # These tests pin the answer to a create-only (If-None-Match: *) retry
+    # of a CompleteMultipartUpload that already completed (200, or 404 when
+    # its part list differs), although the key then has a current object,
+    # for which a create-only write answers 412. They are not run; the new
+    # functional tests check that such a retry changes nothing and is
+    # refused with 412 (or, when its part list differs, with 404 or 412).
+    mpu=test/unit/common/middleware/s3api/test_multi_upload.py
+    for cls in TestS3ApiMultiUpload TestS3ApiMultiUploadNonUTC; do
+        for name in test_mpu_retry_complete_with_if_none_match_star \
+                test_mpu_retry_complete_mixed_policy_with_if_none_match_star \
+                test_object_multipart_upload_retry_complete_with_if_none_match_star
+        do
+            deselect+=(--deselect "$mpu::$cls::$name")
+        done
+    done
+fi
+
+timeout -k 30 -s INT 1800 python -m pytest -p no:cacheprovider -v \
+    --junitxml="$output_path" "${deselect[@]}" "${targets[@]}" 2>&1 |
+    tee "$scratch/run.log"
+status=${PIPESTATUS[0]}
+
+# A run cut short (timeout, crash) reports only the tests that finished.
+# Every collected test without a result is added to the report as failed,
+# so the report is never cleaner than the run.
+timeout -k 30 -s INT 600 python -m pytest -p no:cacheprovider -o addopts= \
+    -p no:requests_mock --collect-only -q \
+    "${deselect[@]}" "${targets[@]}" \
+    >"$scratch/collected.txt" 2>"$scratch/collect-errors.txt"
+collect_status=$?
+python - "$output_path" "$scratch/collected.txt" \
+    "$scratch/collect-errors.txt" "$collect_status" "$scratch/run.log" \
+    "$status" <<'PY'
+import sys
+import xml.etree.ElementTree as ET
+
+out_path, collected_path, errors_path, collect_status = sys.argv[1:5]
+run_log_path, run_status = sys.argv[5:7]
+with open(run_log_path, encoding="utf-8", errors="replace") as f:
+    run_tail = "".join(f.readlines()[-60:])
+wanted = []
+with open(collected_path, encoding="utf-8", errors="replace") as f:
+    for line in f:
+        parts = line.strip().split("::")
+        if len(parts) < 2 or not parts[0].endswith(".py"):
+            continue
+        module = parts[0][:-len(".py")].replace("/", ".")
+        wanted.append((".".join([module] + parts[1:-1]), parts[-1]))
+written = True
+try:
+    tree = ET.parse(out_path)
+    root = tree.getroot()
+except (OSError, ET.ParseError):
+    written = False
+    root = ET.Element("testsuites")
+    tree = ET.ElementTree(root)
+suite = root if root.tag == "testsuite" else root.find("testsuite")
+if suite is None:
+    suite = ET.SubElement(root, "testsuite", name="pytest", tests="0",
+                          failures="0", errors="0")
+reported = {(case.get("classname"), case.get("name"))
+            for case in root.iter("testcase")}
+missing = [case for case in wanted if case not in reported]
+for classname, name in missing:
+    case = ET.SubElement(suite, "testcase", classname=classname, name=name)
+    ET.SubElement(case, "failure", message="no result").text = (
+        "the run ended (exit status %s) before this test reported a result;"
+        " the end of its output:\n%s" % (run_status, run_tail))
+if collect_status != "0" or (
+        not wanted and not any(True for _ in root.iter("testcase"))):
+    # the tests could not all be collected (so some may be missing from the
+    # report) or nothing could be collected: a failure of its own
+    with open(collected_path, encoding="utf-8", errors="replace") as f:
+        detail = f.read()
+    with open(errors_path, encoding="utf-8", errors="replace") as f:
+        detail += f.read()
+    case = ET.SubElement(suite, "testcase", classname="test.sh",
+                         name="collection")
+    ET.SubElement(case, "failure", message="collection failed").text = (
+        detail[-20000:] or "no tests could be collected")
+    missing.append(("test.sh", "collection"))
+if missing or not written:
+    for attr in ("tests", "failures"):
+        suite.set(attr, str(int(suite.get(attr, "0")) + len(missing)))
+    tree.write(out_path, encoding="utf-8", xml_declaration=True)
+    print("%d collected tests had no result; reported as failed"
+          % len(missing))
+sys.exit(1 if missing or not written else 0)
+PY
+report_status=$?
+
+cd /
+rm -rf "$scratch" "$tree"
+
+if [ "$status" -ne 0 ] || [ "$report_status" -ne 0 ] || [ ! -s "$output_path" ]; then
+    exit 1
+fi
+exit 0

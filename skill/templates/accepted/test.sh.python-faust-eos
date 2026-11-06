@@ -1,0 +1,72 @@
+#!/usr/bin/env bash
+set -uo pipefail
+
+usage() {
+    echo "usage: $0 --output_path <file> base|new" >&2
+    exit 2
+}
+
+output_path=""
+mode=""
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --output_path)
+            [ $# -ge 2 ] || usage
+            output_path="$2"
+            shift 2
+            ;;
+        base|new)
+            [ -z "$mode" ] || usage
+            mode="$1"
+            shift
+            ;;
+        *)
+            usage
+            ;;
+    esac
+done
+[ -n "$output_path" ] && [ -n "$mode" ] || usage
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+case "$output_path" in
+    /*) ;;
+    *) output_path="$(pwd)/$output_path" ;;
+esac
+mkdir -p "$(dirname "$output_path")"
+
+scratch="$(mktemp -d /tmp/eos-tests.XXXXXX)"
+export HOME="$scratch/home"
+mkdir -p "$HOME"
+export PYTHONDONTWRITEBYTECODE=1
+
+if [ "$mode" = "base" ]; then
+    selection=(
+        tests/unit/tables
+        tests/unit/transport
+        tests/unit/app/test_base.py
+        --ignore tests/unit/tables/test_eos_offsets_7e41b2.py
+        -k "not (Test_WindowWrapper and test_get_timestamp and not event_is_None)"
+    )
+else
+    selection=(tests/unit/tables/test_eos_offsets_7e41b2.py)
+fi
+
+cd "$repo_root"
+log="$scratch/pytest.log"
+rm -f "$output_path"
+timeout -k 30 -s INT 1500 python -m pytest -p no:cacheprovider -o addopts="" \
+    -o junit_family=xunit1 --junitxml="$output_path" "${selection[@]}" 2>&1 | tee "$log"
+status=${PIPESTATUS[0]}
+
+if [ ! -s "$output_path" ] || ! grep -q "<testsuite" "$output_path" \
+    || grep -q 'tests="0"' "$output_path"; then
+    escaped="$(sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g' "$log" | tail -c 20000)"
+    if ! printf '<?xml version="1.0" encoding="utf-8"?>\n<testsuites><testsuite name="%s" tests="1" failures="1" errors="0"><testcase classname="harness" name="%s"><failure message="pytest did not produce a report">%s</failure></testcase></testsuite></testsuites>\n' \
+        "$mode" "$mode" "$escaped" >"$output_path"; then
+        echo "failed to write $output_path" >&2
+        exit 3
+    fi
+    [ "$status" -ne 0 ] || status=1
+fi
+
+exit "$status"

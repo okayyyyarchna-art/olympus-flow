@@ -1,0 +1,97 @@
+#!/usr/bin/env bash
+set -uo pipefail
+
+usage() {
+    echo "usage: ./test.sh --output_path <file> base|new" >&2
+}
+
+if [ "$#" -eq 0 ]; then
+    usage
+    exit 1
+fi
+if [ "$#" -ne 3 ] || [ "$1" != "--output_path" ] || [ -z "$2" ]; then
+    usage
+    exit 2
+fi
+
+output_path="$2"
+mode="$3"
+cd "$(dirname "${BASH_SOURCE[0]}")" || exit 1
+export GOFLAGS="-buildvcs=false"
+
+new_files=(
+    core/internal/storage/snapshot_5ad239_test.go
+    core/internal/cluster/restored_topics_527ddd_test.go
+)
+
+log="$(mktemp)"
+status=0
+
+run_go_test() {
+    go test -count=1 -v "$@" >> "$log" 2>&1 || status=1
+}
+
+case "$mode" in
+    base)
+        aside="$(mktemp -d)"
+        restore() {
+            for file in "${new_files[@]}"; do
+                if [ -f "$aside/$(basename "$file")" ]; then
+                    mv "$aside/$(basename "$file")" "$file"
+                fi
+            done
+        }
+        trap restore EXIT
+        for file in "${new_files[@]}"; do
+            if [ -f "$file" ]; then
+                mv "$file" "$aside/"
+            fi
+        done
+        excluded='^(TestPausableTicker_Restart|TestKafkaCluster_maybeUpdateMetadataAndDeleteTopics_Delete)$'
+        if ! packages="$(go list ./... 2>> "$log")"; then
+            echo "go list ./... failed" >> "$log"
+            status=1
+        fi
+        for pkg in $packages; do
+            if listed="$(go test -list '.*' "$pkg" 2>/dev/null)"; then
+                names="$(echo "$listed" | grep '^Test' | grep -Ev "$excluded")"
+                if [ -n "$names" ]; then
+                    run_go_test -run "^($(echo $names | tr ' ' '|'))\$" "$pkg"
+                fi
+            else
+                run_go_test "$pkg"
+            fi
+        done
+        ;;
+    new)
+        for file in "${new_files[@]}"; do
+            pkg_dir="./$(dirname "$file")"
+            names="$(sed -n 's/^func \(Test[A-Za-z0-9_]*\)(t \*testing\.T).*/\1/p' "$file")"
+            build_log="$(mktemp)"
+            if go test -count=1 -run '^$' "$pkg_dir" > "$build_log" 2>&1; then
+                for name in $names; do
+                    run_go_test -timeout 120s -run "^${name}\$" "$pkg_dir"
+                done
+            else
+                import_path="$(go list -e -f '{{.ImportPath}}' "$pkg_dir")"
+                for name in $names; do
+                    {
+                        echo "=== RUN   $name"
+                        grep -v 'build failed' "$build_log" | sed 's/^/    /'
+                        echo "--- FAIL: $name (0.00s)"
+                    } >> "$log"
+                done
+                printf 'FAIL\nFAIL\t%s\t0.000s\n' "$import_path" >> "$log"
+                status=1
+            fi
+        done
+        ;;
+    *)
+        usage
+        exit 2
+        ;;
+esac
+
+cat "$log"
+go-junit-report -in "$log" -out "$output_path" -set-exit-code || status=1
+exit "$status"

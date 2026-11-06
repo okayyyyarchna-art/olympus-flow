@@ -1,0 +1,193 @@
+#!/usr/bin/env bash
+set -uo pipefail
+
+usage() {
+    echo "usage: $0 --output_path <file> base|new" >&2
+    exit 2
+}
+
+output_path=""
+mode=""
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --output_path)
+            [ $# -ge 2 ] || usage
+            output_path="$2"
+            shift 2
+            ;;
+        base|new)
+            [ -z "$mode" ] || usage
+            mode="$1"
+            shift
+            ;;
+        *)
+            usage
+            ;;
+    esac
+done
+[ -n "$output_path" ] && [ -n "$mode" ] || usage
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+case "$output_path" in
+    /*) ;;
+    *) output_path="$(pwd)/$output_path" ;;
+esac
+mkdir -p "$(dirname "$output_path")"
+
+scratch="$(mktemp -d /tmp/table-ownership-tests.XXXXXX)"
+export HOME="$scratch/home"
+mkdir -p "$HOME"
+export PYTHONDONTWRITEBYTECODE=1
+# the partition assignment of a rebalance depends on the order of sets and
+# dicts: keep it the same on every run
+export PYTHONHASHSEED=0
+
+if [ "$mode" = "base" ]; then
+    selection=(
+        tests/unit/stores
+        tests/unit/tables
+        tests/unit/app
+        tests/functional/test_app.py
+        # the consumer and the driver are the assignor's users
+        tests/unit/transport/test_consumer.py
+        tests/unit/transport/drivers/test_aiokafka.py
+        --ignore tests/unit/tables/test_table_ownership_8e41c7.py
+        # the ids of this window-wrapper test carry the time they are collected
+        # at, so they differ from one run to the next
+        --deselect tests/unit/tables/test_wrappers.py::Test_WindowWrapper::test_get_timestamp
+        # these RocksDB unit tests hand Mock databases to the store's walk
+        # through its private `_dbs_for_actives` helper; a walk that keeps no
+        # database handle across its pauses (the hang this change fixes) may
+        # go over the partitions and look each database up itself when it
+        # gets there, and such a walk never reads those Mock databases. What
+        # every walk shows is checked on both stores by the tests of this
+        # change.
+        --deselect tests/unit/stores/test_rocksdb.py::Test_Store_RocksDB::test__iterkeys
+        --deselect tests/unit/stores/test_rocksdb.py::Test_Store_RocksDB::test__itervalues
+        --deselect tests/unit/stores/test_rocksdb.py::Test_Store_RocksDB::test__iteritems
+        --deselect tests/unit/stores/test_rocksdb.py::Test_Store_Rocksdict::test__iterkeys
+        --deselect tests/unit/stores/test_rocksdb.py::Test_Store_Rocksdict::test__itervalues
+        --deselect tests/unit/stores/test_rocksdb.py::Test_Store_Rocksdict::test__iteritems
+    )
+    # the existing tests run as they are in the repository (HEAD), from a copy
+    # outside the checkout; the code they test is the checkout's
+    run_root="$scratch/repo"
+    mkdir -p "$run_root"
+    if git -c safe.directory='*' -C "$repo_root" archive HEAD tests pyproject.toml \
+        | tar -x -C "$run_root"; then
+        export PYTHONPATH="$repo_root${PYTHONPATH:+:$PYTHONPATH}"
+        # the in-memory store tests build their store for a Mock table, and a
+        # Mock answers table.is_global with a (truthy) Mock: give them the
+        # regular table they are written for
+        python - "$run_root/tests/unit/stores/test_memory.py" <<'PYEOF'
+import sys
+
+path = sys.argv[1]
+with open(path) as f:
+    text = f.read()
+old = 'table=Mock(name="table")'
+if text.count(old) != 1:
+    print("test.sh: the store fixture of tests/unit/stores/test_memory.py changed;"
+          " running it as it is", file=sys.stderr)
+    sys.exit(0)
+with open(path, "w") as f:
+    f.write(text.replace(old, 'table=Mock(name="table", is_global=False)'))
+PYEOF
+        # the RocksDB store test names the changelog topic of its Mock table
+        # only through `changelog_topic_name`, and its Mock assignor answers
+        # only `assigned_actives`: give the topic itself that name too, and let
+        # the assignor's `is_active` agree, as real ones do
+        python - "$run_root/tests/unit/stores/test_rocksdb.py" <<'PYEOF'
+import sys
+
+path = sys.argv[1]
+with open(path) as f:
+    text = f.read()
+old = '        table.changelog_topic_name = "clog"\n'
+new = (
+    old
+    + '        table.changelog_topic.get_topic_name.return_value = "clog"\n'
+    + '        table.changelog_topic.topics = ["clog"]\n'
+    + "        store.app.assignor.is_active = lambda tp: (\n"
+    + "            tp in store.app.assignor.assigned_actives()\n"
+    + "        )\n"
+)
+if text.count(old) != 1:
+    print("test.sh: test__dbs_for_actives of tests/unit/stores/test_rocksdb.py"
+          " changed; running it as it is", file=sys.stderr)
+    sys.exit(0)
+with open(path, "w") as f:
+    f.write(text.replace(old, new))
+PYEOF
+        # the changelogged-object test stands in the manager's storage with a
+        # Mock whose hooks are not awaitable apart from on_rebalance: let it
+        # await on_recovery_completed too, as a real store's is a coroutine
+        python - "$run_root/tests/unit/tables/test_objects.py" <<'PYEOF'
+import sys
+
+path = sys.argv[1]
+with open(path) as f:
+    text = f.read()
+old = "                on_rebalance=AsyncMock(),\n"
+new = old + "                on_recovery_completed=AsyncMock(),\n"
+if text.count(old) != 1:
+    print("test.sh: the storage of tests/unit/tables/test_objects.py changed;"
+          " running it as it is", file=sys.stderr)
+    sys.exit(0)
+with open(path, "w") as f:
+    f.write(text.replace(old, new))
+PYEOF
+    else
+        echo "test.sh: the tests could not be taken from HEAD; running them as they are" >&2
+        run_root="$repo_root"
+    fi
+else
+    selection=(tests/unit/tables/test_table_ownership_8e41c7.py)
+    run_root="$repo_root"
+fi
+
+cd "$run_root"
+log="$scratch/pytest.log"
+rm -f "$output_path"
+timeout -k 30 -s INT 1500 \
+    python -m pytest -v -p no:cacheprovider -o addopts="" \
+    --continue-on-collection-errors \
+    -o junit_family=xunit1 --junitxml="$output_path" "${selection[@]}" 2>&1 | tee "$log"
+status=${PIPESTATUS[0]}
+
+if [ ! -s "$output_path" ] || ! grep -q "<testsuite" "$output_path" \
+    || grep -q 'tests="0"' "$output_path"; then
+    escaped="$(sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g' "$log" | tail -c 20000)"
+    if ! printf '<?xml version="1.0" encoding="utf-8"?>\n<testsuites><testsuite name="%s" tests="1" failures="1" errors="0"><testcase classname="harness" name="%s"><failure message="pytest did not produce a report">%s</failure></testcase></testsuite></testsuites>\n' \
+        "$mode" "$mode" "$escaped" >"$output_path"; then
+        echo "failed to write $output_path" >&2
+        exit 3
+    fi
+    [ "$status" -ne 0 ] || status=1
+fi
+
+if [ "$status" -eq 124 ]; then
+    # the time limit interrupted pytest: the run is reported as a failing
+    # test case, with the end of its output (the report may be partial)
+    python - "$output_path" "$log" <<'PYEOF'
+import sys
+from xml.etree import ElementTree
+
+report, log = sys.argv[1], sys.argv[2]
+with open(log, errors="replace") as f:
+    output = f.read()[-20000:]
+tree = ElementTree.parse(report)
+root = tree.getroot()
+suite = root if root.tag == "testsuite" else root.find("testsuite")
+case = ElementTree.SubElement(suite, "testcase", classname="harness", name="time_limit")
+failure = ElementTree.SubElement(
+    case, "failure", message="the test run was interrupted by the time limit"
+)
+failure.text = output
+for key in ("tests", "failures"):
+    suite.set(key, str(int(suite.get(key, "0")) + 1))
+tree.write(report, encoding="utf-8", xml_declaration=True)
+PYEOF
+fi
+
+exit "$status"

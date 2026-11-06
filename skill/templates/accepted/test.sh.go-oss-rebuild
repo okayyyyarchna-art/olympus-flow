@@ -1,0 +1,130 @@
+#!/usr/bin/env bash
+# Copyright 2026 Google LLC
+# SPDX-License-Identifier: Apache-2.0
+#
+# Test runner.
+#
+# Usage:
+#   ./test.sh [--output_path <junit.xml>] <base|new>
+#
+#   base  builds the proxy packages and runs the existing tests of the Docker proxy and dockerfs packages.
+#         (The repository's .dockerignore leaves tools/ out of images, so ./... cannot build there.)
+#   new   runs the tests for the proxy's pristine view of /changes and /archive.
+set -uo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+OUTPUT_PATH=""
+OUTPUT_SET=""
+MODE=""
+
+usage() { echo "usage: $0 [--output_path <junit.xml>] <base|new>" >&2; exit 2; }
+set_mode() {
+  case "$1" in base|new) ;; *) echo "unknown mode: $1" >&2; exit 2 ;; esac
+  if [ -n "$MODE" ]; then echo "mode given twice" >&2; exit 2; fi
+  MODE="$1"
+}
+set_output() {
+  if [ -z "$1" ]; then echo "empty output path" >&2; exit 2; fi
+  OUTPUT_PATH="$1"; OUTPUT_SET=1
+}
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --output_path|--output-path) [ $# -ge 2 ] || usage; set_output "$2"; shift 2 ;;
+    --output_path=*|--output-path=*) set_output "${1#*=}"; shift ;;
+    --mode) [ $# -ge 2 ] || usage; set_mode "$2"; shift 2 ;;
+    --mode=*) set_mode "${1#*=}"; shift ;;
+    base|new) set_mode "$1"; shift ;;
+    *) echo "unknown argument: $1" >&2; exit 2 ;;
+  esac
+done
+MODE="${MODE:-base}"
+case "$OUTPUT_PATH" in
+  ""|/*) ;;
+  *) OUTPUT_PATH="$PWD/$OUTPUT_PATH" ;;
+esac
+cd "$ROOT" || exit 2
+
+# -mod=mod only without a go.work file: go rejects -mod=mod in workspace mode.
+if [ -f go.work ]; then export GOFLAGS="${GOFLAGS:-}"; else export GOFLAGS="${GOFLAGS:--mod=mod}"; fi
+case " $GOFLAGS " in *" -buildvcs="*) ;; *) GOFLAGS="$GOFLAGS -buildvcs=false" ;; esac
+# go.mod needs a newer Go than the base image's own; auto picks the toolchain go.mod names, which the image already
+# holds in its module cache, so no download is needed.
+case "${GOTOOLCHAIN:-}" in ""|local) GOTOOLCHAIN=auto ;; esac
+export GOTOOLCHAIN
+export GOCACHE="${GOCACHE:-/tmp/gocache}"
+if ! mkdir -p "$GOCACHE" 2>/dev/null || [ ! -w "$GOCACHE" ]; then
+  GOCACHE="$(mktemp -d)"; export GOCACHE
+fi
+# The image keeps the toolchain, the modules and go-junit-report under /opt/go. An empty environment (env -i, the
+# platform's offline uid) loses GOPATH, and go would then try to download the toolchain.
+if [ -z "${GOPATH:-}" ] && [ -d /opt/go ]; then
+  export GOPATH=/opt/go
+fi
+GO_BIN_DIR="$(go env GOPATH 2>/dev/null)"
+for d in ${GO_BIN_DIR:+"$GO_BIN_DIR/bin"} /opt/go/bin; do
+  case ":$PATH:" in *":$d:"*) ;; *) PATH="$PATH:$d" ;; esac
+done
+export PATH
+
+LOG="$(mktemp)"
+STATUS=0
+
+# fail_case <name> <file>: reports a failing test case carrying the file's contents.
+fail_case() {
+  { echo "=== RUN   $1"; sed 's/^/    /' "$2"; echo "--- FAIL: $1 (0.00s)"; } >> "$LOG"
+}
+
+# run_pkg <package dir> <name pattern|-> [go test flags...]
+# A package whose tests do not build is reported as one failing case per test it declares, with the compiler output.
+run_pkg() {
+  local dir="$1" pattern="$2"; shift 2
+  local build_log; build_log="$(mktemp)"
+  if go test -count=1 -run '^$' "./$dir" > "$build_log" 2>&1; then
+    local args=(-count=1 -v "$@")
+    [ "$pattern" != "-" ] && args+=(-run "$pattern")
+    go test "${args[@]}" "./$dir" >> "$LOG" 2>&1 || STATUS=1
+  else
+    STATUS=1
+    local import_path names
+    import_path="$(go list -e -f '{{.ImportPath}}' "./$dir" 2>/dev/null)"
+    [ -n "$import_path" ] || import_path="github.com/google/oss-rebuild/$dir"
+    names="$(grep -ho '^func Test[A-Za-z0-9_]*' "$dir"/*_test.go 2>/dev/null | sed 's/^func //' | grep -v '^TestMain$')"
+    [ "$pattern" != "-" ] && names="$(printf '%s\n' "$names" | grep -E "$pattern")"
+    for n in $names; do
+      fail_case "$n" "$build_log"
+    done
+    printf 'FAIL\t%s\t0.000s\n' "$import_path" >> "$LOG"
+  fi
+}
+
+case "$MODE" in
+  base)
+    BUILD_LOG="$(mktemp)"
+    if ! go build ./pkg/proxy/... ./internal/proxy/... > "$BUILD_LOG" 2>&1; then
+      STATUS=1
+      fail_case TestBuildProxyPackages "$BUILD_LOG"
+      printf 'FAIL\tbuild\t0.000s\n' >> "$LOG"
+    fi
+    run_pkg pkg/proxy/docker -
+    run_pkg internal/proxy/dockerfs -
+    ;;
+  new)
+    run_pkg pkg/proxy/docker/pristine_5e1c9a - -timeout 10m
+    ;;
+esac
+
+cat "$LOG"
+if [ -n "$OUTPUT_SET" ]; then
+  if ! go-junit-report -set-exit-code < "$LOG" > "$OUTPUT_PATH"; then
+    STATUS=1
+  fi
+  if ! grep -q '<testcase' "$OUTPUT_PATH" 2>/dev/null; then
+    echo "no test cases were reported" >&2
+    STATUS=1
+  fi
+fi
+if ! grep -qE '^(=== RUN|--- (PASS|FAIL|SKIP))' "$LOG"; then
+  echo "no tests ran" >&2
+  STATUS=1
+fi
+exit "$STATUS"

@@ -1,0 +1,17 @@
+FROM public.ecr.aws/d3j8x8q7/olympus-base-go:latest
+
+WORKDIR /app
+
+COPY . .
+
+ENV GOTOOLCHAIN=go1.26.5
+# drop -mod=mod when the repo has a go.work file (go rejects it in workspace mode)
+ENV GOFLAGS="-mod=mod -buildvcs=false"
+ENV GOCACHE=/tmp/gocache
+
+RUN go mod download \
+    && go build ./pkg/proxy/... ./internal/proxy/... \
+    && chmod -R a+rX /opt/go \
+    && chown -R 1000:1000 /app /tmp/gocache
+
+CMD ["/bin/bash"]

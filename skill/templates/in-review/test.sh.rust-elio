@@ -1,0 +1,269 @@
+#!/usr/bin/env bash
+set -uo pipefail
+
+usage() {
+    echo "usage: $0 --output_path <file> base|new" >&2
+    exit 2
+}
+
+output_path=""
+mode=""
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --output_path)
+            [ $# -ge 2 ] || usage
+            output_path="$2"
+            shift 2
+            ;;
+        base|new)
+            [ -z "$mode" ] || usage
+            mode="$1"
+            shift
+            ;;
+        *)
+            usage
+            ;;
+    esac
+done
+[ -n "$output_path" ] && [ -n "$mode" ] || usage
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+case "$output_path" in
+    /*) ;;
+    *) output_path="$(pwd)/$output_path" ;;
+esac
+mkdir -p "$(dirname "$output_path")"
+rm -f "$output_path"
+
+# The image installs the toolchain and every crate the build needs under /opt
+# and builds the tests once with the settings below. Set them here too, so the
+# run works offline and reuses that build whatever user and environment it
+# runs with, and give the tests a private home so no user configuration, trash
+# or editor setting is involved.
+export CARGO_HOME=/opt/elio-cargo RUSTUP_HOME=/opt/elio-rustup CARGO_NET_OFFLINE=true
+export PATH="/opt/elio-cargo/bin:${PATH:-/usr/local/bin:/usr/bin:/bin}"
+export CARGO_BUILD_JOBS="${CARGO_BUILD_JOBS:-2}"
+export CARGO_PROFILE_DEV_DEBUG=0 CARGO_INCREMENTAL=0
+# Files the tests create get the usual permissions whatever umask the run
+# starts with; an upstream test checks that a document it writes is not
+# writable by others.
+umask 022
+# Keep the scratch path short: some tests open Unix sockets under the
+# temporary and runtime folders, and socket paths have a small length limit.
+scratch="$(mktemp -d /tmp/hf.XXXXXX)"
+export HOME="$scratch/home"
+export XDG_CONFIG_HOME="$HOME/.config"
+export XDG_DATA_HOME="$HOME/.local/share"
+export XDG_CACHE_HOME="$HOME/.cache"
+mkdir -p "$XDG_CONFIG_HOME" "$XDG_DATA_HOME" "$XDG_CACHE_HOME"
+# Reuse the image's build in place when this user owns it. Any other user
+# works on its own copy of it: a build script rerun in a folder owned by
+# someone else cannot set the permissions of the files it copies there.
+if [ -O /app/target ] && [ -w /app/target ]; then
+    export CARGO_TARGET_DIR=/app/target
+else
+    export CARGO_TARGET_DIR="$scratch/target"
+    if [ -d /app/target ]; then
+        cp -R --preserve=timestamps /app/target "$CARGO_TARGET_DIR" 2>/dev/null || true
+    fi
+fi
+export TMPDIR="$scratch/tmp"
+export XDG_RUNTIME_DIR="$scratch/run"
+mkdir -p "$TMPDIR"
+mkdir -m 700 "$XDG_RUNTIME_DIR"
+# The editor rename flow only needs an editor command to hand out; it is
+# never started by the tests.
+export VISUAL=true EDITOR=true
+
+module="history_follow_tests"
+
+# Build from a copy of the tree. In new mode the copy also declares the
+# module under src/$module, which is compiled into the library's own test
+# binary so it can use the crate's internal app types; the tree
+# itself stays exactly as the change left it.
+work="$scratch/repo"
+mkdir -p "$work"
+(cd "$repo_root" && tar --exclude=./target -cf - .) | (cd "$work" && tar -xf -)
+cd "$work"
+
+if [ "$mode" = "new" ]; then
+    printf '\n#[cfg(test)]\n#[path = "%s/mod.rs"]\nmod %s;\n' "$module" "$module" >> src/lib.rs
+    cargo_args=(test --lib --no-fail-fast)
+    test_args=("$module::")
+else
+    cargo_args=(test --no-fail-fast)
+    # Skipped because they fail the same way without any change applied:
+    # the raw xz listing and the RAR password prompt need 7-Zip or bsdtar,
+    # which the image does not ship. The others pass alone but fail now and
+    # then inside the full suite: the audio prefetch times out, the git
+    # worktree watch loses git while another test swaps PATH, the delete test
+    # loses its staging folder when another test starts an app, the zip
+    # check lets about one wrong password in 256 through, as ZipCrypto checks
+    # only one byte of it, and the PDF probe check finds no pending work when
+    # its worker has already finished the probe.
+    test_args=(
+        --skip preview::tests::archives::standard_archives::raw_xz_preview_uses_compressed_disk_image_label
+        --skip input_handling::tests::archive::e_prompts_and_retries_encrypted_rar_archive
+        --skip app::job_results::tests::prefetch::nearby_audio_preview_prefetch_warms_adjacent_file_preview
+        --skip background_jobs::workers::git_status::tests::head_watch_refreshes_same_commit_switches_in_root_nested_and_linked_worktree
+        --skip file_operations::tests::trash_delete::confirm_delete_selected_parent_of_current_directory_moves_to_parent
+        --skip archive::extraction::tests::encrypted_zip_rejects_wrong_password
+        --skip app::preview::pdf::tests::session::present_pdf_overlay_queues_current_probe_only_once
+    )
+    # These two look up the running user's passwd record, which a user id
+    # without one (as some sandboxes run with) does not have.
+    if ! getent passwd "$(id -u)" >/dev/null 2>&1; then
+        test_args+=(
+            --skip elevated_session::invoking_user::tests::coherent_non_root_claims_resolve_the_invoking_user
+            --skip elevated_session::invoking_user::tests::invoking_user_xdg_home_accepts_user_owned_absolute_path
+        )
+    fi
+fi
+
+log="$scratch/cargo-test.log"
+# This upstream test runs the test binary again with its output going to the
+# same place; run among the others, that output can land in the middle of
+# their result lines. It runs on its own after the rest instead.
+alone="terminal_runtime::tui_event_loop::tests::terminal_open_uses_browser_cwd_without_changing_parent_cwd"
+if [ "$mode" = "base" ]; then
+    test_args+=(--skip "$alone")
+fi
+timeout -k 30 -s INT 3000 cargo "${cargo_args[@]}" -- "${test_args[@]}" >"$log" 2>&1
+status=$?
+if [ "$mode" = "base" ]; then
+    timeout -k 30 -s INT 600 cargo test --lib --no-fail-fast -- --exact "$alone" >>"$log" 2>&1
+    alone_status=$?
+    [ "$status" -ne 0 ] || status=$alone_status
+fi
+tail -n 60 "$log"
+
+# The JUnit report is written from libtest's output. A test that never
+# reported a result (a build failure, or a test binary that crashed) is
+# reported as failed with the end of the output, so the report never comes
+# back empty or cleaner than the run.
+expected="$scratch/expected.txt"
+: >"$expected"
+if [ "$mode" = "new" ] && [ -d "$repo_root/src/$module" ]; then
+    for f in "$repo_root/src/$module"/*.rs; do
+        stem="$(basename "$f" .rs)"
+        [ "$stem" = "mod" ] && continue
+        awk -v prefix="$module::$stem::" '
+            /#\[test\]/ { want = 1; next }
+            want && /fn [A-Za-z0-9_]+/ {
+                match($0, /fn [A-Za-z0-9_]+/)
+                print prefix substr($0, RSTART + 3, RLENGTH - 3)
+                want = 0
+            }
+        ' "$f" >>"$expected"
+    done
+fi
+
+python3 - "$log" "$output_path" "$expected" "$mode" "$status" <<'PY'
+import re
+import sys
+from xml.sax.saxutils import escape
+
+log_path, out_path, expected_path, mode, status = sys.argv[1:6]
+text = open(log_path, encoding="utf-8", errors="replace").read()
+lines = text.splitlines()
+
+results = []          # (suite, name, outcome)
+details = {}          # (suite, name) -> captured output
+suite = "unknown"
+# Names printed without their result yet, newest last. A test that runs a
+# child process (some run the test binary itself) shares this output with it,
+# so the child's lines can come between a name and its result, and a name the
+# child printed can be followed on the same line by a whole result line of
+# this run.
+pending = []
+marker = re.compile(r"test (\S+) \.\.\. ")
+outcome = re.compile(r"(ok|FAILED|ignored)\b")
+current = None
+buffer = []
+for line in lines:
+    m = re.match(r"\s*Running (?:unittests )?(\S+)", line)
+    if m:
+        suite = re.sub(r"\.rs$", "", m.group(1).split("/")[-1])
+        continue
+    found = list(marker.finditer(line))
+    if found:
+        for i, m in enumerate(found):
+            end = found[i + 1].start() if i + 1 < len(found) else len(line)
+            r = outcome.match(line, m.end(), end)
+            if r:
+                results.append((suite, m.group(1), r.group(1)))
+            else:
+                pending.append(m.group(1))
+        continue
+    m = outcome.match(line)
+    if m and pending:
+        results.append((suite, pending.pop(), m.group(1)))
+        continue
+    m = re.match(r"^---- (\S+) stdout ----$", line)
+    if m:
+        if current:
+            details[current] = "\n".join(buffer)
+        current, buffer = (suite, m.group(1)), []
+        continue
+    if current and (line.startswith("failures:") or line.startswith("test result:")):
+        details[current] = "\n".join(buffer)
+        current, buffer = None, []
+        continue
+    if current:
+        buffer.append(line)
+if current:
+    details[current] = "\n".join(buffer)
+
+tail = "\n".join(lines[-200:])
+# A run cut short (a timeout, a crash, a test binary that never printed its
+# summary) is reported even when some test had already failed in it.
+started = len(re.findall(r"^\s*(?:Running|Doc-tests) ", text, re.M))
+summaries = len(re.findall(r"^test result: ", text, re.M))
+cut_short = status not in ("0", "101") or summaries < started
+expected = [n.strip() for n in open(expected_path, encoding="utf-8") if n.strip()]
+# One case per test of a suite. A test that runs the test binary again can
+# print a result line for a test of the same suite: a test reported twice fails
+# if either result failed, and a test ignored in this run stays out unless a
+# result line says it failed.
+outcomes = {}
+for suite_name, name, outcome in results:
+    outcomes.setdefault((suite_name, name), []).append(outcome)
+cases = []
+for (suite_name, name), seen in outcomes.items():
+    if "ignored" in seen and "FAILED" not in seen:
+        continue
+    cases.append((suite_name, name, "FAILED" not in seen, details.get((suite_name, name), "")))
+reported = {name for _, name, _ in results}
+missing = [name for name in expected if name not in reported] if mode == "new" else []
+for name in missing:
+    cases.append(("lib", name, False, "no result was reported; end of the output:\n" + tail))
+if not cases:
+    cases = [("build", "cargo_test_build", False, "no test ran; end of the output:\n" + tail)]
+elif cut_short or (status != "0" and all(ok for _, _, ok, _ in cases)):
+    cases.append(("build", "cargo_test_incomplete", False,
+                  "cargo test exited with status " + status + "; end of the output:\n" + tail))
+
+failures = sum(1 for case in cases if not case[2])
+with open(out_path, "w", encoding="utf-8") as out:
+    out.write('<?xml version="1.0" encoding="UTF-8"?>\n')
+    out.write(f'<testsuites><testsuite name="{mode}" tests="{len(cases)}" failures="{failures}" errors="0">\n')
+    for suite_name, name, ok, detail in cases:
+        out.write(f'  <testcase classname="{escape(suite_name)}" name="{escape(name)}">')
+        if not ok:
+            if len(detail) > 20000:
+                detail = detail[:6000] + "\n[...]\n" + detail[-14000:]
+            body = escape(detail)
+            out.write(f'<failure message="failed">{body}</failure>')
+        out.write("</testcase>\n")
+    out.write("</testsuite></testsuites>\n")
+print(f"junit: {len(cases)} cases, {failures} failed -> {out_path}")
+sys.exit(0 if cases and failures == 0 else 1)
+PY
+junit_status=$?
+cd /
+rm -rf "$scratch"
+
+if [ "$status" -ne 0 ] || [ "$junit_status" -ne 0 ]; then
+    exit 1
+fi
+exit 0

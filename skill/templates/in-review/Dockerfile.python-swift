@@ -1,0 +1,48 @@
+FROM public.ecr.aws/d3j8x8q7/olympus-base-python:latest
+
+WORKDIR /app
+
+COPY . .
+
+ARG SWIFT_COMMIT=6adb10d738f62f8171318e13b31a78e3440a842e
+RUN dirs="test doc api-ref examples releasenotes"; \
+    git config --global --add safe.directory /app; \
+    git -C /app checkout "$SWIFT_COMMIT" -- $dirs 2>/dev/null \
+      || git -C /app checkout --ignore-skip-worktree-bits "$SWIFT_COMMIT" -- $dirs 2>/dev/null \
+      || true; \
+    if [ ! -f /app/test/functional/s3api/__init__.py ] || [ ! -f /app/doc/source/admin_guide.rst ]; then \
+      python -c "import io, sys, tarfile, urllib.request; c = sys.argv[1]; d = tuple(sys.argv[2:]); pre = 'swift-%s/' % c; t = tarfile.open(fileobj=io.BytesIO(urllib.request.urlopen('https://codeload.github.com/openstack/swift/tar.gz/' + c, timeout=300).read())); m = [x for x in t.getmembers() if x.name.startswith(pre) and x.name[len(pre):].split('/')[0] in d]; [setattr(x, 'name', x.name[len(pre):]) for x in m]; t.extractall('/app', members=m)" "$SWIFT_COMMIT" $dirs; \
+    fi; \
+    test -f /app/test/functional/s3api/__init__.py \
+      && test -f /app/doc/source/admin_guide.rst
+
+RUN { git -C /app rev-parse -q --verify HEAD >/dev/null 2>&1 \
+      || export PBR_VERSION=2.38.1; } \
+    && pip install --no-cache-dir \
+        eventlet==0.41.3 \
+        greenlet==3.5.6 \
+        PasteDeploy==3.1.0 \
+        lxml==6.1.3 \
+        requests==2.34.2 \
+        xattr==1.3.0 \
+        pyeclib==1.8.0 \
+        cryptography==50.0.2 \
+        dnspython==2.9.0 \
+        pytest==9.1.1 \
+        python-swiftclient==4.11.0 \
+        boto3==1.43.119 \
+        botocore==1.43.119 \
+        requests-mock==1.12.1 \
+        keystonemiddleware==13.0.1 \
+        fixtures==4.3.2 \
+    && pip install --no-cache-dir -e . \
+    && chmod -R a+rwX /app
+
+RUN mkdir -p /opt/swift-pristine \
+    && cp -a /app/test /app/etc /app/tox.ini /opt/swift-pristine/ \
+    && chmod -R a+rX /opt/swift-pristine
+
+ENV NO_PROXY=localhost,127.0.0.1,127.0.0.0/8,::1,::,0.0.0.0 \
+    no_proxy=localhost,127.0.0.1,127.0.0.0/8,::1,::,0.0.0.0
+
+CMD ["/bin/bash"]

@@ -1,0 +1,39 @@
+FROM public.ecr.aws/d3j8x8q7/olympus-base-rust:latest
+WORKDIR /app
+
+USER root
+RUN groupadd -g 1000 model && useradd -u 1000 -g model -m model
+RUN apt-get update \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+       python3 git ca-certificates build-essential pkg-config \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN set -eu; \
+    task_cargo_home="${CARGO_HOME:-${HOME}/.cargo}"; \
+    task_rustup_home="$(rustup show home)"; \
+    test -d "$task_cargo_home"; \
+    test -d "$task_rustup_home"; \
+    if [ "$task_cargo_home" != /opt/elio-cargo ]; then mv "$task_cargo_home" /opt/elio-cargo; fi; \
+    if [ "$task_rustup_home" != /opt/elio-rustup ]; then mv "$task_rustup_home" /opt/elio-rustup; fi
+
+ENV CARGO_HOME=/opt/elio-cargo \
+    RUSTUP_HOME=/opt/elio-rustup \
+    PATH=/opt/elio-cargo/bin:$PATH \
+    CARGO_BUILD_JOBS=2 \
+    CARGO_PROFILE_DEV_DEBUG=0 \
+    CARGO_INCREMENTAL=0 \
+    CARGO_NET_RETRY=10
+
+COPY . .
+RUN rustup toolchain install 1.98.1 --profile minimal --component clippy --component rustfmt \
+    && command -v python3 && command -v git && rustc --version && cargo --version \
+    && cargo fetch --locked \
+    && cargo test --locked --offline --no-run \
+    && test "$(id -u model)" = 1000 \
+    && test "$(id -g model)" = 1000 \
+    && chown -R model:model /app /opt/elio-cargo /opt/elio-rustup \
+    && chmod -R a+rwX /app /opt/elio-cargo /opt/elio-rustup
+
+ENV CARGO_NET_OFFLINE=true
+USER model
+CMD ["/bin/bash"]

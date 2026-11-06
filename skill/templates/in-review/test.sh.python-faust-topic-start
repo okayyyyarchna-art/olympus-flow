@@ -1,0 +1,199 @@
+#!/usr/bin/env bash
+set -uo pipefail
+
+usage() {
+    echo "usage: $0 --output_path <file> base|new" >&2
+    exit 2
+}
+
+output_path=""
+mode=""
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --output_path)
+            [ $# -ge 2 ] || usage
+            output_path="$2"
+            shift 2
+            ;;
+        base|new)
+            [ -z "$mode" ] || usage
+            mode="$1"
+            shift
+            ;;
+        *)
+            usage
+            ;;
+    esac
+done
+[ -n "$output_path" ] && [ -n "$mode" ] || usage
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+case "$output_path" in
+    /*) ;;
+    *) output_path="$(pwd)/$output_path" ;;
+esac
+mkdir -p "$(dirname "$output_path")"
+
+scratch="$(mktemp -d /tmp/start-from-tests.XXXXXX)"
+export HOME="$scratch/home"
+mkdir -p "$HOME"
+export PYTHONDONTWRITEBYTECODE=1
+# The compiled extensions are required: their absence fails the run
+# (tests/unit/test_cython_parity.py) instead of skipping the parity tests.
+export FAUST_REQUIRE_CYTHON=1
+
+new_tests=tests/functional/test_start_from_d29e4c.py
+if [ "$mode" = "base" ]; then
+    selection=(
+        tests/unit/test_cython_parity.py
+        tests/unit/transport
+        tests/unit/test_topics.py
+        tests/unit/app
+        tests/unit/agents
+        tests/unit/tables/test_recovery.py
+        tests/unit/test_streams.py
+        tests/functional/test_app.py
+        tests/functional/test_streams.py
+        tests/functional/test_channels.py
+        tests/functional/test_aiokafka.py
+        tests/functional/agents
+        --ignore "$new_tests"
+    )
+    # Deselected (exact node id), as it pins an internal a valid design may
+    # change: it checks that the consumer thread hands aiokafka's own
+    # seek_to_committed to call_thread, so a design that also moves the
+    # start_from partitions within that seek fails it.
+    deselected=(
+        "tests/unit/transport/drivers/test_aiokafka.py::Test_AIOKafkaConsumerThread::test_seek_to_committed"
+    )
+else
+    selection=("$new_tests")
+    deselected=()
+fi
+
+# The conductor and the stream iterator have compiled twins: build the
+# extensions from this checkout, in a copy, so the code under test is the
+# code in the tree even when the tree itself is read-only.  Binaries left by
+# an earlier build are removed first so that they cannot stand in for it.
+work="$scratch/repo"
+cp -a "$repo_root/." "$work"
+cd "$work"
+find faust \( -name '*.so' -o -name '*.pyd' \) -delete
+rm -rf build
+build_ok=1
+python setup.py build_ext --inplace >"$scratch/build.log" 2>&1 || build_ok=0
+# setup.py falls back to a pure-Python setup when compiling fails
+python -c "import faust.transport._cython.conductor" >>"$scratch/build.log" 2>&1 \
+    || build_ok=0
+if [ "$build_ok" -ne 1 ]; then
+    echo "building the Cython extensions failed:" >&2
+    tail -n 40 "$scratch/build.log" >&2
+fi
+
+# The repository's own tests and pytest settings are used as they are at the
+# base commit, with the new test file added: changes made to them, and test
+# files or pytest settings added since, do not count.
+base_commit=ca53750fdea332cdf5ac7088afc525691556c167
+git_work=(git -c safe.directory="$work" -C "$work")
+if "${git_work[@]}" cat-file -e "$base_commit^{commit}" 2>/dev/null; then
+    cp "$work/$new_tests" "$scratch/new_tests.py"
+    "${git_work[@]}" checkout -q "$base_commit" -- tests pyproject.toml
+    "${git_work[@]}" clean -q -f -d -x -- tests conftest.py pytest.ini
+    cp "$scratch/new_tests.py" "$work/$new_tests"
+else
+    echo "base commit $base_commit not found: the tests are run as they are" >&2
+fi
+
+# pytest's --deselect matches node id prefixes; this drops exactly the ids
+# listed above.
+plugins="$scratch/plugins"
+mkdir -p "$plugins"
+printf '%s\n' ${deselected[@]+"${deselected[@]}"} >"$plugins/deselected_ids.txt"
+cat >"$plugins/exact_deselect.py" <<'EOF'
+import os
+
+with open(os.path.join(os.path.dirname(__file__), "deselected_ids.txt")) as f:
+    DESELECTED = {line.strip() for line in f if line.strip()}
+
+
+def pytest_collection_modifyitems(config, items):
+    removed = [item for item in items if item.nodeid in DESELECTED]
+    if removed:
+        items[:] = [item for item in items if item.nodeid not in DESELECTED]
+        config.hook.pytest_deselected(items=removed)
+EOF
+
+log="$scratch/pytest.log"
+rm -f "$output_path"
+PYTHONPATH="$plugins${PYTHONPATH:+:$PYTHONPATH}" timeout -k 30 -s INT 420 \
+    python -m pytest -v -p no:cacheprovider -p exact_deselect -o addopts="" \
+    --continue-on-collection-errors \
+    -o junit_family=xunit1 --junitxml="$output_path" "${selection[@]}" 2>&1 | tee "$log"
+status=${PIPESTATUS[0]}
+
+if [ ! -s "$output_path" ] || ! grep -q "<testsuite" "$output_path" \
+    || grep -q 'tests="0"' "$output_path"; then
+    escaped="$(sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g' "$log" | tail -c 20000)"
+    if ! {
+        printf '<?xml version="1.0" encoding="utf-8"?>\n<testsuites>'
+        printf '<testsuite name="%s" tests="1" failures="1" errors="0">' "$mode"
+        printf '<testcase classname="harness" name="%s">' "$mode"
+        printf '<failure message="pytest did not produce a report">%s</failure>' \
+            "$escaped"
+        printf '</testcase></testsuite></testsuites>\n'
+    } >"$output_path"; then
+        echo "failed to write $output_path" >&2
+        exit 3
+    fi
+    [ "$status" -ne 0 ] || status=1
+fi
+
+if [ "$status" -eq 124 ]; then
+    # the time limit interrupted pytest: the run is reported as a failing
+    # test case, with the end of its output (the report may be partial)
+    python - "$output_path" "$log" <<'PYEOF'
+import sys
+from xml.etree import ElementTree
+
+report, log = sys.argv[1], sys.argv[2]
+with open(log, errors="replace") as f:
+    output = f.read()[-20000:]
+tree = ElementTree.parse(report)
+root = tree.getroot()
+suite = root if root.tag == "testsuite" else root.find("testsuite")
+case = ElementTree.SubElement(suite, "testcase", classname="harness", name="time_limit")
+failure = ElementTree.SubElement(
+    case, "failure", message="the test run was interrupted by the time limit"
+)
+failure.text = output
+for key in ("tests", "failures"):
+    suite.set(key, str(int(suite.get(key, "0")) + 1))
+tree.write(report, encoding="utf-8", xml_declaration=True)
+PYEOF
+fi
+
+if [ "$build_ok" -ne 1 ]; then
+    # the failed build is reported as a failing test case, with its output
+    python - "$output_path" "$scratch/build.log" <<'EOF'
+import sys
+from xml.etree import ElementTree
+
+report, build_log = sys.argv[1], sys.argv[2]
+with open(build_log, errors="replace") as f:
+    output = f.read()[-20000:]
+tree = ElementTree.parse(report)
+root = tree.getroot()
+suite = root if root.tag == "testsuite" else root.find("testsuite")
+case = ElementTree.SubElement(suite, "testcase", classname="setup", name="build_ext")
+failure = ElementTree.SubElement(
+    case, "failure", message="building the Cython extensions failed"
+)
+failure.text = output
+for key in ("tests", "failures"):
+    suite.set(key, str(int(suite.get(key, "0")) + 1))
+tree.write(report, encoding="utf-8", xml_declaration=True)
+EOF
+    status=1
+fi
+
+exit "$status"
