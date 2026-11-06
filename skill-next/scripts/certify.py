@@ -8,6 +8,7 @@ from pathlib import Path, PurePosixPath
 import re
 import subprocess
 import sys
+import tempfile
 import xml.etree.ElementTree as ET
 
 
@@ -43,8 +44,9 @@ def fingerprint(paths, metadata=None):
 
 def patch_paths(data):
     # --numstat validates unified-diff syntax without modifying files or the index.
+    # run outside any repository: inside one, git apply ignores paths outside the current subdirectory
     result = subprocess.run(["git", "apply", "--numstat", "-z", "--"],
-                            input=data, capture_output=True, check=False)
+                            input=data, capture_output=True, check=False, cwd=tempfile.gettempdir())
     require(result.returncode == 0,
             "malformed patch: " + result.stderr.decode("utf-8", errors="replace"))
     paths = []
