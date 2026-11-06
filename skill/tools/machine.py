@@ -66,6 +66,7 @@ def load(profile=None):
         paths.setdefault("shared_root", home + "/OSS/shipd")
         paths.setdefault("coordinator_root", home + "/OSS")
         paths.setdefault("claude_config_dir", home + "/.claude")
+        paths.setdefault("claude2_config_dir", "")
         project = paths["coordinator_root"].replace("\\", "/")
         project_key = "".join(c if c.isalnum() or c == "-" else "-" for c in project)
         paths.setdefault("memory_dir", paths["claude_config_dir"] + "/projects/" + project_key + "/memory")

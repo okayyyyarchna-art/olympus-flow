@@ -2,7 +2,7 @@
 # Run one independent job on claude2 (the second Claude install: own account/limit, config ~/.claude-cli,
 # same agents + skills via symlinks). Claude (main session) coordinates; claude2 and Codex give independent results.
 #
-#   bash ~/OSS/shipd/tools/claude2_run.sh <role> <task-dir> <pkg> [brief.md] [effort]
+#   bash tools/lib/claude2_run.sh <role> <task-dir> <pkg> [brief.md] [effort]
 #
 # roles (agent definitions in ~/.claude/agents, shared):
 #   tq     olympus-tq-judge       (Test Quality judge, T1-T8)            default effort high (user 2026-10-17)
@@ -16,8 +16,9 @@
 # Report: the job writes <task-dir>/eval/claude2/<pkg>-<role>.md; console log next to it (.log).
 # Rules passed to every job: read-only on package folders / repo / base-clean / solveN, probes under eval/ with a
 # _c2 suffix, ONE container at a time through dockrun.py, never docker rm/rmi/prune or stop foreign containers.
-# Solves on claude2 use eval/solve.sh-style clones: bash ~/OSS/shipd/tools/claude2_solve.sh.
+# Blind solves use tools/solvers.sh and their own clean clones.
 set -uo pipefail
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../machine.sh" || exit 2
 role="$1"; T=$(cd "$2" && pwd); pkg="$3"
 brief="${4:-$T/eval/agent-brief-$pkg.md}"; effort="${5:-}"
 case "$role" in
@@ -30,11 +31,14 @@ esac
 # optional C2_SUFFIX=<tag> keeps parallel runs of one role apart (e.g. 2 FP auditors on one package)
 out="$T/eval/claude2"; mkdir -p "$out"; tag="$pkg-$role${C2_SUFFIX:+-$C2_SUFFIX}"
 report="$out/$tag.md"; log="$out/$tag.log"
-L=$(cd ~/OSS/claude-code/challenges/cc-faust-eos-offsets/eval 2>/dev/null && pwd -W)
+[ -n "${OLYMPUS_CLAUDE2_CONFIG_DIR:-}" ] || { echo "claude2 needs paths.claude2_config_dir" >&2; exit 2; }
+L="$(machine_host "$OLYMPUS_LIB")"
+docker_env=""; [ "$OLYMPUS_OS" = windows ] && docker_env="MSYS_NO_PATHCONV=1 "
+mount='$(pwd)'; [ "$OLYMPUS_OS" = windows ] && mount='$(pwd -W)'
 rules="Rules: you are an independent reviewer running on a second Claude account; nobody else's verdicts bind you.
 Never edit package folders (wip*/ submit*/ sample/), repo/, base-clean/ or solveN/ folders. Write probes only under
-eval/ with a _c2 suffix. Docker: one container at a time via: MSYS_NO_PATHCONV=1 python \"$L/dockrun.py\" run --rm
---network none -v \"\$(pwd -W):/s:ro\" <image> bash /s/eval/<script>.sh ; never docker rm/rmi/prune, never stop
+eval/ with a _c2 suffix. Docker: one container at a time via: ${docker_env}\"$PY\" \"$L/dockrun.py\" run --rm
+--network none -v \"$mount:/s:ro\" <image> bash /s/eval/<script>.sh ; never docker rm/rmi/prune, never stop
 containers you did not start. Verify every claim you make (probe or file:line); mark the rest NOT VERIFIED.
 NO mutation batteries, mutant sweeps, PYTHONHASHSEED sweeps or repeat runs (user rule 2026-10-18: mutation is
 the coordinator's job after all checks): at most one targeted probe per suspected gap, host venv first, Docker
@@ -60,7 +64,7 @@ esac
 # Independence (review roles only): write your own verdict BEFORE reading earlier reviews or triage tables named in the
 # brief; then add a section "Against earlier decisions" (HOLD/CONCEDE per earlier row you disagree with).
 # Shared learning (user 2026-10-17): every role except the cold reader reads the coordinator's memory first.
-mem="$HOME/.claude/projects/c--Users-asus-OSS/memory"
+mem="$OLYMPUS_MEMORY_DIR"
 case "$role" in cold) ;; *) task="Before anything else read $mem/MEMORY.md and every lesson file it lists that concerns
 your role (test quality, solution quality, auto review, FP/passers, hints/calibration, reviewers); they are the
 team's accumulated rules and outweigh your defaults.
@@ -72,7 +76,7 @@ prompt="$task
 
 $rules"
 args=(-p "$prompt" --effort "$effort" --permission-mode acceptEdits
-      --allowedTools "Bash,Read,Grep,Glob,Write,Edit,Agent" --add-dir "$T" --add-dir "$HOME/.claude/skills")
+      --allowedTools "Bash,Read,Grep,Glob,Write,Edit,Agent" --add-dir "$T" --add-dir "$OLYMPUS_CLAUDE_CONFIG_DIR/skills")
 [ -n "$agent" ] && args+=(--agent "$agent")
 # optional model override, e.g. CLAUDE2_MODEL=sonnet (default: the agent file's model, else the CLI default)
 # default model (user rule 2026-10-28): Opus 5.5 high for every split job; FP auditors pass Sonnet explicitly
@@ -81,8 +85,8 @@ echo "claude2 $role ($agent, effort $effort) on $pkg -> $report"
 # Reviews and studies run from ~/OSS so they load the SAME project memory (MEMORY.md + lesson files) as the
 # coordinator; the task folder comes in through --add-dir and absolute paths. (Blind solves never use this script:
 # they run from their own clean checkout via claude2_solve.sh, so they see no memory.)
-wd="$HOME/OSS"; [ "$role" = cold ] && { wd="$out/cold-cwd"; mkdir -p "$wd"; }  # cold reader: no memory
-cd "$wd" && CLAUDE_CONFIG_DIR="$(cygpath -w ~/.claude-cli)" OLYMPUS_WORKER=cli ~/.local/bin/claude.exe "${args[@]}" \
+wd="$OLYMPUS_COORDINATOR_ROOT"; [ "$role" = cold ] && { wd="$out/cold-cwd"; mkdir -p "$wd"; }  # cold reader: no memory
+cd "$wd" && CLAUDE_CONFIG_DIR="$(machine_config "${CLAUDE2_CONFIG_DIR:-$OLYMPUS_CLAUDE2_CONFIG_DIR}")" OLYMPUS_WORKER=cli "$OLYMPUS_CLAUDE_BIN" "${args[@]}" \
   < /dev/null > "$log" 2>&1
 rc=$?
 echo "claude2 $role exit=$rc (report: $report)"

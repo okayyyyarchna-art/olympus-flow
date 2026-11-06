@@ -7,18 +7,18 @@
 #                                    bash round.sh <task> r2 fairness ar (tests changed)
 # Expects <task-dir>/pkg/{description.md,test.patch,solution.patch,Dockerfile} (or those at the task root) and repo/ (pinned commit + both patches).
 set -uo pipefail
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/machine.sh" || exit 2
 # the whole body is one function: bash reads it completely before running, so editing this file while a run
 # is in progress cannot break that run (vet 2026-11-06: an edit mid-run garbled the tail of solvers.sh)
 main() {
-PY="$(command -v python || command -v python3)"  # macOS has only python3
 T=$(cd "$1" && pwd); tag="${2:-r1}"; shift 2 2>/dev/null || shift $#
 checks=("$@"); [ ${#checks[@]} -gt 0 ] || checks=(fairness sq dq ar)
 R="$(cd "$(dirname "$0")" && pwd)/replica.sh"
 mkdir -p "$T/eval/replica"; log="$T/eval/replica/round-$tag.log"; : > "$log"
 # machine-wide limit: at most ROUND_SLOTS (default 2) replica rounds at once across all sessions (Codex rate limits)
-slots="$HOME/OSS/shipd/.round-slots"; mkdir -p "$slots"; slot=""
+slots="$OLYMPUS_WORK_ROOT/.round-slots"; mkdir -p "$slots"; slot=""
 while [ -z "$slot" ]; do
-  for i in $(seq 1 "${ROUND_SLOTS:-2}"); do
+  for i in $(seq 1 "${ROUND_SLOTS:-$OLYMPUS_REVIEW_LANES}"); do
     if mkdir "$slots/$i" 2>/dev/null; then slot="$slots/$i"; echo "$T $tag $$" > "$slot/owner"; break; fi
     # a slot left by a dead round (owner pid gone) is freed
     pid=$(awk '{print $3}' "$slots/$i/owner" 2>/dev/null); [ -n "$pid" ] && ! kill -0 "$pid" 2>/dev/null && rm -rf "${slots:?}/$i"

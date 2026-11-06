@@ -14,19 +14,32 @@ import os
 import re
 import sys
 from pathlib import Path
+from machine import load
 
-HOME = Path.home()
-CLAUDE_DIRS = [HOME / ".claude" / "projects", HOME / ".claude-cli" / "projects"]
-CODEX_SESSIONS = HOME / ".codex" / "sessions"
+try:
+    MACHINE = load()
+except ValueError as exc:
+    sys.exit(f"machine: {exc}")
+PATHS = MACHINE["paths"]
+CLAUDE_DIRS = [Path(PATHS["claude_config_dir"]) / "projects"]
+if PATHS.get("claude2_config_dir"):
+    CLAUDE_DIRS.append(Path(os.environ.get("CLAUDE2_CONFIG_DIR", PATHS["claude2_config_dir"])) / "projects")
+CODEX_SESSIONS = Path(PATHS["codex_home"]) / "sessions"
 
 
 def norm(s):
-    return s.replace("\\\\", "\\").replace("/", "\\").lower()
+    s = s.replace("\\\\", "\\").replace("/", "\\")
+    return s.lower() if MACHINE["os"] == "windows" else s
 
 
 def forbidden_patterns(task_dir):
     t = norm(str(task_dir))
-    return [t, r"oss\claude-code", r"oss\shipd", r".claude\projects", r".claude\skills\olympus",
+    return [t, norm(PATHS["tasks_root"]), norm(PATHS["shared_root"]), norm(PATHS["seams_root"]),
+            norm(PATHS["memory_dir"]),
+            *[norm(PATHS["codex_home"] + "/" + name) for name in ("skills", "memories", "olympus")],
+            *[norm(str(d)) for d in CLAUDE_DIRS],
+            norm(PATHS["claude_config_dir"] + "/skills/olympus"), norm(PATHS["claude_config_dir"] + "/agents"),
+            r"oss\claude-code", r"oss\shipd", r".claude\projects", r".claude\skills\olympus",
             r".claude\agents", r".claude-cli\projects", r".codex\skills", r".codex\memories", r".codex\olympus"]
 
 
@@ -83,15 +96,15 @@ def main():
     bad = forbidden_patterns(task)
     lines = ["# Solver watch", "", "| solve | transcripts | tool calls | verdict | first hits |", "|---|---|---|---|---|"]
     for meta in sorted(glob.glob(str(task / "solves" / "s*" / "meta.txt"))):
-        m = re.search(r"clone=(\S+)", Path(meta).read_text(encoding="utf-8", errors="replace"))
+        m = re.search(r"clone=([^\r\n]+)", Path(meta).read_text(encoding="utf-8", errors="replace"))
         if not m:
             continue
         clone = m.group(1)
-        if clone.startswith("/") and len(clone) > 2 and clone[2] == "/":  # /c/Users -> C:\Users
+        if MACHINE["os"] == "windows" and clone.startswith("/") and len(clone) > 2 and clone[2] == "/":
             clone = clone[1].upper() + ":" + clone[2:]
         clone_n = norm(clone)
         own_top = norm(str(Path(clone).parent))
-        others = [norm(c) + "\\" for c in glob.glob(str(HOME / "vp-*")) if norm(c) != own_top]
+        others = [norm(c) + "\\" for c in glob.glob(str(Path(PATHS["solver_root"]) / "vp-*")) if norm(c) != own_top]
         files = claude_transcripts(clone) + codex_rollouts(clone)
         calls, hits = 0, []
         for f in files:

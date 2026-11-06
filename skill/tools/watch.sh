@@ -5,10 +5,10 @@
 #   bash watch.sh <challenge-id> <task-dir> [interval-seconds=300] [max-hours=12]
 # Run it in the background after every paste; when it exits: pull.sh, then the S9 loop (references/platform.md).
 set -uo pipefail
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/machine.sh" || exit 2
 # the whole body is one function: bash reads it completely before running, so editing this file while a run
 # is in progress cannot break that run (vet 2026-11-06: an edit mid-run garbled the tail of solvers.sh)
 main() {
-PY="$(command -v python || command -v python3)"  # macOS has only python3
 export OLYMPUS_NO_UPDATE_CHECK=1
 id="$1"; T="$2"; iv="${3:-300}"; maxh="${4:-12}"
 here="$(cd "$(dirname "$0")" && pwd)"

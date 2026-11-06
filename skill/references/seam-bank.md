@@ -28,5 +28,5 @@ from `olympus problems mine`, seams already in the bank), the schema above, and 
 4. Novel: no implementation in any PR/issue state, not declined, fits the README.
 Output 5-8 seams ranked by score; the coordinator keeps the top 3.
 
-Command: `bash ~/OSS/shipd/tools/codex_job.sh <bank-work-dir> seams-<repo> <brief.md> high search`
+Command: `bash ~/.claude/skills/olympus-flow/tools/lib/codex_job.sh <bank-work-dir> seams-<repo> <brief.md> high search`
 (no CODEX_MODEL: config default gpt-6.1-sol, which is also the Orion model).

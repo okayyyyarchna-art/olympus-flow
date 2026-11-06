@@ -1,7 +1,7 @@
 """Run docker with a bounded number of containers at a time across agents (the machine has little RAM).
 
 usage: MSYS_NO_PATHCONV=1 python eval/dockrun.py run --rm ... <image> <cmd...>
-Waits for a free slot (DOCKRUN_SLOTS, default 2; set 1 while solvers run), then runs ``docker <args>``.
+Waits for a free slot (DOCKRUN_SLOTS, default from machine profile; set 1 while solvers run), then runs ``docker <args>``.
 Slot 0 is the byte the earlier one-slot version locked, so a run still waiting from that version keeps its turn.
 """
 try:
@@ -13,8 +13,19 @@ import os
 import subprocess
 import sys
 import time
+from pathlib import Path
 
-SLOTS = max(1, int(os.environ.get("DOCKRUN_SLOTS", "2")))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from machine import load
+
+try:
+    machine = load()
+except ValueError as exc:
+    sys.exit(f"machine: {exc}")
+SLOTS = max(1, int(os.environ.get("DOCKRUN_SLOTS", machine["docker"]["slots"])))
+env = dict(os.environ)
+if machine["os"] == "windows":
+    env["MSYS_NO_PATHCONV"] = "1"
 lock = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".docker.lock")
 with open(lock, "a+") as f:
     slot = None
@@ -33,7 +44,7 @@ with open(lock, "a+") as f:
         if slot is None:
             time.sleep(1)
     try:
-        code = subprocess.call(["docker", *sys.argv[1:]])
+        code = subprocess.call(["docker", *sys.argv[1:]], env=env)
     finally:
         f.seek(slot)
         if msvcrt:

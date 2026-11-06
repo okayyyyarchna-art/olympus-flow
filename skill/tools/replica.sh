@@ -9,6 +9,7 @@
 # catalogs. Override only for an experiment: REPLICA_MODEL / REPLICA_EFFORT. ar and verify read earlier outputs of
 # the same tag, so they run last (round.sh orders them).
 set -uo pipefail
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/machine.sh" || exit 2
 T=$(cd "$1" && pwd); check="$2"; tag="${3:-r1}"
 here=$(cd "$(dirname "$0")/.." && pwd)
 case "$check" in
@@ -60,9 +61,9 @@ Task files:
 Write the JSON result to: $out/$check-$tag.json
 Return a short Markdown summary as your final answer (verdict line first).
 EOF
-bash "$HOME/OSS/shipd/tools/check_codex_brief.sh" "$brief" "$out/prompts/common.md" "$out/prompts/$check.md" $kbl >/dev/null \
+bash "$OLYMPUS_LIB/check_codex_brief.sh" "$brief" "$out/prompts/common.md" "$out/prompts/$check.md" $kbl >/dev/null \
   || { echo "brief has flagged words; reword before launch" >&2; exit 3; }
-CODEX_MODEL="$model" CODEX_ONE_OFF_EFFORT="$effort" bash "$HOME/OSS/shipd/tools/codex_job.sh" "$T" "replica-$check-$tag" "$brief" "$effort" judge
+CODEX_MODEL="$model" CODEX_ONE_OFF_EFFORT="$effort" bash "$OLYMPUS_LIB/codex_job.sh" "$T" "replica-$check-$tag" "$brief" "$effort" judge
 cp -f "$T/eval/codex/replica-$check-$tag.md" "$out/$check-$tag.md" 2>/dev/null || true
 # codex judge mode asks for a _cx suffix on files it writes; accept that name too
 [ -s "$out/$check-$tag.json" ] || { [ -s "$out/$check-${tag}_cx.json" ] && mv -f "$out/$check-${tag}_cx.json" "$out/$check-$tag.json"; }

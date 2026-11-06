@@ -9,6 +9,7 @@
 # Prints "<name>: <passed>/<total> new" plus the failing test names. Language-agnostic: parses the JUnit XML that
 # test.sh writes. Works from macOS bash and Windows Git Bash (MSYS_NO_PATHCONV + cygpath -m).
 set -uo pipefail
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../machine.sh" || exit 2
 pkg="$1"; repo="$2"; img="$3"; patches="$4"; mode="${5:-new}"
 # a git worktree (base/) has a .git FILE pointing outside the mount: replay a real clone of the same commit instead
 if [ -f "$repo/.git" ]; then
@@ -16,7 +17,7 @@ if [ -f "$repo/.git" ]; then
   git clone -q --no-checkout "$repo" "$tmp/r" && git -C "$tmp/r" checkout -q "$c" || { echo "clone of $repo failed" >&2; exit 2; }
   repo="$tmp/r"; trap 'rm -rf "$tmp"' EXIT
 fi
-host() { if command -v cygpath >/dev/null 2>&1; then cygpath -m "$1"; else (cd "$1" && pwd); fi; }
+host() { if [ "$OLYMPUS_OS" = windows ]; then machine_host "$1"; else (cd "$1" && pwd); fi; }
 inner='
 set -u
 cp -r /repo /tmp/r && cd /tmp/r
@@ -41,6 +42,6 @@ run reference /pkg/solution.patch
 for f in /patches/*.patch; do run "$(basename "$f" .patch)" "$f"; done
 '
 # through the machine-wide Docker slot lock (2 containers across sessions)
-MSYS_NO_PATHCONV=1 "$(command -v python || command -v python3)" "$(host "$HOME/OSS/shipd/tools")/dockrun.py" run --rm --network none \
+"${OLYMPUS_DOCKER_ENV[@]}" "$PY" "$(machine_host "$OLYMPUS_LIB/dockrun.py")" run --rm --network none \
   -v "$(host "$pkg")":/pkg:ro -v "$(host "$repo")":/repo:ro -v "$(host "$patches")":/patches:ro \
   --entrypoint bash "$img" -c "$inner"

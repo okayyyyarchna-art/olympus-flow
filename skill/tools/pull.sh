@@ -3,7 +3,7 @@
 # plus each run's solution patch and failing-test lines. Never triggers anything.
 #   bash pull.sh <challenge-id> <out-dir> [--runs]
 set -uo pipefail
-PY="$(command -v python || command -v python3)"  # macOS has only python3
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/machine.sh" || exit 2
 export OLYMPUS_NO_UPDATE_CHECK=1
 id="$1"; out="$2"; mkdir -p "$out"
 here="$(cd "$(dirname "$0")" && pwd)"

@@ -15,4 +15,8 @@ machine_host() {
 machine_config() {
   if [ "$OLYMPUS_OS" = windows ]; then cygpath -w "$1"; else printf '%s\n' "$1"; fi
 }
+machine_date() {
+  if [ "$OLYMPUS_OS" = windows ]; then date -Is
+  else "$PY" -c 'from datetime import datetime; print(datetime.now().astimezone().isoformat(timespec="seconds"))'; fi
+}
 unset _olympus_python _olympus_exports
