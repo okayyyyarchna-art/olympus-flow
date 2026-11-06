@@ -1,0 +1,28 @@
+{
+  "os": "macos",
+  "shell": "bash",
+  "python": "python3",
+  "home": "~",
+  "paths": {
+    "tasks_root": "~/OSS/challenges",
+    "work_root": "~/OSS/olympus-work",
+    "seams_root": "~/OSS/seams",
+    "shared_root": "~/OSS/shipd",
+    "codex_home": "~/.codex",
+    "claude_bin": "claude",
+    "claude2_config_dir": "~/.claude-cli",
+    "codex_bin": "codex"
+  },
+  "docker": {
+    "slots": 8,
+    "native_platform": "linux/arm64",
+    "final_platform": "linux/amd64",
+    "memory_gb": 32
+  },
+  "parallel": {
+    "battery_workers": 6,
+    "review_lanes": 6,
+    "solvers": 4,
+    "stability_parallel": true
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "os": "windows",
+  "shell": "bash",
+  "python": "python",
+  "home": "C:/Users/ASUS",
+  "paths": {
+    "tasks_root": "C:/Users/ASUS/OSS/claude-code/challenges",
+    "work_root": "C:/Users/ASUS/OSS/shipd",
+    "solver_root": "C:/Users/ASUS",
+    "seams_root": "C:/Users/ASUS/OSS/shipd/seams",
+    "shared_root": "C:/Users/ASUS/OSS/shipd",
+    "codex_home": "C:/Users/ASUS/.codex",
+    "claude_bin": "C:/Users/ASUS/.local/bin/claude.exe",
+    "claude2_config_dir": "C:/Users/ASUS/.claude-cli",
+    "codex_bin": "codex",
+    "memory_dir": "C:/Users/ASUS/.claude/projects/c--Users-asus-OSS/memory"
+  },
+  "docker": {
+    "slots": 2,
+    "native_platform": "linux/amd64",
+    "final_platform": "linux/amd64",
+    "memory_gb": 4
+  },
+  "parallel": {
+    "battery_workers": 2,
+    "review_lanes": 2,
+    "solvers": 4,
+    "stability_parallel": false
+  }
+}
