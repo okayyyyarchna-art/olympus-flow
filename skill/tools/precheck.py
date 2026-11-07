@@ -135,10 +135,25 @@ def main():
         unlocked = [u for u in urls if "$" in u or not re.search(r"\d+\.\d+", u)]
         out("FAIL" if unlocked else "PASS", "build-time downloads use a literal versioned URL (Harbor rebuild-safe)",
             unlocked[0][:80] if unlocked else "")
-        # user rule 2026-11-06: never write comments in a Dockerfile (WARN, not FAIL: the vet unused-suppression task
-        # kept its locked, commented one)
-        comments = [l for l in df.splitlines() if l.lstrip().startswith("#") and not l.lstrip().startswith("# syntax=")]
-        out("WARN" if comments else "PASS", "no comments in the Dockerfile (user rule)", f"{len(comments)} comment lines")
+        # user rule 2026-11-06, amended 2026-11-07: no comments in a Dockerfile, except one block right above the RUN
+        # it justifies (why a step deviates from the base image). The AI precheck failed vet's Go reinstall once its
+        # "base has Go 1.26, go.mod needs 1.27.3" comment was removed.
+        lines = df.splitlines()
+        blocks, prev = [], False
+        for i, l in enumerate(lines):
+            c = l.lstrip().startswith("#") and not l.lstrip().startswith("# syntax=")
+            if c and not prev:
+                blocks.append(i)
+            prev = c
+        def above_run(i):
+            j = i
+            while j < len(lines) and lines[j].lstrip().startswith("#"):
+                j += 1
+            return j < len(lines) and lines[j].lstrip().upper().startswith("RUN ")
+        stray = [i + 1 for i in blocks if not above_run(i)]
+        ok = len(blocks) <= 1 and not stray
+        out("PASS" if ok else "WARN", "Dockerfile comments: none, or one justification block right above its RUN (user rule)",
+            f"{len(blocks)} comment blocks" + (f", not above a RUN at lines {stray}" if stray else ""))
         out("PASS" if re.search(r"^FROM public\.ecr\.aws/d3j8x8q7/olympus-base-[a-z]+:latest", df, re.M) else "WARN",
             "FROM the platform base image (public.ecr.aws/d3j8x8q7/olympus-base-<lang>:latest)")
         out("WARN" if re.search(r"git (clone|fetch)|curl .*github", df) else "PASS", "Dockerfile builds from the checked-out repo (no clone)")
