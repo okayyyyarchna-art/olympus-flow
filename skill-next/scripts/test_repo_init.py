@@ -122,6 +122,9 @@ class Discovery(unittest.TestCase):
         self.assertEqual((reconstructed / "test.sh").read_bytes(), (task / "init/test.sh").read_bytes())
         self.assertEqual(repo_init.git(task / "base", "status", "--porcelain"), "")
         p = json.loads((task / "profile.json").read_text())
+        p["timeout"] = 600
+        repo_init.save(task, p)
+        self.assertIn("600 seconds", json.loads((task / "profile.json").read_text())["environment"]["watchdog"])
         p["build_commands"] = "go test ./..."
         with self.assertRaisesRegex(ValueError, "test runner in RUN"):
             repo_init.save(task, p)

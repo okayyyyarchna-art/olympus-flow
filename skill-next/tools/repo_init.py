@@ -344,6 +344,7 @@ def render(task, profile):
 
 def save(task, profile):
     render(task, profile)
+    profile["environment"]["watchdog"] = f"NOT VERIFIED; local {profile['timeout']} seconds below proof.py's 688-second bound"
     (task / "profile.json").write_text(json.dumps(profile, indent=2) + "\n", encoding="utf-8")
 
 
@@ -415,7 +416,6 @@ def main():
             apply_settings(profile, settings)
         if profile["language"] == "go":
             profile["env"].setdefault("GOMAXPROCS", str(machine["parallel"]["battery_workers"]))
-        profile["environment"]["watchdog"] = f"NOT VERIFIED; local {profile['timeout']} seconds below proof.py's 688-second bound"
         save(task, profile)
         print(f"profile: {task / 'profile.json'}; language: {profile['language']}; open: {len(profile['open'])}")
         return 0

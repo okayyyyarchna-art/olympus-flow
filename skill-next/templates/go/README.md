@@ -36,8 +36,8 @@ module inputs; matching -trimpath flags preserve content-based reuse across scra
 paths. Completed named results survive
 partial runs; missing results become named errors containing the actual diagnostic.
 The Vet recipe allows 600 seconds below the recorded 688-second bound. The local
-checker seeds a separate cache volume from the image and reuses it within one
-invocation; `-count=1` disables test-result caching. Cache metadata is retained in
+checker seeds a separate cache volume from the image and reuses it only for that
+exact image identity, including retries; `-count=1` disables test-result caching. Cache metadata is retained in
 `check/cache.json`. Standalone runner execution uses the container's private cache.
 
 Every template marker is filled from the profile: `platform`, `toolchain_version`,

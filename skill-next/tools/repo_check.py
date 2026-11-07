@@ -113,7 +113,7 @@ class Check:
             if self.cache_volume and self.image and self.image in args:
                 cache = ("-v", self.cache_volume + ":/opt/adapter-gocache")
                 (self.out / "cache.json").write_text(json.dumps({"volume": self.cache_volume, "seed_image": self.image,
-                    "scope": "this checker invocation only; image-seeded Go build cache", "test_result_cache": "disabled by -count=1",
+                    "scope": "retained Go build cache for this exact image identity", "test_result_cache": "disabled by -count=1",
                     "cleanup": "retained; no Docker cleanup authorized"}, indent=2) + "\n", encoding="utf-8")
             args = ("run", "--memory", str(self.machine["docker"]["memory_gb"]) + "g", *cache, *args[1:])
         argv = [self.machine["python"], str(self.lock), *args]
@@ -209,6 +209,13 @@ class Check:
         def qualify(image, patches, out, mode, solution, **kwargs):
             self.image = image
             if self.cache_volume:
+                previous = self.out / "cache.json"
+                if previous.exists():
+                    metadata = json.loads(previous.read_text())
+                    volume = metadata.get("volume", "")
+                    if metadata.get("seed_image") == image and re.fullmatch(r"olympus-repo-check-[0-9a-f]{32}", volume):
+                        if self.docker("volume", "inspect", volume).returncode == 0:
+                            self.cache_volume = volume
                 seed = self.docker("run", "--rm", "--platform", self.profile["environment"]["platform"],
                                    "--network", "none", "--user", "0:0", "--entrypoint", "/bin/sh", image,
                                    "-c", "chmod a+rwx /opt/adapter-gocache")
