@@ -1,148 +1,164 @@
-# Description playbook (S1): hard, solvable, locked once
+# Description rulebook: the only source of truth for task descriptions
 
 The description is the exam question. The tests grade it, the reference answers it, the platform checks that the
-three match. A good one is short, in the user's voice, has one reading per sentence, and every tested outcome can
-be derived from it plus the repo. Difficulty is designed in the tests (the code paths the outcomes run through), not
-in words. Budget: one lock. The owner may make one more change, only when the platform rollout shows the task too easy
-(rollout.md lever 6); that change is the last.
+three match. A good one is short, in the owner's own words, has one reading per consequential clause, and every
+tested outcome can be derived from it plus the repository. Difficulty is designed in the tests (the code paths the
+outcomes run through), never in ambiguous words.
 
-**Evidence rule:** only tasks submitted on or after 2026-10-16 count. The platform added the "too many requirements"
-and AI/plagiarism checks on 2026-10-14, so older accepted texts never faced them. Agents also improve with every
-submission, so the most recent accepted texts set the bar (section 7). Per-task audits: vet task
-eval/desc-audit-A.md, eval/desc-audit-B.md, eval/desc-history-digest.md.
+**Evidence rule:** only tasks submitted on or after 2026-10-16 set rules (the platform added the requirement-count and
+AI/plagiarism checks on 2026-10-14). Older tasks are historical mechanisms only. Agents improve with every submission,
+so the newest verified accepted texts set the bar. Audits: vet eval/desc-audit-A.md, desc-audit-B.md,
+desc-history-digest.md, desc-recipe-astra.md; decisions: olympus-product TRIAGE-desc-astra.md.
 
-## 1. What a description is
-Every sentence is one of three kinds, nothing else:
-- **Outcome**: an observable, tested result, one per sentence.
-- **Scope**: the named inclusions and exclusions, up front ("This only needs to be implemented on the aiokafka
-  transport and for apps that dont have tables").
-- **Anchor**: the exact public name the outcome attaches to (`app.topic()`, `consumer_auto_offset_reset`,
-  `ImproperlyConfigured`, "the same way the expired warning does"). Anchors are names, not mechanisms.
-One short line of context or symptom in the user's voice is allowed ("We currently have many suppressions ... We
-would like vet to tell us about these.").
+## 0. Policy and states (owner rules)
+| State | What may change | Exit |
+|---|---|---|
+| PRE-LOCK | anything; every check in section 3 runs here | the lock (section 3 step 11) |
+| LOCKED | nothing in the text; findings change tests and the reference inside the stated sentences | the platform rollout result |
+| OWNER EXCEPTION | one last change, only when the rollout shows the task too easy after rollout.md levers 1-5; then a fresh rollout | locked for good |
+| REDESIGN | outside the band and no allowed lever works: the owner decides a new version (new lock, fresh rollout) or retirement; a known false pass is never released to reach the band | owner decision |
+Hard limits: at most **9 requirement units** (target 5-8); about **250 site words is guidance**, not a limit; the
+owner writes the final words.
 
-| Rule | Evidence (submitted on or after 2026-10-16) |
-|---|---|
-| No direction: no where/how/why, no bug narration that names a place, mechanism or cause | vet wip01: three direction lines ("Currently if another suppression is before it in the list ...") -> 3/4 solves; removed -> ~1/4. turso "We currently support IN, EXISTS and NOT EXISTS in materialized views" points at the code to extend |
-| No corner lists | docker proxy 5 corners, live readers 7; November texts 0 |
-| No meta-instructions to the solver ("go through every file") | producer-flush opening: the only description issue any check raised (AR description band 2) |
-| Keep it short: under 250 site words as guidance (not a hard limit); the hard limit is the requirement count: at most 9 (owner 2026-11-07) | owner rule |
-| Target 5-8 requirements (user 2026-11-07: 6-8 is fine; the platform accepts up to ~9 and blocks at ~10+: elio 13, turso 16); count with the DQ replica before the lock | accepted since 2026-10-16: swift 6, vet 6, dead-letter 8, topic start 8 |
-| One sentence = one outcome; "also / even when / instead" clauses and a parenthetical carrying an outcome each count | elio and task 11: one parenthetical rule -> "too many requirements" |
-| Every sentence has ONE reading; prefer the repo's own term for a state | vet "did not run" (vet prints it for outages) -> 3 sweeps and a re-lock; "turned off" = the repo's word |
-| Tested or deleted: every sentence tested, every test traced to a sentence | FP official definition |
-| Never excuse a reference gap in the text | task 5: SQ read the excuse as a requirement |
-| Depth, not breadth: one hard invariant through several modules | elio's broad "every kind" contract: endless findings |
-| User's own words (AI detector) | model-written drafts flagged; user texts passed |
-| Sample (Scope Gate) promises: narrowing later is accepted, widening is the risk | tasks 11, 12, turso, swift narrowed after the sample and were accepted |
-| No URI schemes; bug-report shape -> Bugfix, "Add support for ..." -> Feature Request | prechecks |
+## 1. Sentence rules (the checklist and the prompts refer to these IDs)
+| ID | Rule | Evidence |
+|---|---|---|
+| R1 | Every sentence is an **outcome** (observable result), a **scope** line, or an **anchor** (the exact public name an outcome attaches to); plus at most one true line of context or symptom that carries no promise | accepted texts since 16 Oct; context is not a requirement in the reading audits or DQ |
+| R2 | No direction: no where/how/why, no narration that names a place, mechanism or cause. A symptom story with the observable is fine | vet wip01 direction lines (their removal coincided with the drop from 3/4; tests also changed, so the effect is confounded); turso "We currently support IN, EXISTS and NOT EXISTS" points at the code to extend |
+| R3 | No instructions to the solver ("go through every file") | producer-flush (pre-16-Oct, historical): the only description issue any check raised (AR description band 2) |
+| R4 | An example is allowed only to disambiguate behaviour or scope; never a list of hidden traps or a debugging checklist | docker proxy AR called its boundary examples necessary; a full corner list is the hint (faust-window, historical) |
+| R5 | Count independently testable obligations honestly; group related clauses in one sentence when clearer; an "also / even when / instead" clause or a parenthetical that carries an outcome counts; never merge or reword to dodge the count | task 12 carries earliest/latest/datetime in one sentence; elio and task 11 failed TPQ on outcome-carrying parentheticals |
+| R6 | One reading per consequential clause; use the repo's own term for each state | vet "did not run" (vet prints it for outages) -> 3 sweeps and a re-lock; "turned off" is the repo's word |
+| R7 | Every normative promise (outcome, preservation, rejection) has a test; every test traces to a sentence or to quoted repo behaviour | the FP rule: an untested promise makes a passer that misses it a false pass |
+| R8 | Every obligation is required-explicit, required-implied, or unspecified; "unnamed" is not "unrequired": an implied consequence of a stated invariant is required | topic-start's drop list would have released false passes |
+| R9 | Never excuse a reference gap in the text | task 5: SQ read the excuse as a requirement |
+| R10 | Every claim about current behaviour, API names and paths is true at the pin (source-checked) | docker "/export and /commit already hide these writes" was false -> major |
+| R11 | For each boundary decide: outside the feature (no promise), preserve current behaviour (measured on base), or must reject (a requirement). Name the meaningful boundaries of reachable supported variants; do not catalogue unreachable or unsupported things; silence excludes nothing | task 5's exclusion read in reverse; turso's catalogue cost TPQ count; topic-start's missing tables exclusion |
+| R12 | Depth, not breadth: one coherent objective, one hard invariant through several modules | elio's "every kind elio knows" contract: endless findings |
+| R13 | The owner's own words; never fabricate anecdotes, typos or errors to look authored | model drafts were flagged by the AI check; owner texts passed |
+| R14 | The sample's promises are the final contract; narrow or widen only before the lock | topic-start's late narrowing invalidated earlier runs |
+| R15 | No URI schemes; the category follows the semantic change (the precheck's shape check is a warning) | prechecks; standby and turso are feature requests with bug-story openings |
+| R16 | Clarifications are not hints: the exact words that close a two-meaning gate are allowed, direction never | "the **whole** app should fail" (task 12), "**If writing the copy fails**" (task 11), "a check that was **turned off**", "from that run only, **not the ones saved with the scan**" (vet) |
 
-**Clarifications are not hints.** The only text help the recent accepted descriptions carry is the exact word that
-closes a gate with two meanings: "the **whole** app should fail" (task 12), "**If writing the copy fails**" (task 11),
-"a check that was **turned off**" and "the policy warnings from that run only, **not the ones saved with the scan**"
-(vet). Find these gates before the lock (word-reach + reading audit), and close them with a word, never with direction.
+## 1b. Sentence roles, with real examples
+Belongs when it carries needed meaning:
+- Direct public ask: "Add start_from to app.topic()."
+- Outcome with a precise boundary: "the first message greater than or equal to that time".
+- Whole-system consequence: "the whole app should fail with ImproperlyConfigured instead of reading it".
+- Short observed symptom: "When you press forward it will give you Cannot open .../old: Not found."
+- Scope that changes applicability: "This only needs to be implemented on the aiokafka transport and for apps that
+  dont have tables."
+- Identity analogy: "The warning should name the suppression the same way the expired warning does."
+- Explicit freedom: "If both are equal it does not matter which one receives it."
+- Required preservation: "Topics that dont specify this ... will continue to use consumer_auto_offset_reset."
+Never, in these roles: a solver instruction ("go through the entire repository"); an excuse ("I don't expect that one
+to be handled"); an unrequested trim ("has not expired and"); an ambiguous state word ("a check that did not run"); a
+false causal link ("so we never commit ..." where "and" is meant); a parenthetical smuggling a requirement past the
+count; an unbounded parity umbrella ("a file elio knows how to display"); an unverified claim about base behaviour; a
+loose example that changes the rule ("ex: app.log.1").
 
-## 2. Where difficulty comes from (design it before writing a word)
-Classify every trap a solver must clear: explicit clause ~1.0; named scoped-out ~0.9; unnamed but scoped ~0.4; latent
-upstream bug ~0.12-0.3; unnamed cross-subsystem interaction ~0-0.05 (Orion profile). Target 0.15-0.25 for the in-band
-family. These numbers drift upward as agents improve: re-calibrate on the newest rollouts.
-- Good difficulty = a STATED outcome reached through a path a quick solver does not test: another entry point (a saved
+## 2. Where difficulty comes from (designed before writing a word)
+- Good difficulty: a STATED outcome reached through a path a quick solver does not test: another entry point (a saved
   report, a second command), a second code path, ordering, lifecycle (restart, rebalance, stop), multiplicity, a saved
   format variant, an older input shape the repo documents. vet: report show of a saved PR scan, first match through
   package rules, an unrelated failing check, an older report without a check list, a mistyped id.
-- Bad difficulty = a word with two readings (breaks the reference and fairness, separates nobody), an undiscoverable
-  timing window, an unrelated subsystem, two stacked unnamed traps (0%).
-- Named vs implied: solvers do the named variants and skip the implied ones; keep ONE implied trap for the band and
-  catch it with a test.
-- Local vs platform: platform agents are stronger (local 1/4 -> Orion ~3/4 on task 12). Local 0/4 is not a reason for
-  hints; local 3-4/4 is a too-easy alarm.
+- Bad difficulty: a word with two readings (breaks the reference and fairness, separates nobody), an undiscoverable
+  timing window, an unrelated subsystem, an unstated performance limit, missing tools.
+- Trap inventory, qualitative: list each trap a solver must clear and mark it explicit or implied; do not stack two
+  unnamed traps on one path; every implied consequence that is required gets a test (R8). No probability numbers and
+  no rate forecasts: the rollout measures.
 
-## 3. S1 procedure (artifacts in eval/; order fixed by the user 2026-11-07)
-**A. I scan before the user sees the draft** (the draft handed over must already pass every check):
-1. **Facts list** (eval/description_facts.md): the 5-8 tested outcomes. For each: the code path, the entry points it
-   covers, the natural wrong implementation a quick solver writes, the trap class. Gate: at least 2 outcomes carry a
-   non-obvious path; no two-reading trap.
-2. **Variant table** per outcome: every shape a user can hit. Mark each TESTED, EXCLUDED (named in the scope line) or
-   OUT. Discoverability filter: TESTED only if a careful agent finds it from the text + repo.
-3. **Draft** in the user's voice from section 1's three kinds; precise outcome words at the first draft.
-4. **Word-reach check** per sentence: grep docs, code comments and diagnostic/error texts for each key word; every
-   state the repo names with it is TESTED or the word changes. Scope words (only, any, always, every, all) and
-   exclusions get a second-reading check in both directions.
-5. **Reading audit** (2 independent lanes: Codex GPT high + Claude, on claude2 when an in-process lane is busy;
-   prompt in section 8). Any second reading -> close it with a word now.
-6. **Count**: DQ replica lands on the facts-list count +-1. Precheck.py clean. Checklist (section 4) all yes.
+## 3. Procedure (order fixed by the owner 2026-11-07)
+**A. I scan before the owner sees the draft** (the draft handed over already passes every check):
+1. **Decide the problem**: one observable objective at the pin, its public entry points and supported domain, and the
+   three-way decision of R11 for every boundary. No undecided public behaviour may reach the lock.
+2. **Obligation ledger** (eval/description_facts.md): each atomic obligation with its future wording, observable
+   result, category (explicit / implied, R8), grounding (sentence, or repo behaviour with file:line), planned
+   assertion, and the plausible partial implementation it rejects. At most 9 units (R5).
+3. **Feasibility gate**: a disposable reference spike proves the hard path with the real interfaces; sketch one
+   materially different valid design; run the base suite against the spike to find base tests that pin internals.
+   If the hard path cannot be built or tested fairly, narrow the problem now.
+4. **Variant table** per obligation: every shape a user can hit, marked TESTED, EXCLUDED (named boundary) or OUT
+   (unreachable, with the evidence). TESTED only if a careful agent finds it from the text + repo.
+5. **Draft** from R1-R16, precise outcome words at the first draft.
+6. **Word reach**: grep docs, code comments, configuration and diagnostic/error texts for every key word; every state
+   the repo names with it is TESTED or the word changes. Scope words (only, any, always, every, all) and exclusions
+   get a second-reading check in both directions.
+7. **Reading audit, two independent lanes** (Codex GPT Sol 6.1 high + Claude; the draft and the pinned repo only,
+   never the reference) **and adjudication**: for every second reading record the separating input (one input, two
+   different outputs), the strongest repo evidence for or against it, and the disposition: reword (as many words as
+   needed), a deliberate scope choice, or tests that accept both behaviours. A DQ pass is not proof of one reading.
+8. **Counts and checks, with evidence types**: the DQ replica runs with the real (or planned) test.patch, precheck.py,
+   and the checklist in section 4. Record each result as TEXT-ONLY, STATIC (aligned with tests), EXECUTED or
+   PLATFORM; no local check certifies AI detection, plagiarism or the platform's requirement count.
 
-**B. The user humanizes** the scanned draft in their own words (AI detector).
+**B. The owner humanizes** the scanned draft, given the compact fact ledger and the precision points.
 
-**C. I re-check the user's text, then we lock:**
-7. **Behaviour diff**: each tested case, result under my draft and under the user's text; every pronoun, referent,
-   connective (so, because, then) and time qualifier checked against the tests. Any change not asked for -> I report
-   it, the user fixes it in their words.
-8. **Word-reach + reading check on every changed word**, DQ replica again, precheck.py.
-9. **Lock** together with the user: record the hash. The locked text goes to the build (tests and reference by the
-   construction cards). No local solves: the owner runs the platform checks and a 2-2-2 rollout on the first complete
-   draft (PIPELINE.md stage 5b).
+**C. I re-check the owner's text, then we lock:**
+9. **Counterexample diff**: every obligation and every known separator (including untested variants and
+   applicability), under my draft and under the owner's text; check quantifiers, negation, pronouns, tense,
+   connectives (so, and, because, then) and exact output boundaries. Any unrequested change goes back to the owner as
+   a concrete case, to fix in their own words.
+10. **Word reach and reading check on every changed word**; DQ replica and precheck.py on the exact bytes.
+11. **Lock** together with the owner. Lock record: hash, pinned commit, category, the test/reference snapshot
+    reviewed, the count method and result, and the external checks still NOT VERIFIED. The locked text goes to the
+    build (tests and reference by the construction cards). No local solves: the owner runs the platform checks and a
+    2-2-2 rollout on the first complete draft (PIPELINE.md stage 5b).
 
-## 4. Checklist before the lock (all yes)
-- [ ] every sentence is an outcome, a scope line or an anchor (plus at most one line of context)
-- [ ] at most 9 requirement units (target 5-8), each tested; short (about 250 site words as guidance); no sentence without a test; no test without a sentence
-- [ ] no direction (where/how/why), no corner list, no excuse, no meta-instruction, no URI scheme
-- [ ] every key word grepped; repo's own term; one reading per sentence (reading audit clean)
-- [ ] scope words and exclusions second-read both ways; every unreachable variant named in the scope line
-- [ ] at least 2 outcomes run through a non-obvious path; no two-reading trap; no stacked unnamed traps
-- [ ] behaviour diff for every rewrite; after the user's rewrite every pronoun, referent, connective and time
-      qualifier re-checked against the tests
+## 4. Checklist before the lock (all yes, or a named external check marked NOT VERIFIED)
+- [ ] one coherent objective; every boundary decided three-way (R11, R12)
+- [ ] at most 9 requirement units, counted honestly (R5); short (about 250 site words as guidance)
+- [ ] every sentence is an outcome, a scope line or an anchor, plus at most one true context line (R1)
+- [ ] no direction, no solver instruction, no excuse, no trap list, no URI scheme (R2-R4, R9, R15)
+- [ ] every normative promise has a planned test; preservation sentences are tested or removed together with their
+      assertions; every assertion traces to a sentence or quoted repo behaviour (R7)
+- [ ] every obligation categorized explicit / implied; implied required consequences have planned tests (R8)
+- [ ] every claim about current behaviour, names and paths source-checked (R10)
+- [ ] feasibility gate done: hard path proven by a spike, a valid alternative sketched, base pins found (step 3)
+- [ ] every key word grepped; the repo's own term; every second reading adjudicated with its separating input (R6,
+      steps 6-7)
+- [ ] the difficulty is in a stated path, not a word; no two unnamed traps stacked (section 2)
+- [ ] DQ replica run with the real test.patch; precheck.py clean; evidence types recorded (step 8)
+- [ ] after the owner's rewrite: the counterexample diff shows no unrequested change (step 9)
+- [ ] the sample's promises equal the locked promises (R14)
 
 ## 5. After the lock
-- The description stays fixed. Findings from sweeps, false-pass audits and the platform rollout change tests and the
-  reference inside the stated sentences; rollout results are shaped with rollout.md.
-- Sweep/FP findings that need a new promise go through triage first; a new promise is the last lever (section 6).
-- Platform re-eval: tests may be added or dropped.
+The text is fixed (state LOCKED). Findings from sweeps, false-pass audits and the platform rollout change tests and
+the reference inside the stated sentences, through gates.md Repair. A finding that needs a new promise goes to the
+OWNER EXCEPTION or REDESIGN state, never into the text on its own.
 
-## 6. Calibration levers: the description-side details (order of use: rollout.md)
-Test-side levers (too easy 2, too hard 3) can be used at any time through gates.md Repair. Text edits (too easy 1, 3,
-4; too hard 1-2, 4-5) are the owner's single allowed change and come only after rollout.md levers 1-5.
-**Too easy** (a family above 25%, or two families in band; FP-audit the passers first: false passes are test gaps):
-1. Remove any word that gives direction: read the passers' trajectories, find the sentence that told them the path
-   (vet: three direction lines removed, 3/4 -> ~1/4; swift: per-check list and race hint removed).
-2. Add a test discriminator on an unnamed variant of a stated rule (turso Vega 2/4 -> 1/4, elio Orion 4/4 -> 1/4, swift
-   -> Orion 1/4, vet older-report and typo tests). Text unchanged; the finest control.
-3. Deepen a stated outcome's path inside the same sentence (another entry point, a saved format).
-4. Add a requirement (sqlite, standby, window worked; costs TPQ count and new FP surface; vet "did not run" broke the
-   reference when the word had two readings). Run word-reach + reading audit on it first.
+## 6. Rollout levers, description side (the order of use is rollout.md)
+- First classify the evidence (rollout.md step 1): eligible runs only, per-family denominators; a re-evaluation of one
+  trajectory adds no run; incomplete or contaminated runs are counted apart.
+- Test-side levers, any time through Repair: a discriminator for an implied variant of a stated rule (turso Vega 2/4 ->
+  1/4, elio Orion 4/4 -> 1/4, swift -> Orion 1/4, vet older-report and typo tests); fixing an assertion only when it
+  pins unsupported behaviour (never because a case is rare or unnamed); dropping a test only when its case is
+  unspecified (R8), with the list of wrong designs the drop would release.
+- Too easy after rollout.md levers 1-5: the OWNER EXCEPTION. Remove the wording that gave the path, or deepen or add a
+  requirement (word reach, reading audit and DQ replica first). Then a fresh rollout: replaying old patches checks
+  compatibility only, it cannot measure a new wording. Text hints overshoot (elio 0/4 -> Orion 4/4, swift 4/4, turso
+  4/4), which is why text levers come last.
+- Too hard after rollout.md levers 1-5: no text change under the lock; the REDESIGN state (owner decision).
 
-**Too hard** (all families 0%):
-1. Read every trajectory; rank the closest runs; classify each miss: a two-meaning word (close it with the exact
-   word), an undiscoverable quirk, a genuine mistake (keep).
-2. Narrow the scope with a named exclusion (task 12 tables, task 11 confluent, turso grouped subqueries).
-3. Drop the test of an unnamed corner that the closest runs miss (platform re-eval; task 12 lookup race).
-4. One precise observable phrase inside an existing sentence (producer-flush "when the whole app is shutting down
-   after a message was lost": 0/12 -> Orion 1/6). Replay the stored patches against it before pasting: hint sentences
-   overshoot ("the Orion dial is binary": elio 0/4 -> Orion 4/4, swift 4/4, turso 4/4).
-5. Remove the test AND its promise (the outcome is not reachable).
+## 7. Evidence: descriptions since the new checks (submitted on or after 2026-10-16)
+"Reqs" is the platform's verifyFairness extraction (our own ledger count can differ). Status: A = accepted,
+F = finalizing review, L = local only.
+| Submitted | Task | Status | Narration | Direction hints | Corner list | Reqs | Result |
+|---|---|---|---|---|---|---|---|
+| 21 Oct | live readers | A | 9 | 2 | 7 | 15 | Vega 1/6 |
+| 22 Oct | docker proxy | A | 4 | 5 | 5 | 9 | Orion 1/8 |
+| 23 Oct | standby (task 9) | A | 4 | 2 | 0 | 9 | Vega 1/5 |
+| 24 Oct | table visibility (task 10) | A | 6 | 2 | 1 | 9 | Vega 1/4 |
+| 26 Oct | turso NOT IN | F | 3 | 3 | 1 | 10 | Vega 1/4 |
+| 27 Oct | elio history | F | 6 | 2 | 4 | 2 (10 by our count) | Orion 1/4 |
+| 1 Nov | dead-letter (task 11) | local record | 2 | 1 | 1 | 8 | Orion 1/4, genuine FP |
+| 2 Nov | swift writes | F | 1 | 0 | 0 | 6 | Orion 1/4 |
+| 3-4 Nov | topic start (task 12) | F | 0 | 0 | 0 | 8 | Orion 1/4, FP passed with caveats |
+| 6 Nov | vet (ours) | L | 1 (context) | 0 | 0 | 6 | no rollout yet |
+The trend: direction hints went from 2-5 per text to 0 and narration and corner lists to 0-1, while the November
+tasks reached the band through tests with the text frozen. This is an observed trend, not a measured cause.
 
-After any text change: behaviour diff, word-reach and reading audit on the changed sentence, DQ replica, lock for
-good.
-
-## 7. Accepted descriptions since the new checks (submitted on or after 2026-10-16)
-| Submitted | Task | Narration | Direction hints | Corner list | Reqs (platform) | Result |
-|---|---|---|---|---|---|---|
-| 21 Oct | live readers | 9 | 2 | 7 | 15 | Vega 1/6 |
-| 22 Oct | docker proxy | 4 | 5 | 5 | 9 | Orion 1/8 |
-| 23 Oct | standby (task 9) | 4 | 2 | 0 | 9 | Vega 1/5 |
-| 24 Oct | table visibility (task 10) | 6 | 2 | 1 | 9 | Vega 1/4 |
-| 26 Oct | turso NOT IN | 3 | 3 | 1 | 10 | Vega 1/4 |
-| 27 Oct | elio history | 6 | 2 | 4 | 2 (10 by our count) | Orion 1/4 |
-| 1 Nov | dead-letter (task 11) | 2 | 1 | 1 | 8 | Orion 1/4, genuine FP |
-| 2 Nov | swift writes | 1 | 0 | 0 | 6 | Orion 1/4 |
-| 4 Nov | topic start (task 12) | 0 | 0 | 0 | 8 | Orion 1/4, genuine FP |
-| 6 Nov | vet (ours) | 1 (context) | 0 | 0 | 6 | local 0/4 |
-
-**The trend:** direction hints went from 2-5 per text to 0, narration and corner lists to 0-1, and every task still
-landed at ~1/4 in one family. The November tasks reached the band through tests (discriminators on unnamed
-variants), with the text frozen. Write for the newest row, not the oldest.
-
-Example (task 12, 113 words, 8 requirements):
+Example (task 12: 113 words; 8 units by platform extraction, 7 by our count):
 ```
 Add start_from to app.topic().  When we are given a partition of that topic that we have no committed offset for as a
 consumer group we should start from the beginning of the partition if earliest, the end if latest and if a datetime
@@ -154,25 +170,25 @@ app should fail with ImproperlyConfigured instead of reading it. This only needs
 transport and for apps that dont have tables.
 ```
 
-**What cost the most rounds (prevent at S1):** late scope cuts (each = DQ + fresh rollout; the variant table finds
-them at S1); the description used as the calibration lever (task 11: 15 edits); requirement-count failures from an
-added clause or parenthetical; humanize passes that changed meaning (task 11 "so" -> GPT 0/8); imprecise outcome
-words ("the app" -> "the whole app"); a broad contract (elio); a two-reading word as the difficulty lever (vet).
+What cost the most rounds (prevented at S1): late scope cuts (each a DQ check plus a fresh rollout; the variant table
+and R11 find them); the description used as the calibration lever (task 11: 15 edits); requirement-count failures
+from an added clause or parenthetical; humanize passes that changed meaning (task 11 "so" -> GPT 0/8); imprecise
+outcome words ("the app" -> "the whole app"); a broad contract (elio); a two-reading word as the difficulty lever (vet).
 
 ## 8. Prompts
 Draft prompt (fill <...>):
 ```
-Write the task description for <seam> in <repo> at <commit>. Inputs: the facts list (5-8 tested outcomes with their
-code paths and the wrong implementation a quick solver writes). Every sentence is an outcome, a scope line or an
-anchor (the exact public name the outcome attaches to), plus at most one line of context in plain user words. No
-where/how/why, no bug narration with its cause, no corner lists, no excuses, no instructions to the solver, no URI
-schemes. Use the repo's own term for every state (grep it). For every sentence output: its kind, the outcomes it
-carries, the repo states each key word covers (grep evidence), and any second reading.
+Write the task description for <seam> in <repo> at <commit>. Inputs: the obligation ledger (each obligation with its
+observable result, category explicit/implied, grounding and the partial implementation it rejects) and the boundary
+decisions (outside / preserve / reject). Follow rules R1-R16 of the description rulebook. For every sentence output:
+its kind (outcome / scope / anchor / context), the obligations it carries, the repo states each key word covers (grep
+evidence with file:line), and any second reading with its separating input.
 ```
-Reading audit prompt (2 independent lanes, before the lock):
+Reading audit prompt (2 independent lanes, before the lock; the draft and the pinned repo only):
 ```
 Read only <task>/pkg/description.md and the repo at <path>. For each sentence: list every reading a careful developer
-could take, and every repository state or input that each key word covers (grep docs, code comments, diagnostic and
-error texts; cite file:line). Mark a sentence AMBIGUOUS when two readings lead to different observable results, and
-give the input that separates them. Do not open any other file of the task folder.
+could take, and every repository state or input each key word covers (grep docs, code comments, configuration,
+diagnostic and error texts; cite file:line). Mark a sentence AMBIGUOUS when two readings give different observable
+results; for each, give the separating input, the strongest repository evidence for and against each reading, and
+your proposed disposition (reword / scope choice / accept both). Do not open any other file of the task folder.
 ```
