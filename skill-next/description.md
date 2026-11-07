@@ -3,8 +3,8 @@
 The description is the exam question. The tests grade it, the reference answers it, the platform checks that the
 three match. A good one is short, in the user's voice, has one reading per sentence, and every tested outcome can
 be derived from it plus the repo. Difficulty is designed in the tests (the code paths the outcomes run through), not
-in words. Budget: one lock. One more change is allowed after the first solve batch when the task is too easy or
-unsolvable (section 6), and that change is the last.
+in words. Budget: one lock. The owner may make one more change, only when the platform rollout shows the task too easy
+(rollout.md lever 6); that change is the last.
 
 **Evidence rule:** only tasks submitted on or after 2026-10-16 count. The platform added the "too many requirements"
 and AI/plagiarism checks on 2026-10-14, so older accepted texts never faced them. Agents also improve with every
@@ -79,7 +79,9 @@ family. These numbers drift upward as agents improve: re-calibrate on the newest
    connective (so, because, then) and time qualifier checked against the tests. Any change not asked for -> I report
    it, the user fixes it in their words.
 8. **Word-reach + reading check on every changed word**, DQ replica again, precheck.py.
-9. **Lock** together with the user: record the hash. Start the one solve batch (2 Opus + 2 GPT) in the background.
+9. **Lock** together with the user: record the hash. The locked text goes to the build (tests and reference by the
+   construction cards). No local solves: the owner runs the platform checks and a 2-2-2 rollout on the first complete
+   draft (PIPELINE.md stage 5b).
 
 ## 4. Checklist before the lock (all yes)
 - [ ] every sentence is an outcome, a scope line or an anchor (plus at most one line of context)
@@ -92,12 +94,14 @@ family. These numbers drift upward as agents improve: re-calibrate on the newest
       qualifier re-checked against the tests
 
 ## 5. After the lock
-- The solve batch is an alarm: too easy (3-4/4 clean passers, FP-audited DESERVED) or unsolvable (0/4 with the misses
-  on a word, not on a path). Otherwise its findings change tests inside the stated sentences.
+- The description stays fixed. Findings from sweeps, false-pass audits and the platform rollout change tests and the
+  reference inside the stated sentences; rollout results are shaped with rollout.md.
 - Sweep/FP findings that need a new promise go through triage first; a new promise is the last lever (section 6).
 - Platform re-eval: tests may be added or dropped.
 
-## 6. Calibration levers, in priority order (all stay available; use the next one only when the one before fails)
+## 6. Calibration levers: the description-side details (order of use: rollout.md)
+Test-side levers (too easy 2, too hard 3) can be used at any time through gates.md Repair. Text edits (too easy 1, 3,
+4; too hard 1-2, 4-5) are the owner's single allowed change and come only after rollout.md levers 1-5.
 **Too easy** (a family above 25%, or two families in band; FP-audit the passers first: false passes are test gaps):
 1. Remove any word that gives direction: read the passers' trajectories, find the sentence that told them the path
    (vet: three direction lines removed, 3/4 -> ~1/4; swift: per-check list and race hint removed).

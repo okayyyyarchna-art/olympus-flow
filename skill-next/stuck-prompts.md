@@ -9,7 +9,7 @@ unclear. Ask the question of yourself first; the user should not have to.
 |---|---|---|---|
 | Solves pass too easily (3-4/4) | "first tell me how many hints are present in our desc? ... and 3/4 solvers solve it right?" | vet wip01 (3/4 -> de-hint) | count every why/where/how sentence and "Currently ..." narration; remove them, behaviour diff, keep every tested outcome |
 | A trim or rewrite | "did we lose anything during trimming? ... i always ask you to trim so that nothing lost related to task" | vet v2 (lost expired+unmatched) | behaviour diff table old vs new per tested case, shown to the user before the lock |
-| Need difficulty | (superseded) "add something in desc that can be little tricky and can have 2 different results based on how agents read" | vet v5 -> backfired: reference broken, 3 sweeps, re-lock | difficulty from code paths of stated outcomes (other entry point, saved format, second code path, ordering), never from a two-reading word; references/description.md sections 8-9 |
+| Need difficulty | (superseded) "add something in desc that can be little tricky and can have 2 different results based on how agents read" | vet v5 -> backfired: reference broken, 3 sweeps, re-lock | difficulty from code paths of stated outcomes (other entry point, saved format, second code path, ordering), never from a two-reading word; description.md sections 1-3 |
 | Description keeps changing | "why are you not making perfect change in desc? ... learn from everything we have evidence for desc .. and lock in once" | vet v6 | word-reach check (grep key words in the repo, use the repo's own term), reading audit lanes before the lock, one lock |
 | Is it still solvable? | "are our problem yet solvable based on desc?" | vet v6 (0/4) | per tested outcome: where the repo tells a solver (file:line or diagnostic text), how hard, which solves failed it |
 | Platform pass rate 0/10 | P3 + P3a + P3b (verbatim below) | faust tasks 3-11 | read every trajectory and patch, rank closest agents, inline observable hint (<= +60 words) or remove a test AND its promise |
@@ -37,9 +37,9 @@ unclear. Ask the question of yourself first; the user should not have to.
 |---|---|---|---|
 | A solver result looks too good | "are you giving opus any context? or is the solver somehow cheating?" | vet v5 | solve_watch.py CLEAN/SUSPICIOUS; only CLEAN solves count |
 | A step repeats | "why are we doing this step of rebuild? what's the point?" / "why do we have to run proof and battery again and again?" | vet (image rebuilds, proofs per fix) | name the decision the step can change; build once, battery only between S4 and S7, full proof at S7 |
-| Solves slow the flow | "how long are we going to run solver isnt this is making our progress slow again?" | vet (4 batches) | one solve batch per description lock, in the background, never blocking; no local re-runs after the lock |
+| Solves slow the flow | "how long are we going to run solver isnt this is making our progress slow again?" | vet (4 batches) | no local solves (2026-11-07): the platform 2-2-2 rollout is the solver data; keep closing gaps while it runs |
 
 ## Verbatim: P3, P3a, P3b (platform pass rate 0/10; faust tasks)
 Full text and the run procedure: olympus-challenge-creation/references/prompts.md sections P3, P3a, P3b and "How P3 +
 P3a + P3b run together". Target today: exactly one family in (0, 25%]. The 60-word hint allowance applies only to the
-one allowed description change (references/description.md section 9).
+one allowed description change (rollout.md lever 6).

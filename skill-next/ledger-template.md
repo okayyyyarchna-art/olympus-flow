@@ -17,7 +17,7 @@ of unreachability. No untested in-scope row may become OUT or a reserve waiver.
 | Current stage; DIRTY/LOCAL READY/PLATFORM VERIFIED; blockers | Fill |
 | Human description lock + hash; Dockerfile build check ID; Scope Gate | NOT VERIFIED |
 | Rollout minimum per family; long-horizon rule; source/date | NOT VERIFIED |
-| Docker lock path; single-container limit; allowed filesystem paths | Fill |
+| Docker lock path; configured container limit (machine profile); allowed filesystem paths | Fill |
 
 ## Repository adapter profile (cite manifest/CI file:line for each value)
 

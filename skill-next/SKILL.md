@@ -37,7 +37,7 @@ The build-time [evidence report](../BUILD-3-report.md) maps the rule IDs to curr
 observations, historical incidents and proposed controls; it is not needed to run
 the skill. Do not infer a universal threshold from one accepted example.
 
-Keep the description fixed after lock. Implement and test every promised path;
+Keep the description fixed after lock; the only exception is the owner's single too-easy change (rollout.md lever 6). Implement and test every promised path;
 never invent a hidden requirement to reject a particular solver. Keep real upstream
 regressions and allow valid alternative designs. A reference defect and a false
 pass can coexist; agreement with the reference is not the definition of correctness.
