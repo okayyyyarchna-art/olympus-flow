@@ -14,6 +14,7 @@ main() {
 T=$(cd "$1" && pwd); tag="${2:-r1}"; shift 2 2>/dev/null || shift $#
 checks=("$@"); [ ${#checks[@]} -gt 0 ] || checks=(fairness sq dq ar)
 R="$(cd "$(dirname "$0")" && pwd)/replica.sh"
+for c in "${checks[@]}" verify; do bash "$R" "$T" "$c" "$tag" --validate-only || exit 2; done
 mkdir -p "$T/eval/replica"; log="$T/eval/replica/round-$tag.log"; : > "$log"
 # machine-wide limit: at most ROUND_SLOTS (default 2) replica rounds at once across all sessions (Codex rate limits)
 slots="$OLYMPUS_WORK_ROOT/.round-slots"; mkdir -p "$slots"; slot=""

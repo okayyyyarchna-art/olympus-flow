@@ -8,10 +8,13 @@
 # The platform-shaped replica round (round.sh) runs once afterwards only as the final gate.
 set -uo pipefail
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/machine.sh" || exit 2
+source "$OLYMPUS_LIB/inputs.sh"
 # the whole body is one function: bash reads it completely before running, so editing this file while a run
 # is in progress cannot break that run (vet 2026-11-06: an edit mid-run garbled the tail of solvers.sh)
 main() {
 T=$(cd "$1" && pwd); tag="${2:-s1}"; here=$(cd "$(dirname "$0")/.." && pwd)
+require_files "$here/replicas/sweep-brief.md" || exit 2
+bash "$here/tools/replica.sh" "$T" ref-audit "sw${tag}a" --validate-only || exit 2
 brief="$T/eval/sweep-brief-$tag.md"; mkdir -p "$T/eval/claude2"
 { cat "$here/replicas/sweep-brief.md"; printf '\nTask folder: %s\n' "$T"; } > "$brief"
 bash "$OLYMPUS_LIB/check_codex_brief.sh" "$brief" >/dev/null || { echo "brief has flagged words" >&2; exit 3; }
