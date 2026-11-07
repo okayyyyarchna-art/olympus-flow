@@ -31,3 +31,8 @@ Supply nonempty provisional `expected.base` IDs in settings before repo_check.
 Review test-helper/config restoration and compiled twins. Author new-mode IDs,
 selectors and overlays separately. Missing inputs, unsupported frameworks and
 reporter failures produce nonzero results; none is treated as platform proof.
+
+For feature mode, run `test.sh new --discover` on a successful reference tree and
+supply its returned map as `new_native_ids` in settings, alongside `expected.new`.
+Execution uses that predeclared map and preserves native assertion outcomes on base;
+it never learns IDs by running failing feature cases. Without the map it fails closed.

@@ -12,7 +12,8 @@ in explicit settings for the exact repository/pin. This recipe asserts Python
 is not itself an exact interpreter pin. A different base runtime fails the build.
 
 The template markers are `platform`, `toolchain_version`, `dependency_install`,
-`development_install`, `profile_b64`. For a different repository, supply its own
+`development_install`, `build_environment`, `profile_b64`. For a different
+repository, supply its own
 exact dependency/test/development pins and setup commands; the Faust dependency
 recipe is guarded by URL and commit and is never silently reused elsewhere.
 Native lint/type tools are discovered from CI; unprovisioned development tools
@@ -28,6 +29,8 @@ deselection is copied: a valid current base regression must remain selected.
 Candidate code is copied to writable scratch. Tests, fixtures and grading config
 are restored from the pinned commit before collection or setup. Shared manifests
 need an ownership review in `restore_paths`. Hidden overlays are explicit files.
+`hidden_paths` is new-mode-only; `base_hidden_paths` names intentional base-mode
+edits. New feature files are kept out of base-mode compilation/collection.
 Stale extensions and generated C twins are removed. Faust's extensions rebuild
 from candidate pyx source and their imports must resolve inside candidate scratch.
 The clean base checkout and image never receive solver edits.

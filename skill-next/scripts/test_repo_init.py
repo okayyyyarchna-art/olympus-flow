@@ -6,6 +6,7 @@ from pathlib import Path
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 from unittest.mock import patch
 from xml.etree import ElementTree as ET
@@ -13,6 +14,7 @@ from xml.etree import ElementTree as ET
 TOOLS = Path(__file__).resolve().parents[1] / "tools"
 sys.path.insert(0, str(TOOLS))
 import repo_init
+import repo_check
 
 
 class Discovery(unittest.TestCase):
@@ -34,6 +36,8 @@ class Discovery(unittest.TestCase):
     def test_go_toolchain_commands_inventory_and_production_authority(self):
         self.files({"go.mod": "module example.org/project\n\ngo 1.24.0\ntoolchain go1.24.3\n",
                     "go.sum": "", "internal/config.go": "package internal\n",
+                    "internal/testutil/helper.go": "package testutil\n",
+                    "internal/gitbase/gitbasetest/helper.go": 'package gitbasetest\nimport "testing"\n',
                     "internal/p_test.go": "package internal\nfunc TestOne(t *testing.T) {}\n",
                     "internal/testdata/a.txt": "fixture", "Makefile": "test:\n\tgo test ./...\nfmt:\n\tgofmt -w .\n"})
         p = repo_init.discover(self.repo)
@@ -41,6 +45,9 @@ class Discovery(unittest.TestCase):
         self.assertIn("go.sum", p["locks"])
         self.assertIn("internal/config.go", p["production"])
         self.assertNotIn("internal/config.go", p["config"])
+        self.assertIn("internal/testutil/helper.go", p["helpers"])
+        self.assertNotIn("internal/testutil/helper.go", p["production"])
+        self.assertIn("internal/gitbase/gitbasetest/helper.go", p["helpers"])
         self.assertIn("internal/testdata/a.txt", p["fixtures"])
         self.assertEqual(p["expected"]["base"], ["example.org/project/internal::TestOne"])
         self.assertTrue(any(e["location"] == "go.mod:4" for e in p["evidence"]["toolchain"]))
@@ -63,13 +70,16 @@ class Discovery(unittest.TestCase):
         self.files({"package.json": json.dumps({"packageManager": "pnpm@10.1.0", "engines": {"node": ">=22"},
                     "devDependencies": {"vitest": "3.0.0"}, "scripts": {"test": "vitest run", "lint": "eslint ."}}),
                     ".nvmrc": "v22.13.0\n", "pnpm-lock.yaml": "lockfileVersion: '9.0'\n",
-                    "src/index.ts": "export const x = 1;", "src/index.test.ts": "test('x', () => {});"})
+                    "src/index.ts": "export const x = 1;", "src/config.ts": "export const y = 2;",
+                    "src/index.test.ts": "test('x', () => {});"})
         p = repo_init.discover(self.repo)
         self.assertEqual(p["language"], "typescript")
         self.assertEqual(p["toolchain"]["version"], "22.13.0")
         self.assertEqual(p["frameworks"], ["vitest"])
         self.assertEqual(p["commands"]["fetch"], "pnpm install --frozen-lockfile")
         self.assertIn("src/index.ts", p["production"])
+        self.assertIn("src/config.ts", p["production"])
+        self.assertNotIn("src/config.ts", p["config"])
         self.assertIn("src/index.test.ts", p["tests"])
         self.assertTrue(any("UNPROVEN" in r["reason"] for r in p["open"]))
 
@@ -86,7 +96,7 @@ class Discovery(unittest.TestCase):
             repo_init.apply_settings({}, {"shell_hook": "unsafe"})
 
     def test_cli_fresh_clone_is_clean_and_all_template_markers_render(self):
-        self.files({"go.mod": "module example.org/x\n\ngo 1.24.3\n", "x.go": "package x\n",
+        self.files({"go.mod": "module example.org/x\n\ngo 1.24.3\n", "x.go": "package x\n", "test.sh": "#!/bin/sh",
                     "x_test.go": "package x\nfunc TestX(t *testing.T) {}\n"})
         commit = repo_init.git(self.repo, "rev-parse", "HEAD")
         task = self.repo / "task"
@@ -100,27 +110,66 @@ class Discovery(unittest.TestCase):
         self.assertNotIn("{{", dockerfile)
         self.assertIn("NOT_VERIFIED", dockerfile)
         self.assertIn("go1.24.3.linux-amd64.tar.gz", dockerfile)
+        repo_check.patch_runner(task)
+        patch_file = task / "init/test.patch"
+        checked = subprocess.run(["git", "-C", str(task / "base"), "apply", "--check", str(patch_file)], capture_output=True, text=True)
+        self.assertEqual(checked.returncode, 0, checked.stderr)
+        self.assertIn("new mode 100755", patch_file.read_text())
+        p = json.loads((task / "profile.json").read_text())
+        p["build_commands"] = "go test ./..."
+        with self.assertRaisesRegex(ValueError, "test runner in RUN"):
+            repo_init.save(task, p)
+
+    def test_grading_inventory_cannot_restore_production_or_escape_repository(self):
+        self.files({"p.py": "value = 1\n", "tests/test_p.py": "def test_ok(): pass\n"})
+        p = repo_init.discover(self.repo)
+        for name in ("p.py", "../outside", "/outside", "C:/outside", ".git/config"):
+            p["restore_paths"] = [name]
+            with self.subTest(name=name), self.assertRaises(ValueError):
+                repo_init.validate(p)
+
+    def test_import_probe_targets_loaded_package_instead_of_examples(self):
+        self.files({"p/__init__.py": "", "p/core.py": "value = 1\n", "examples/__init__.py": "",
+                    "tests/test_p.py": "import p\ndef test_ok(): pass\n"})
+        profile = repo_init.discover(self.repo)
+        profile["native_ids"] = {"tests.test_p::test_ok": "tests/test_p.py::test_ok"}
+        profile["setup_imports"] = ["p.core"]
+        self.assertEqual(repo_check.choose_production(profile, self.repo, "tests.test_p::test_ok"), "p/__init__.py")
+        profile["setup_imports"] = []
+        self.assertEqual(repo_check.choose_production(profile, self.repo, "tests.test_p::test_ok"), "p/__init__.py")
+        profile["production_probe"] = "tests/test_p.py"
+        with self.assertRaises(ValueError):
+            repo_check.choose_production(profile, self.repo, "tests.test_p::test_ok")
 
     def test_restore_neutralizes_test_edits_and_retains_candidate_production(self):
-        self.files({"p.py": "value = 1\n", "tests/test_p.py": "assert True\n", "tests/helper.py": "value = 2\n"})
+        self.files({"p.py": "value = 1\n", "tests/test_p.py": "assert True\n", "tests/helper.py": "value = 2\n",
+                    "internal/testutil/helper.go": "original helper\n"})
         commit = repo_init.git(self.repo, "rev-parse", "HEAD")
         (self.repo / "p.py").write_text("value = 99\n")
         (self.repo / "tests/test_p.py").write_text("skip_all = True\n")
         (self.repo / "tests/rogue.py").write_text("shadow = True\n")
         (self.repo / "tests/feature.py").write_text("feature = True\n")
+        (self.repo / "internal/testutil/helper.go").write_text("tampered helper\n")
+        (self.repo / "internal/testutil/rogue.go").write_text("rogue helper\n")
         # Scratch must be outside the candidate tree to avoid recursive copying.
         with tempfile.TemporaryDirectory() as folder:
             ns = runtime()
             ns["PROFILE"].update({"identity": {"commit": commit}, "language": "python",
-                                  "restore_paths": ["tests/test_p.py", "tests/helper.py"],
+                                  "restore_paths": ["tests/test_p.py", "tests/helper.py", "internal/testutil/helper.go"],
                                   "tests": ["tests/test_p.py", "tests/helper.py"],
+                                  "helpers": ["internal/testutil/helper.go"],
                                   "hidden_paths": ["tests/feature.py"]})
-            effective = ns["prepare"](self.repo, Path(folder), dict(os.environ))
+            effective = ns["prepare"](self.repo, Path(folder), dict(os.environ), "new")
             self.assertEqual((effective / "p.py").read_text(), "value = 99\n")
             self.assertEqual((effective / "tests/test_p.py").read_text(), "assert True\n")
             self.assertEqual((effective / "tests/helper.py").read_text(), "value = 2\n")
             self.assertFalse((effective / "tests/rogue.py").exists())
             self.assertEqual((effective / "tests/feature.py").read_text(), "feature = True\n")
+            self.assertEqual((effective / "internal/testutil/helper.go").read_text(), "original helper\n")
+            self.assertFalse((effective / "internal/testutil/rogue.go").exists())
+            with tempfile.TemporaryDirectory() as baseline:
+                base_tree = ns["prepare"](self.repo, Path(baseline), dict(os.environ), "base")
+                self.assertFalse((base_tree / "tests/feature.py").exists())
             ns["PROFILE"]["identity"]["commit"] = "f" * 40
             with self.assertRaisesRegex(RuntimeError, "pristine base commit unavailable"):
                 ns["prepare"](self.repo, Path(folder), dict(os.environ))
@@ -166,6 +215,14 @@ class Reporting(unittest.TestCase):
         self.assertEqual(code, 1)
         self.assertIsNotNone(result[0].find("error"))
 
+    def test_phase_exit_code_is_retained_independently_in_xml(self):
+        code, _ = self.runtime["command"]([sys.executable, "-B", "-c", "import sys; sys.exit(17)"],
+                                         self.tmp.name, dict(os.environ), 10, phase="compile")
+        self.assertEqual(code, 17)
+        self.assertEqual(self.runtime["COMMAND_STATUSES"], [{"phase": "compile", "exit": 17}])
+        self.report([], code)
+        self.assertIn('"exit": 17', ET.parse(self.output).find(".//testsuite/system-out").text)
+
     def test_duplicate_unexpected_empty_and_missing_reports_fail(self):
         one = ET.Element("testcase", classname="A", name="one")
         other = ET.Element("testcase", name="surprise")
@@ -187,6 +244,13 @@ class Reporting(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             self.report([], expected=[])
 
+    def test_unknown_option_prefix_is_rejected_before_execution(self):
+        self.runtime["PROFILE"]["timeout"] = 420
+        with patch.object(sys, "argv", ["test.sh", "/unused", "base", "--out", "file.xml"]), contextlib.redirect_stderr(io.StringIO()):
+            with self.assertRaises(SystemExit) as exc:
+                self.runtime["main"]()
+        self.assertEqual(exc.exception.code, 2)
+
     def test_diagnostics_with_control_bytes_still_produce_valid_xml(self):
         self.assertEqual(self.runtime["write_report"](self.output, ["one"], [], "bad\x00\x1boutput", 1, "base"), 1)
         self.assertIn("bad\\x00\\x1boutput", ET.parse(self.output).find(".//error").text)
@@ -195,6 +259,17 @@ class Reporting(unittest.TestCase):
         values = [(repo_init.TEMPLATES / lang / "test.sh").read_text() for lang in ("go", "python", "typescript")]
         self.assertEqual(values[0], values[1])
         self.assertEqual(values[1], values[2])
+
+
+class Supervision(unittest.TestCase):
+    def test_watchdog_stops_tracked_process_tree_without_pipe_hang(self):
+        check = repo_check.Check.__new__(repo_check.Check)
+        check.env = dict(os.environ)
+        start = time.monotonic()
+        with self.assertRaisesRegex(RuntimeError, "tracked process tree stopped"):
+            check.supervise([sys.executable, "-B", "-c", "import time; time.sleep(20)"], 0.2,
+                            stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        self.assertLess(time.monotonic() - start, 8)
 
 
 if __name__ == "__main__":

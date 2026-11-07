@@ -10,9 +10,30 @@
     {
       "location": "cc-faust-topic-start/wip15/test.patch:52",
       "text": "Cython rebuild and import checks; base regression surface."
+    },
+    {
+      "location": "requirements/test.txt:5",
+      "text": "Repository-pinned format/lint tools: black, isort, flake8."
+    },
+    {
+      "location": "requirements/typecheck.txt:5",
+      "text": "Repository-pinned mypy 2.3.0."
+    },
+    {
+      "location": "tests/unit/transport/drivers/test_aiokafka.py:1514",
+      "text": "Retain the existing conditional api_version skip at the pinned aiokafka version; exact ID/replacement in skip_allowlist."
+    },
+    {
+      "location": "tests/unit/transport/drivers/test_aiokafka.py:523",
+      "text": "Retain the existing SOURCE BUG skip; no newly deselected regression."
+    },
+    {
+      "location": "tests/unit/transport/drivers/test_aiokafka.py:471",
+      "text": "Retain the existing SOURCE BUG skip; active no-fetch timeout coverage remains selected."
     }
   ],
   "settings": {
+    "build_environment": "ENV SETUPTOOLS_SCM_PRETEND_VERSION=0.15.3",
     "dependency_install": "pip install --no-cache-dir --retries 10 --timeout 60 \\\n        aiohappyeyeballs==2.7.1 \\\n        aiohttp==3.14.3 \\\n        aiohttp-cors==0.8.1 \\\n        aiokafka==0.14.0 \\\n        aiosignal==1.4.0 \\\n        async-timeout==5.0.1 \\\n        attrs==26.1.0 \\\n        click==8.3.3 \\\n        colorlog==6.12.0 \\\n        croniter==5.0.1 \\\n        cython==3.1.2 \\\n        frozenlist==1.8.0 \\\n        intervaltree==3.2.1 \\\n        mode-streaming==0.7.1 \\\n        multidict==6.9.1 \\\n        mypy_extensions==1.1.0 \\\n        opentracing==2.4.0 \\\n        propcache==0.5.4 \\\n        pytest==7.4.4 \\\n        pytest-asyncio==0.23.8 \\\n        python-dateutil==2.9.0.post0 \\\n        pytz==2026.5 \\\n        six==1.17.0 \\\n        sortedcontainers==2.4.0 \\\n        terminaltables==3.1.10 \\\n        venusian==3.1.0 \\\n        yarl==1.25.1 \\\n    && pip install --no-cache-dir --no-build-isolation --no-deps -e .",
     "toolchain": {
       "version": "3.12.13"
@@ -32,7 +53,8 @@
     "setup_imports": [
       "faust.transport._cython.conductor",
       "faust._cython.streams",
-      "faust._cython.windows"
+      "faust._cython.windows",
+      "faust.models._cython.fields"
     ],
     "selectors": {
       "base": [
@@ -49,6 +71,12 @@
         "tests/functional/test_aiokafka.py",
         "tests/functional/agents"
       ]
+    },
+    "development_install": "pip install --no-cache-dir black==26.5.1 isort==8.0.1 flake8==5.0.4 mypy==2.3.0",
+    "skip_allowlist": {
+      "tests.unit.transport.drivers.test_aiokafka.TestProducer::test__new_producer__using_settings[expected_args0]": "Existing conditional upstream skip for api_version removed in aiokafka>=0.13.0; this recipe pins 0.14.0. tests/unit/transport/drivers/test_aiokafka.py:1514. Current producer settings/default behavior remains covered by expected_args1 and TestProducer::test__new_producer__default.",
+      "tests.unit.transport.drivers.test_aiokafka.Test_VEP_no_recent_response::test_timed_out": "Existing upstream SOURCE BUG skip: the response-staleness constant is never emitted at this pin, outside task-12 start-position behavior. tests/unit/transport/drivers/test_aiokafka.py:523. Active poll-timeout behavior remains covered by Test_VEP_no_recent_fetch::test_timed_out and Test_VEP_no_recent_response::test_recent_response.",
+      "tests.unit.transport.drivers.test_aiokafka.Test_VEP_no_response_since_start::test_timed_out": "Existing upstream SOURCE BUG skip: the response-since-start constant is never emitted at this pin, outside task-12 start-position behavior. tests/unit/transport/drivers/test_aiokafka.py:471. Active no-fetch timeout remains covered by Test_VEP_no_fetch_since_start::test_timed_out."
     }
   }
 }

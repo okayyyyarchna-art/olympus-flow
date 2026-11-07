@@ -7,12 +7,15 @@ RUN curl -fsSL -o /tmp/go.tgz https://dl.google.com/go/go{{toolchain_version}}.l
     && go version
 ENV PATH=/usr/local/go/bin:/opt/go/bin:/usr/local/bin:/usr/bin:/bin
 ENV GOTOOLCHAIN=local GOWORK=off GOCACHE=/opt/adapter-gocache GOPATH=/opt/go
+ENV GOFLAGS="-buildvcs=false -trimpath"
 WORKDIR /app
 COPY . .
 RUN go mod download \
     && {{build_commands}}
 RUN mkdir -p /opt/adapter-gocache \
-    && chmod -R a+rX /app /opt/go /opt/adapter-gocache \
+    && find /app /opt/go -type d ! -perm -005 -exec chmod a+rx {} + \
+    && find /app /opt/go -type f ! -perm -004 -exec chmod a+r {} + \
+    && chmod -R a+rwX /opt/adapter-gocache \
     && git config --system --add safe.directory /app
 RUN {{development_install}}
 CMD ["/bin/bash"]

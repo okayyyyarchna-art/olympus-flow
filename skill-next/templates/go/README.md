@@ -21,7 +21,8 @@ modules, builds production and enumerates test dependencies without running test
 Pin native development tools with `development_install`; a repository requiring
 lint tools not already in the base remains OPEN until those are installed.
 
-Canonical IDs are `ImportPath::TestFunction`. Dynamic subtests contribute output
+Canonical IDs name top-level Test, Fuzz-seed and Example functions as
+`ImportPath::Function`. Dynamic subtests contribute output
 and failure status to their named top-level parent; they are not independently
 selectable IDs. `go test -list .` successfully compiles each selected package before
 IDs become qualified. Build tags/workspaces and external services need an explicit
@@ -29,14 +30,19 @@ adapter choice. There is no automatic skip or exclusion policy.
 
 The runner copies production to unique scratch, discards generated binaries,
 restores grading files from the exact commit, and overlays only `hidden_paths`.
-Missing history fails closed. No runtime downloads are permitted. Immutable Go
-build cache is copied to a writable per-run cache. Completed named results survive
+Missing history fails closed. No runtime downloads are permitted. The prepared Go
+build cache is writable in each container's private layer, separate from immutable
+module inputs; matching -trimpath flags preserve content-based reuse across scratch
+paths. Completed named results survive
 partial runs; missing results become named errors containing the actual diagnostic.
 
 Every template marker is filled from the profile: `platform`, `toolchain_version`,
 `go_sha256`, `build_commands`, `development_install`, `profile_b64`. The last marker
 embeds only the runner's adapter fields. Unresolved build inputs block repo_check.
 Review restore ownership: production files must never enter `restore_paths`.
+`hidden_paths` overlays feature files only in new mode. `base_hidden_paths` is the
+separate list of intentional base-mode test/config edits. Added grading files are
+excluded before copying candidate production, then restored from Git or overlaid.
 
 Generated `init/test.sh` supports mode before/after `--output_path`, `--one ID`,
 `--list` and `--discover`. The latter compiles/lists upstream tests without running
