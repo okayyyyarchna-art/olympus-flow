@@ -21,8 +21,9 @@
 4. **E4 - Keep image construction separate from tests.** Do not invoke a test runner
    in Dockerfile RUN, even compile-only test flags. Use package-manager dependency
    enumeration/fetch or supported build commands; run tests after building. Follow
-   current platform Dockerfile rules. Omit gratuitous comments as local style, not an
-   alleged universal platform prohibition. Never ship a solution-built cached binary
+   current platform Dockerfile rules. No comments, except one block right above a RUN
+   that deviates from the base image, stating why (the AI precheck failed vet's Go
+   reinstall without its "base has Go 1.26, go.mod needs 1.27.3" reason). Never ship a solution-built cached binary
    as the executable graded against later candidates.
 5. **E5 - Qualify once, reuse by identity.** Build the full submitted Dockerfile through
    the configured lock. Key reuse by Dockerfile + source/context + resolved base image
