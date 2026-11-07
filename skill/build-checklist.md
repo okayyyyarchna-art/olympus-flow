@@ -156,6 +156,10 @@ Reference:
    keep a passer (B7). Nothing out of scope, no unrequested cleanup or churn. [S1, S3]
 7. Code quality the repo enforces: its formatter and CI linters, no dead parameters or unused variables, comments
    that state what the code does, docs/glossary/CHANGELOG consistent with the code, line width as the file. [S4, SQ]
+8. The repo's own review rules (REVIEW.md, CONTRIBUTING, AGENTS.md): read them before writing the reference and
+   follow every rule the change touches. The platform SQ applies them (vet task 2: Code Quality 1/3 for no regression
+   test, REVIEW.md rule 4; rule 8 asks a user guarantee to bring an acceptance script and a catalog row). The
+   reference carries its own regression test in the repo's style, in files the hidden tests do not touch. [SQ, S2]
 
 ## 7. Export and prove (ledger: Evidence)
 - Export the patches from explicit paths; check the file list, modes (`test.sh` 100755), applicability in grading

@@ -100,7 +100,9 @@ def main():
     overlap = set(sfiles) & set(tfiles)
     out("FAIL" if overlap else "PASS", "solution.patch and test.patch touch different files", ", ".join(sorted(overlap)))
     sp_tests = [f for f in sfiles if re.search(r"(^|/)tests?/|_test\.go$|test_[^/]+\.py$", f)]
-    out("WARN" if sp_tests else "PASS", "solution.patch adds no tests", ", ".join(sp_tests[:4]))
+    # vet task 2: platform SQ Code Quality 1/3, "No regression test accompanies the bug fix" (the repo REVIEW.md rule 4:
+    # a bug fix needs a test that fails without the fix). The reference carries its own test, in the repo's style.
+    out("PASS" if sp_tests else "WARN", "solution.patch adds its own regression test (repo review rules)", ", ".join(sp_tests[:4]))
     stray = [f for f in sfiles if re.search(r"\.(patch|orig|rej|log)$|(^|/)(eval|wip\d+)/", f)]
     out("FAIL" if stray else "PASS", "no stray files in solution.patch", ", ".join(stray[:4]))
     for name, body in (("test.patch", tp), ("solution.patch", sp)):
