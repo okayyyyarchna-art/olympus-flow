@@ -12,7 +12,9 @@ batteries 1-18, final-package variants) weighted most; 8 accepted or in-review t
 docker proxy); Codex's own platform-CLI study (vet eval/checklist-cx.md, C01-C31); a GPT-6 Astra review (vet
 eval/checklist-review-astra.md, M1-M6, R1-R8); vet eval/checklist-evidence-platform.md (rows A-E) and
 eval/checklist-evidence-accepted.md; the vet platform phase (wip02 rollout of 16 runs, wip03 re-eval, platform SQ/AR
-notes, FP panel notes; eval/decisions.md). Rule definitions: the platform rubric (section 9).
+notes, FP panel notes; eval/decisions.md); the gap study of the 9 accepted packages after 2026-10-12
+(olympus-product eval/checklist-gaps/oss70.md P1-P15, codex.md 1-8); vet task 2 (rollout 1 replay). Rule
+definitions: the platform rubric (section 9).
 
 ## The ledger (eval/build-ledger.md): one file, these sections, each row linked to its contract row
 1. Contract: one row per atomic obligation (quote, outcome, allowed readings, exclusions, grounding, status).
@@ -34,6 +36,10 @@ notes, FP panel notes; eval/decisions.md). Rule definitions: the platform rubric
 - Mark each row NAMED (a sentence names the case) or IMPLIED (only the general rule covers it). Two stacked implied
   cases in one script gave 0/16 platform runs on vet; the mark also decides what a re-eval may relax later
   (near-miss-release.md). [T5, FP]
+- A row whose path runs in a mode or entry point that no sentence names is HIDDEN, not implied: name the mode in
+  the description (the mode only, no mechanism) or drop the row. Re-mark every test added after the lock before each
+  paste (vet task 2: sweep fixes added pull-request tests to a description that never named pull requests; 4/4
+  rollout patches failed only those tests and the general sentences no other). [T5, FP]
 - Scope, exclusion and "keeps current behaviour" sentences are obligations too (A7). Couple each keep-behaviour
   assertion to a feature case that FAILS on base, because every new test must fail at the base commit (T1); ordinary
   legacy behaviour stays in base mode (M3). [T1, T4]
@@ -46,7 +52,9 @@ notes, FP panel notes; eval/decisions.md). Rule definitions: the platform rubric
 For each obligation, list every materially different value; the reference handles each, and a test reaches each:
 1. **Entry points**: the live path, every saved-replay path, the view WITHOUT the feature's flag, sibling commands
    that share the code (vet: scan, report show with and without --policy, endpoint audit). [T4, S1; A6, most frequent
-   Tests band 1 cause]
+   Tests band 1 cause] Every read surface of one state (accessors, endpoints, views, commands) is checked in one
+   helper, each one the first to look after the change in some test; where the value is the design's choice, assert
+   that all surfaces agree (P13: accessor matrix, GET == HEAD == /changes). [T4, S1]
 2. **Stores and formats**: every store and serialized form read or written, including older shapes the repo still
    reads and optional fields older versions omit (vet: last, .db, JSON, JSONL, older report). Write through the live
    path, save, reload through that form's real reader, assert the same contract (C04). [T4, S1]
@@ -72,7 +80,9 @@ For each obligation, list every materially different value; the reference handle
    what may remain, which result is allowed, who releases the resource (C13). Record every resource, cache, lock and
    iterator lifetime and its invalidation (C27). For a rejection or no-change promise, snapshot every visible side
    effect (stored objects, versions, temporary artifacts, unrelated sentinels) before the rejection and compare after
-   (C12). [S1, T4]
+   (C12). [S1, T4] Per stage, inject the dependency's own error, a foreign exception type, a refusal, and a
+   cancellation of the caller apart from a cancellation of the underlying work, one knob per stage. When a batch
+   fails or is cancelled midway, grade which items completed and which did not, item by item (P9, codex 3). [S1, T4]
 
 ## 4. Discriminators and valid alternatives (ledger: Discriminators)
 - For each obligation, name every distinct plausible wrong-rule class and every materially different valid
@@ -84,7 +94,10 @@ For each obligation, list every materially different value; the reference handle
     each winning a different item, one rule winning then losing, exact duplicates, two instances of every exemption
     (two plugins off), two sources, and two sources that share a name or identity key (vet: two merged policy files
     with one name give one suppression ref; an FP judge probed it, so decide it in the ledger). [T3; A2 T11 High; vet
-    r6, G1, G2, m2, FP panel]
+    r6, G1, G2, m2, FP panel] Vary the structural count too (three or more tables, partitions, manifests or workers
+    where the rule spans them): the platform coverage notes asked for it twice (codex 4). [T4, T3]
+  - **Same entity, two names**: an alias, a link, a short and a full id, an equivalent spelling of one construct, the
+    same source on both sides (P2, codex 2). [T3, FP]
   - **Order and precedence**: two competing eligible items in both orders; the winner and the non-winner asserted;
     "either is fine" asserted as membership in the allowed set. [T3]
     When code picks one item among several (a copy, a row, a manifest) by an internal key, compute that key and build
@@ -98,25 +111,43 @@ For each obligation, list every materially different value; the reference handle
     r2]
   - **Regeneration and cleanup**: stale results AND a new result of every kind; old removed, new present once,
     unrelated state kept; repeated with the same and with an empty configuration (C11). [T3; vet r1-r4, delete-all, m5]
+  - **Repeat the trigger**: for every "once", "keeps", "stays" or "fails" promise, trigger again and assert no second
+    effect, the same failure or the unchanged state (P12). [T3]
   - **Boundaries and caps**: exact equality and the nearest value on each side, zero/empty where valid; a supported
     large input when it exposes an unsupported cap. Never invent a size or performance limit the text does not state.
     [T3; A4, T12 exact-ms]
-- Choose fixture values that separate the classes (sum vs max, n vs n+1, 0, delete-then-0, a second match). Derive the
-  expected values from the visible fixture data, with an oracle independent of the reference's private algorithm
-  (C16). Assert that the scenario really happened before asserting the outcome. [T3, T5]
+- Choose fixture values that separate the classes (sum vs max, n vs n+1, 0, delete-then-0, a second match): each value
+  identifies its item by itself (distinct totals, content that names its own item), falsy-but-present values (0, "",
+  [], null), and near-miss decoys for every matching rule (prefix sibling, one character off, other case) (P2). Derive
+  the expected values from the visible fixture data, with an oracle independent of the reference's private algorithm
+  (C16); where an allowed choice decides the outcome, read the expectation from the observed winner or the system's
+  own record, and add an end-of-test invariant (each item exactly once, equals a recomputation) (P3). [T3, T5]
+- Assert that the scenario really happened before asserting the outcome: every all/any/filtered assertion also
+  asserts a non-empty exact count, a case picked from live state asserts it was found, a setup helper fails when its
+  own precondition did not happen (P7, codex 1; an AR High on an `all()` over an empty list). [T3]
 
 ## 5. Fixtures, harness and result contracts (ledger: Fixtures and harness)
 - Run the real code end to end; stub only the outermost external system, with the repo's own stub where it has one.
   For every fake, a capability table: the methods, state and events a VALID implementation may use, so the fake never
   decides the design (C15: 46 failures on one task from a coordinator the stub omitted). No fake that bypasses a real
-  layer (C1). End every lifecycle a test starts (C2). [T5]
+  layer (C1). Build a fake on the dependency's real classes or state machine and add only observation hooks, keep the
+  real async boundary and separate completion signals, and name the real behaviour (quirks too) it mirrors (P5,
+  codex 6). End every lifecycle a test starts: teardown releases held gates, cancels leftover tasks and routes
+  background crashes to the output; an algorithm that may cycle runs under a watchdog (C2, P10). [T5, T8]
+- Normalize ambient inputs in the runner (umask, XDG/TMPDIR, editor, hash seed, locale); a fixed seed is not
+  correctness for all seeds (codex 5). [T2, T6]
 - Generate fixtures with live runs (e.g. `stub fail <backend>`); a hand-made fixture copies the production formats and
   counts exactly. [T5; vet hand-made fixture]
-- test.sh: base mode = the base-commit tests of every package the change can affect; new mode = only the hidden tests;
-  no fail-fast. Restore the base-commit test files in a scratch copy or overlay and fail (not warn) if the base commit
-  is missing; agent test edits never count (C3). [T1, test.sh rules]
-- Exact deselects with a reason for base tests that fail on a correct design, need the network or pin an internal
-  call: run the base suite against the reference AND each valid alternative to find them (C4). [T1]
+- test.sh: base mode = the base-commit tests of every file the reference edits, of every test file either patch
+  changes, and of their sibling areas (P15: an AR High for a left-out lifecycle test file); new mode = only the hidden
+  tests; no fail-fast. Restore the base-commit test files in a scratch copy or overlay and fail (not warn) if the base
+  commit is missing; agent test edits never count (C3; a house anti-cheat rule, not a platform requirement). [T1]
+- Hidden tests compile at the base commit (exported API only, or added in new mode in the scratch copy), so base fails
+  each id for its behaviour, not as one build failure (P14, codex 8). [T8, verify]
+- A base test that pins an internal call or the old behaviour: rewrite or loosen it in place into a behaviour
+  assertion, with a comment naming the hidden test that now covers it; deselect only when that fails, exactly, with a
+  reason, and with a hidden test on the same input (P6). Run the base suite against the reference AND each valid
+  alternative to find them (C4). [T1, S2]
 - One scenario or test per independent obligation, never several obligations chained in one script: the runner stops
   at the first failing line, so a run's later failures stay hidden. That blinded the vet re-eval analysis (16 runs, one
   visible failure each) and makes the TQ coverage map coarse. [T8, TQ]
@@ -124,18 +155,22 @@ For each obligation, list every materially different value; the reference handle
   `go-junit-report -subtest-mode exclude-parents` in new mode; check the runner's equivalent for class or suite
   rows). A group's own failure must still fail the run through the build and zero-cases checks. [T8, verify]
 - Predeclare the expected test ids; one failure table: trigger (production build failure, test build failure,
-  collection failure, timeout, zero selected, missing or empty report, reporter failure), expected ids, raw
-  diagnostic, exit code. A missing or failed id fails under its own id, also on a build failure (C22; vet reports one
-  TestAcceptance case). The real status survives every pipe and reporter (C21). Stable unique ids; modes never
+  collection failure, timeout, zero selected, missing or empty report, reporter failure, a result reported twice),
+  expected ids, raw diagnostic, exit code. A missing or failed id fails under its own id, also on a build failure (C22;
+  vet reports one TestAcceptance case); where ids cannot be predeclared, one synthetic failing case per mode carrying
+  the log tail is enough, and a timeout is appended to the partial report as its own case (P1: 9/9 accepted, AR
+  praised "fail-safe"). The real status survives every pipe and reporter (C21). Stable unique ids; modes never
   merged (C23). [T8, verify]
 - The runner sets its own environment: the toolchain paths, writable scratch HOME and caches, no network. The probe
   runs the literal platform environment (offline, arbitrary uid without passwd, cleared HOME/env); never repair the
   environment in the probe except for values the platform supplies (R5). [T6, verify]
 - No elapsed wall time as proof of ordering or as a new latency promise; gates or a controlled clock for that.
-  Bounded watchdogs that end a hung test with a real diagnostic are fine (R7). Clean new run < 300 s; test.sh timeout
-  under the platform kill (C8). [T2, verify]
-- No leak words (challenge/quest/olympus/Shipd), no process words, no stray build outputs; test files named with a
-  short hash suffix; `./test.sh` committed with mode 100755. [test.sh rules, prechecks]
+  Bounded watchdogs that end a hung test with a real diagnostic are fine (R7). A gate releases a held step only if it
+  has not finished, then only the end state is asserted, so waiting and non-waiting designs both pass; "no matter how
+  long" is proven by jumping the controlled clock (monotonic and wall together) far ahead (P8, codex 7). Clean new run
+  < 300 s; test.sh timeout under the platform kill, or a hung run leaves no partial report (C8). [T2, verify]
+- No leak words (challenge/quest/olympus/Shipd), no process words, no stray build outputs; test files unique and named
+  in the repo's convention (a short hash suffix by default); `./test.sh` committed with mode 100755. [prechecks]
 
 ## 6. Implement tests and reference against the ledger
 Tests:
@@ -150,6 +185,9 @@ Tests:
 - Where an optional invalid input competes with existing error behaviour, grade the promised invariant and leave the
   precedence free unless the text or repo fixes it (C31: swift 412-over-413 FAIL_TEST_MISMATCH x5). [T5]
 - One-line reading risk for any assertion with a second reading. [T5]
+- At every assertion with an unpromised part, accept the allowed set explicitly (membership, sorted compare,
+  `None or <=`) and say so in a comment; leave the failure surface (raise, false return, logged error) free unless the
+  text fixes it, and grade only the effect (P4). [T5, T7]
 Reference:
 1. The change sits in the layer that owns the concern, passes data through existing interfaces and reuses the repo's
    helpers and formats. Read the header comments of every file you edit: they hold local rules (vet task 2: scanfile.go
@@ -161,18 +199,22 @@ Reference:
    [S1; B1, B3]
 3. Unknown, stale, optional and unsupported states behave as the contract and the repo's conventions require; trace
    fallback evidence to its authoritative source; an in-scope promise never silently degrades to a no-op (R6; vet
-   typo, older report). [S1]
+   typo, older report). A mode the text excludes keeps its exact old path behind one explicit check with a comment;
+   a sibling driver the feature does not support fails with a clear error naming the supported one (P11: SQ praised
+   both). [S1, S2]
 4. No hand-made tables of repository knowledge unless derived from code (vet per-plugin data map). [S1, S4]
 5. No kept residuals inside a promise, no excuse sentences; "the repo does the same" is no defense: fix it or cite the
    sentence that excludes it (B5: SQ 1/3-2/3 on 5 tasks). [S1]
 6. Every heuristic or threshold has its smallest breaking input in Discriminators (B6). Never weaken the reference to
    keep a passer (B7). Nothing out of scope, no unrequested cleanup or churn. [S1, S3]
 7. Code quality the repo enforces: its formatter and CI linters, no dead parameters or unused variables, comments
-   that state what the code does, docs/glossary/CHANGELOG consistent with the code, line width as the file. [S4, SQ]
+   that state what the code does, docs/glossary/CHANGELOG consistent with the code when the repo keeps them or the
+   change touches them, line width as the file. [S4, SQ]
 8. The repo's own review rules (REVIEW.md, CONTRIBUTING, AGENTS.md): read them before writing the reference and
    follow every rule the change touches. The platform SQ applies them (vet task 2: Code Quality 1/3 for no regression
-   test, REVIEW.md rule 4; rule 8 asks a user guarantee to bring an acceptance script and a catalog row). The
-   reference carries its own regression test in the repo's style, in files the hidden tests do not touch. [SQ, S2]
+   test, REVIEW.md rule 4; rule 8 asks a user guarantee to bring an acceptance script and a catalog row). When those
+   rules ask for it, the reference carries its own regression test in the repo's style, in files the hidden tests do
+   not touch; 8 of 9 accepted packages without such a rule had none. [SQ, S2]
 
 ## 7. Export and prove (ledger: Evidence)
 - Export the patches from explicit paths; check the file list, modes (`test.sh` 100755), applicability in grading
@@ -227,7 +269,8 @@ Reference:
 | Verify | tests fail without / pass with, stable, offline uid | 5, 7 |
 
 ## 10. Never (unfair or wasteful)
-Pin helper names, call counts, internal maps or file counts; turn a surviving variant into a finding without a
+Pin helper names, call counts, internal maps or file counts (never GRADE an internal; a harness wait or setup hook
+on repo-visible state is acceptable, rated "repo-discoverable" on 4 accepted packages); turn a surviving variant into a finding without a
 concrete failing scenario; pin behaviour only the reference's own docs state; force a race winner or error precedence
 the text does not state; grade unstated sizes, budgets or performance; build the full cross product of the axes (one
 case per distinct entry, form and guard, plus the interactions that expose a plausible wrong rule); copy another
