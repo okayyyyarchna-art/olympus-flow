@@ -37,7 +37,7 @@ and the scheduled independent confirmation (not an extra model call per row).
 | S2 | Native checks/regressions pass; patterns, interfaces and lifetimes remain compatible. | D + J |
 | S3 | Every hunk maps to required behavior/integration; no unrelated churn or grading bypass. | J + diff inventory |
 | S4 | No process residue, weird/generated comments, unjustified defenses or inconsistent conventions. | D lint + J |
-| Description | D1-D7 closed; grounded, single-reading, clear, necessary text; current count/category/prechecks. | D mechanics + J meaning |
+| Description | description.md (the rulebook) checklist all yes, under 250 site words; grounded, single-reading, clear, necessary text; current category/prechecks. | D mechanics + J meaning |
 
 Local target is clean description/tests/solution bands (3/3/3), with every concrete
 in-scope defect closed. This is the product's stronger target, not a claim that the

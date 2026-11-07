@@ -30,6 +30,8 @@ construction instructions, not a list of reviews to run after writing:
 | Hidden tests and fixtures | [tests.md](tests.md), [harness.md](harness.md) |
 | Reference implementation | [solution.md](solution.md) |
 | Proof, every repair, confirmation, hand-over | [gates.md](gates.md) |
+| Platform rollout results | [rollout.md](rollout.md) |
+| Stuck, looping, or unsure which fix path | [stuck-prompts.md](stuck-prompts.md) |
 
 The build-time [evidence report](../BUILD-3-report.md) maps the rule IDs to current
 observations, historical incidents and proposed controls; it is not needed to run
@@ -43,5 +45,8 @@ pass can coexist; agreement with the reference is not the definition of correctn
 Use [scripts/certify.py](scripts/certify.py) for byte fingerprints, structural package
 checks and strict JUnit reconciliation. It cannot decide fairness, completeness,
 authorship, or platform acceptance. Its command contract is in [gates.md](gates.md).
-No universal language adapter is bundled: discover and qualify the repository's
-own build, test listing and reporting commands before relying on them.
+Tools live in [tools/](tools/) and read the machine profile (machine/*.json) for every
+machine-specific value; [TOOLS.md](TOOLS.md) lists what exists and what is being built.
+Every long job runs as its own tracked background command. [description.md](description.md)
+is the description rulebook and its only source of truth (every description under 250
+site words).

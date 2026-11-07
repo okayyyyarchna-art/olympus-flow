@@ -17,17 +17,18 @@ prepare all fields before it. This skill does not authorize platform mutations.
 | 6. Deterministic closure | Four artifacts + variants + available solver patches -> four-cell proof, failure-probe evidence, discrimination/fair-alternative results | Run G0, then gate order G1 -> G2 -> G3 -> G4. No OPEN in-scope obligation, unexplained survivor, failed valid alternative, or stale execution evidence. |
 | 7. Owner's confirmation | Frozen candidate -> three sweeps of two independent lanes, two independent FP audits per passing run, two platform-style replica rounds | Follow the fixed schedule below. Findings invoke Repair before the next checkpoint. Required independent samples cannot be cached away. |
 | 8. Freeze and hand over | Closed candidate -> final four-cell/offline/stability proof, immutable package, exact hashes, ledger and compact hand-over | Final new-mode stability: six base and six reference runs with identical per-ID vectors; investigated differences block. Include repo URL, full pin, title/category/language, four files, image/build evidence, check IDs and remaining external gates. Call this LOCAL READY, not platform accepted. |
-| 9. Human platform validation | Exact frozen fields -> current prechecks, quality checks, rollout pool and FP findings | **Human runs checks/rollouts.** Read results via CLI after `--help`; compare uploaded/downloaded bytes when available. Require current readiness and classify every run. Repair in a new version, then repeat affected gates. |
+| 9. Human platform validation | Exact frozen fields -> current prechecks, quality checks, 2-2-2 rollout and FP findings | **Human runs checks/rollouts.** Read results via CLI after `--help`; compare uploaded/downloaded bytes. Classify every run; shape with [rollout.md](rollout.md). Repair in a new version, then repeat affected gates. |
 
 ## Confirmation schedule and remaining model runs
 
 1. At stage 2, two independent reading samples see draft + pinned repository only.
    Their question is semantic ambiguity/discoverability; grep cannot decide it.
-2. After stage 3 and a usable environment, start one bounded blind solve batch if
-   authorized by the task. Record model/family, effort, budget and sample IDs first.
-   Give only pinned source and locked task text. Inspect isolation and completion;
-   replays of one trajectory are not new solves. Local outcomes diagnose difficulty,
-   not predict platform percentages. Tests/solution edits need replay, not new solves.
+2. No local blind solves (owner decision 2026-11-07). Solver evidence comes from the
+   platform: when every platform check passes, the owner runs a 2-2-2 rollout (two runs
+   per model family). Do not wait for it: from the first locked draft onward keep
+   closing gaps (sweeps, replica rounds, repair). When the rollout lands, pull every
+   run read-only, add every patch to the permanent false-pass corpus, and follow
+   [rollout.md](rollout.md). Replays of one trajectory are not new runs.
 3. Stage 7: sweep 1 (lanes A/B) -> repair; sweep 2 (fresh A/B) -> repair;
    sweep 3 (fresh A/B) -> repair; replica round 1 -> repair; replica round 2 -> repair.
    Each sweep lane independently covers the entire G1-G4 contract. Each replica
@@ -46,7 +47,14 @@ not the report with the most findings. Package reviews on this machine use the
 configured fresh read-only `codex_review.sh` route and reviewer skill; do not silently
 substitute the builder session. Configure other lanes explicitly with the coordinator.
 
-Run Docker work one container at a time through the configured `dockrun.py` lock.
-Never bypass its lock or run `docker rm/rmi/prune`. Track long jobs and completion;
-queue probes while independent reading proceeds. Timeboxes trigger a progress report
-and a scope/budget decision, never omitted gates or automatic post-lock scope cuts.
+Container limits come from the machine profile (machine/*.json: slots, memory,
+parallel workers, cleanup permission), never from this file; run Docker work through
+the profile's `dockrun.py` lock. Every long job is its own tracked background command
+that blocks until it ends (no `&`, no detached shells), one per lane, so each lane's
+completion is seen at once. Queue experiments while independent reading proceeds.
+
+Time boxes (owner target 2-4 h local work; platform and human waits counted apart):
+0 Qualify 20 m | 1 Environment 20 m + owner build | 2-3 Meaning and lock 40 m + owner
+rewrite | 4 Tests 45 m | 5 Reference 45 m | 6 Closure 20 m | 7 Confirmation 3 x 35 m
+(sweeps) with replica rounds alongside | 8 Freeze 20 m. An overrun triggers a progress
+report and a decision with the owner, never an omitted gate or a post-lock scope cut.
