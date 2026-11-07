@@ -111,8 +111,8 @@ loose example that changes the rule ("ex: app.log.1").
     (implied cases listed apart); (c) the difficulty check: per hard point, the words that would give its cause away,
     grepped in the text and absent, and what the text must reveal because it is the requirement; (d) what stays NOT
     VERIFIED until the platform (its own extraction and DQ, the real difficulty). The locked text goes to the
-    build (tests and reference by the construction cards). No local solves: the owner runs the platform checks and a
-    2-2-2 rollout on the first complete draft (PIPELINE.md stage 5b).
+    build (tests and reference by the construction cards). No local solves: the owner runs the platform checks and the
+    calibration rollout on v1, the first complete package (PIPELINE.md stage 6b).
 
 ## 4. Checklist before the lock (all yes, or a named external check marked NOT VERIFIED)
 - [ ] one coherent objective; every boundary decided three-way (R11, R12)
