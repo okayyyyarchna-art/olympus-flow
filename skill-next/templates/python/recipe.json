@@ -1,0 +1,54 @@
+{
+  "name": "faust-task12-wip15",
+  "repository_url": "https://github.com/faust-streaming/faust",
+  "commit": "ca53750fdea332cdf5ac7088afc525691556c167",
+  "evidence": [
+    {
+      "location": "cc-faust-topic-start/wip15/Dockerfile:1",
+      "text": "Platform-accepted task 12; dependency install recipe. Runtime patch pin is locally verified separately."
+    },
+    {
+      "location": "cc-faust-topic-start/wip15/test.patch:52",
+      "text": "Cython rebuild and import checks; base regression surface."
+    }
+  ],
+  "settings": {
+    "dependency_install": "pip install --no-cache-dir --retries 10 --timeout 60 \\\n        aiohappyeyeballs==2.7.1 \\\n        aiohttp==3.14.3 \\\n        aiohttp-cors==0.8.1 \\\n        aiokafka==0.14.0 \\\n        aiosignal==1.4.0 \\\n        async-timeout==5.0.1 \\\n        attrs==26.1.0 \\\n        click==8.3.3 \\\n        colorlog==6.12.0 \\\n        croniter==5.0.1 \\\n        cython==3.1.2 \\\n        frozenlist==1.8.0 \\\n        intervaltree==3.2.1 \\\n        mode-streaming==0.7.1 \\\n        multidict==6.9.1 \\\n        mypy_extensions==1.1.0 \\\n        opentracing==2.4.0 \\\n        propcache==0.5.4 \\\n        pytest==7.4.4 \\\n        pytest-asyncio==0.23.8 \\\n        python-dateutil==2.9.0.post0 \\\n        pytz==2026.5 \\\n        six==1.17.0 \\\n        sortedcontainers==2.4.0 \\\n        terminaltables==3.1.10 \\\n        venusian==3.1.0 \\\n        yarl==1.25.1 \\\n    && pip install --no-cache-dir --no-build-isolation --no-deps -e .",
+    "toolchain": {
+      "version": "3.12.13"
+    },
+    "env": {
+      "FAUST_REQUIRE_CYTHON": "1",
+      "SETUPTOOLS_SCM_PRETEND_VERSION": "0.15.3"
+    },
+    "setup_commands": [
+      [
+        "python",
+        "setup.py",
+        "build_ext",
+        "--inplace"
+      ]
+    ],
+    "setup_imports": [
+      "faust.transport._cython.conductor",
+      "faust._cython.streams",
+      "faust._cython.windows"
+    ],
+    "selectors": {
+      "base": [
+        "tests/unit/test_cython_parity.py",
+        "tests/unit/transport",
+        "tests/unit/test_topics.py",
+        "tests/unit/app",
+        "tests/unit/agents",
+        "tests/unit/tables/test_recovery.py",
+        "tests/unit/test_streams.py",
+        "tests/functional/test_app.py",
+        "tests/functional/test_streams.py",
+        "tests/functional/test_channels.py",
+        "tests/functional/test_aiokafka.py",
+        "tests/functional/agents"
+      ]
+    }
+  }
+}

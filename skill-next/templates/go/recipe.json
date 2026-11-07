@@ -1,0 +1,26 @@
+{
+  "name": "vet-wip02",
+  "repository_url": "https://github.com/safedep/vet",
+  "commit": "7574fa1dd338d9543da1c1b33c7c7c4b9633a81f",
+  "evidence": [
+    {
+      "location": "cc-vet-unused-suppression/wip02/Dockerfile:6",
+      "text": "Proven explicit Go release install with published checksum, module download and production build."
+    },
+    {
+      "location": "cc-vet-unused-suppression/wip02/test.patch:143",
+      "text": "Affected base packages: policy, reportdoc, state, runner."
+    }
+  ],
+  "settings": {
+    "go_sha256": "65efbc80fdc1fa2cd2631cad5b481777a68e8725f34e89f50fc6ac714e379b40",
+    "selectors": {
+      "base": [
+        "./internal/policy",
+        "./internal/reportdoc",
+        "./internal/state",
+        "./internal/runner"
+      ]
+    }
+  }
+}
