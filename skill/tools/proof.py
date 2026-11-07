@@ -160,9 +160,10 @@ def run(image, patches, out, mode, solution, as_user=12345, platform=None,
     t0 = time.monotonic()
     proc = docker("run", "--rm", "--platform", platform, "--network", "none",
                   "--user", f"{as_user}:{as_user}", "--workdir", "/",
-                  # Docker mounts a tmpfs noexec by default; Go builds and runs its test binaries under /tmp,
-                  # as the platform's own runs do (vet task 2 proof: every Go test "fork/exec ... permission denied").
-                  "--tmpfs", "/out:rw,mode=1777", "--tmpfs", "/tmp:rw,exec,mode=1777",
+                  # /tmp stays the container's own writable /tmp: the image keeps its warm build cache there, as
+                  # on the platform. A tmpfs over it hid that cache, and a cold vet build filled the size-capped,
+                  # noexec tmpfs (vet task 2: "fork/exec ... permission denied", "no space left on device").
+                  "--tmpfs", "/out:rw,mode=1777",
                   "-v", f"{prepared}:/app:ro", "--entrypoint", "/usr/bin/env", image,
                   "-i", f"PATH={MINIMAL_PATH}", "/bin/bash", "-c", command, timeout=timeout)
     log, marker, xml = proc.stdout.partition("\n" + MARK + "\n")
