@@ -28,8 +28,6 @@ Read each card right before its stage; the cards are construction instructions, 
 | Stuck, looping, or unsure which fix path | [stuck-prompts.md](stuck-prompts.md) |
 
 Fixed rules:
-- **Read [BIAS.md](BIAS.md) at every stage exit and before every paste**, and log the bias check line in the
-  task's eval/decisions.md. It holds our decided priorities and the shortcuts that already cost us.
 - I paste, the owner runs: platform checks, rollouts, lock and submit are the owner's (platform.md).
 - The description is locked at stage 3 for good. The only exit is the owner's one final change in an extreme case
   (description.md section 5b). About 250 site words is guidance; the hard limit is 9 requirement units.

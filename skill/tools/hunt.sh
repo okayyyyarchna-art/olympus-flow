@@ -3,7 +3,7 @@
 # hunt lanes (Codex + claude2) serially. The coordinator starts the third lane (in-process, read-only) with
 # the same brief, then decides with hunt.md (part B).
 #   bash hunt.sh <github-url-or-owner/repo> ["already taken: one line per task to exclude"]
-# Output: ~/OSS/shipd/seams/work/<repo>/ (clone, brief.md, eval/codex/hunt.md, eval/claude2/hunt-free.md)
+# Output: $OLYMPUS_SEAMS_ROOT/work/<repo>-<yyyymmdd>/ (clone, brief.md, eval/codex/hunt.md, eval/claude2/hunt-free.md)
 set -uo pipefail
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/machine.sh" || exit 2
 # the whole body is one function: bash reads it completely before running, so editing this file while a run
@@ -11,7 +11,9 @@ source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/machine.sh" || exit 2
 main() {
 src="${1#https://github.com/}"; src="${src%.git}"; src="${src%/}"
 exclude="${2:-none}"
-name="${src##*/}"; W="$OLYMPUS_SEAMS_ROOT/work/$name"; mkdir -p "$W/eval"
+name="${src##*/}"
+# one folder per hunt: an earlier clone may back a task's git worktree (vet base/), so it is never reused
+W="$OLYMPUS_SEAMS_ROOT/work/$name-$(date +%Y%m%d)"; mkdir -p "$W/eval"
 here="$(cd "$(dirname "$0")/.." && pwd)"
 
 # eligibility (platform repo rules): 500+ stars, recent commit, permissive licence, not on our lists
