@@ -47,6 +47,16 @@ high, search mode), claude2 (Opus) and the in-process lane (Agent tool, read-onl
    cases on "which checks ran" and got 0/16).
 7. **Verify the top 3 myself:** open every cited file:line, re-run two novelty searches, write the 3-4 consequences
    in plain words. A claim that does not hold removes the candidate.
-8. **Pick** the highest verified score; ties go to the one whose consequences meet more different subsystem pairs,
+8. **Blocker check on the pick (and on a runner-up before it replaces the pick)**, written as a table in the seam
+   bank, each row with file:line evidence; a row that cannot be cleared drops the candidate:
+   - every consequence has a deterministic test path through an existing repo seam (CLI, stub counters, the
+     engine's own stage hook); no sleep-then-act ordering (Auto Review T2 Medium on goka and task 8);
+   - base tests that pin the current behaviour of every function the fix touches (grep their tests; task 12 lost
+     15 of 22 runs to one pin): a deselect plan or a design that keeps them valid;
+   - sibling paths of the same rule (other queries, modes, the pull-request base side, counts) that the reference
+     must also cover (task 11 SQ FAIL x2 on an unread driver path);
+   - situations.md P-1..P-7, side effects across scans (caches), and the base at the current tip;
+   - difficulty: the hard points and why a strong agent misses them, and the problem-design.md p^k sizing.
+9. **Pick** the highest verified score; ties go to the one whose consequences meet more different subsystem pairs,
    then to the smaller change. Record the top 3 in `$OLYMPUS_SEAMS_ROOT/<owner>-<repo>.md` (seam-bank.md schema) and
    give the owner a short table: pick, why, two runners-up. The owner may override; otherwise stage 1 starts.
