@@ -17,6 +17,7 @@
     }
   ],
   "settings": {
+    "timeout": 600,
     "setup_commands": [
       [
         "go",

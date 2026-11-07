@@ -115,6 +115,12 @@ class Discovery(unittest.TestCase):
         checked = subprocess.run(["git", "-C", str(task / "base"), "apply", "--check", str(patch_file)], capture_output=True, text=True)
         self.assertEqual(checked.returncode, 0, checked.stderr)
         self.assertIn("new mode 100755", patch_file.read_text())
+        check = repo_check.Check.__new__(repo_check.Check)
+        check.task, check.out = task, task / "check"
+        check.out.mkdir()
+        reconstructed = check.source("exported", patch_file)
+        self.assertEqual((reconstructed / "test.sh").read_bytes(), (task / "init/test.sh").read_bytes())
+        self.assertEqual(repo_init.git(task / "base", "status", "--porcelain"), "")
         p = json.loads((task / "profile.json").read_text())
         p["build_commands"] = "go test ./..."
         with self.assertRaisesRegex(ValueError, "test runner in RUN"):
@@ -127,6 +133,48 @@ class Discovery(unittest.TestCase):
             p["restore_paths"] = [name]
             with self.subTest(name=name), self.assertRaises(ValueError):
                 repo_init.validate(p)
+
+    def test_first_qualification_accepts_exact_skips_absent_from_static_ids(self):
+        self.files({"p.py": "value = 1\n", "tests/test_p.py": "def test_x(): pass\n"})
+        task = self.repo / "task"
+        task.mkdir()
+        subprocess.run(["git", "clone", "-q", "--no-local", str(self.repo), str(task / "base")], check=True)
+        profile = repo_init.discover(task / "base")
+        profile.update(identity={"commit": repo_init.git(self.repo, "rev-parse", "HEAD")},
+                       environment={"platform": "linux/amd64"}, dependency_install="true", development_install="true")
+        profile["toolchain"]["version"] = "3.12.13"
+        exact = "native::test_x[param]"
+        profile["skip_allowlist"] = {exact: "known optional backend"}
+        self.assertNotIn(exact, profile["expected"]["base"])
+        repo_init.save(task, profile)
+        check = repo_check.Check.__new__(repo_check.Check)
+        check.task, check.profile, check.out = task, profile, task / "check"
+        check.out.mkdir()
+        check.results, check.image, check.cache_volume, check.timeout = [], None, None, 660
+        check.docker = lambda *args, **kwargs: subprocess.CompletedProcess(args, 0, "sha256:fixture", "")
+
+        def invoke(source, label, extra=(), discover=False, relative=False):
+            if discover:
+                return 0, "", "=====ADAPTER-IDS=====\n" + json.dumps({exact: "tests/test_p.py::test_x[param]"}) + "\n"
+            (check.out / "offline-base.json").write_text('{"seconds": 0.01}')
+            return 0, '<testsuite><testcase classname="native" name="test_x[param]"><skipped/></testcase></testsuite>', ""
+
+        machine = TOOLS.parents[1] / "machine/windows-asus.json"
+        with patch.dict(os.environ, OLYMPUS_MACHINE=str(machine)):
+            import proof
+
+            def main():
+                skips = Path(sys.argv[sys.argv.index("--base-skips") + 1])
+                self.assertEqual(json.loads(skips.read_text()), [])
+                patches = check.out / "patches"
+                patches.mkdir()
+                (patches / "test.patch").write_bytes((task / "init/test.patch").read_bytes())
+                proof.run("fixture-image", patches, check.out / "base-base", "base", False, allowed_skips=[])
+                return 0
+
+            with patch.object(proof, "main", main), patch.object(check, "invoke", invoke), contextlib.redirect_stdout(io.StringIO()):
+                self.assertTrue(check.build())
+        self.assertEqual(profile["expected"]["base"], [exact])
 
     def test_import_probe_targets_loaded_package_instead_of_examples(self):
         self.files({"p/__init__.py": "", "p/core.py": "value = 1\n", "examples/__init__.py": "",

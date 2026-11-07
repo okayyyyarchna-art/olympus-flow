@@ -18,6 +18,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import uuid
 from xml.etree import ElementTree as ET
 
 from machine import load
@@ -93,6 +94,7 @@ class Check:
         self.results = []
         self.checked_runner_sha = None
         self.image = None
+        self.cache_volume = "olympus-repo-check-" + uuid.uuid4().hex if self.profile["language"] == "go" else None
         self.env = dict(os.environ, DOCKRUN_SLOTS="1", PYTHONDONTWRITEBYTECODE="1")
         if self.machine["os"] == "windows":
             self.env["MSYS_NO_PATHCONV"] = "1"
@@ -107,7 +109,13 @@ class Check:
 
     def docker(self, *args, timeout=None):
         if args[0] == "run":
-            args = ("run", "--memory", str(self.machine["docker"]["memory_gb"]) + "g", *args[1:])
+            cache = ()
+            if self.cache_volume and self.image and self.image in args:
+                cache = ("-v", self.cache_volume + ":/opt/adapter-gocache")
+                (self.out / "cache.json").write_text(json.dumps({"volume": self.cache_volume, "seed_image": self.image,
+                    "scope": "this checker invocation only; image-seeded Go build cache", "test_result_cache": "disabled by -count=1",
+                    "cleanup": "retained; no Docker cleanup authorized"}, indent=2) + "\n", encoding="utf-8")
+            args = ("run", "--memory", str(self.machine["docker"]["memory_gb"]) + "g", *cache, *args[1:])
         argv = [self.machine["python"], str(self.lock), *args]
         duration = timeout or (3600 if args[0] == "build" else self.timeout)
         if args[0] == "build":
@@ -133,10 +141,13 @@ class Check:
             raise RuntimeError(f"Docker watchdog expired after {duration}s; tracked process tree stopped")
         return subprocess.CompletedProcess(argv, proc.returncode, stdout, stderr)
 
-    def source(self, label):
+    def source(self, label, patch=None):
         path = Path(tempfile.mkdtemp(prefix=f"source-{label}-", dir=self.out)) / "repo"
         subprocess.run(["git", "clone", "-q", "--no-local", str(self.task / "base"), str(path)], check=True)
-        shutil.copyfile(self.task / "init/test.sh", path / "test.sh")
+        if patch:
+            subprocess.run(["git", "-C", str(path), "apply", "--whitespace=nowarn", str(patch)], check=True)
+        else:
+            shutil.copyfile(self.task / "init/test.sh", path / "test.sh")
         (path / "test.sh").chmod(0o755)
         return path
 
@@ -197,6 +208,13 @@ class Check:
 
         def qualify(image, patches, out, mode, solution, **kwargs):
             self.image = image
+            if self.cache_volume:
+                seed = self.docker("run", "--rm", "--platform", self.profile["environment"]["platform"],
+                                   "--network", "none", "--user", "0:0", "--entrypoint", "/bin/sh", image,
+                                   "-c", "chmod a+rwx /opt/adapter-gocache")
+                (self.out / "cache-seed.log").write_text(seed.stdout + seed.stderr, encoding="utf-8")
+                if seed.returncode:
+                    raise ValueError("Go cache volume initialization failed; cache-seed.log")
             source = self.source("discovery")
             code, _, log = self.invoke(source, "discovery", discover=True)
             marker = "=====ADAPTER-IDS=====\n"
@@ -205,6 +223,8 @@ class Check:
             ids = json.loads(log.split(marker, 1)[1].splitlines()[0])
             if not ids:
                 raise ValueError("zero IDs discovered")
+            if set(self.profile["skip_allowlist"]) - set(ids):
+                raise ValueError("base skip allowlist contains IDs absent from successful native discovery")
             self.profile["expected"]["base"] = sorted(ids)
             self.profile["native_ids"] = ids
             self.profile["ids_qualified"] = True
@@ -212,9 +232,18 @@ class Check:
             save(self.task, self.profile)
             patch_runner(self.task)
             shutil.copyfile(self.task / "init/test.patch", patches / "test.patch")
-            kwargs["expected_ids"] = sorted(ids)
             self.record("native-discovery", True, f"{len(ids)} named IDs; discovery.log")
-            return old_run(image, patches, out, mode, solution, **kwargs)
+            if mode != "base" or solution:
+                raise ValueError("repository self-check only qualifies pristine base mode")
+            source = self.source("offline-base", patches / "test.patch")
+            code, xml, log = self.invoke(source, "offline-base")
+            out.mkdir(parents=True, exist_ok=True)
+            (out / "base.log").write_text(log, encoding="utf-8")
+            (out / "base.xml").write_text(xml, encoding="utf-8")
+            timing = json.loads((self.out / "offline-base.json").read_text())
+            (out / "base-exit.json").write_text(json.dumps(timing), encoding="utf-8")
+            evidence = proof.inspect_junit(xml.encode(), sorted(ids), "pass", code, self.profile["skip_allowlist"])
+            return evidence["results"], timing["seconds"]
 
         proof.run = qualify
         patch_runner(self.task)
@@ -223,7 +252,9 @@ class Check:
         bootstrap_ids = self.out / "build-only-unused-new-ids.json"
         bootstrap_ids.write_text(json.dumps(provisional), encoding="utf-8")
         skips = self.out / "base-skips.json"
-        skips.write_text(json.dumps(list(self.profile["skip_allowlist"])), encoding="utf-8")
+        # Exact parametrized skip IDs may not exist in the provisional static map.
+        # The qualification callback validates them against native discovery first.
+        skips.write_text("[]\n", encoding="utf-8")
         sys.argv = [str(Path(proof.__file__)), str(self.task / "base"), str(self.task / "init"),
                     "--base-ids", str(self.task / "init/base-ids.json"),
                     "--new-ids", str(bootstrap_ids), "--build-only", "--final",
