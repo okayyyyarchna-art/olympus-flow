@@ -26,7 +26,7 @@ would like vet to tell us about these.").
 | No direction: no where/how/why, no bug narration that names a place, mechanism or cause | vet wip01: three direction lines ("Currently if another suppression is before it in the list ...") -> 3/4 solves; removed -> ~1/4. turso "We currently support IN, EXISTS and NOT EXISTS in materialized views" points at the code to extend |
 | No corner lists | docker proxy 5 corners, live readers 7; November texts 0 |
 | No meta-instructions to the solver ("go through every file") | producer-flush opening: the only description issue any check raised (AR description band 2) |
-| **Under 250 site words, always** (user 2026-11-07; site split on space, - and /); the platform cap (1000 today) is far above it | user rule |
+| Keep it short: under 250 site words as guidance (not a hard limit); the hard limit is the requirement count: at most 9 (owner 2026-11-07) | owner rule |
 | Target 5-8 requirements (user 2026-11-07: 6-8 is fine; the platform accepts up to ~9 and blocks at ~10+: elio 13, turso 16); count with the DQ replica before the lock | accepted since 2026-10-16: swift 6, vet 6, dead-letter 8, topic start 8 |
 | One sentence = one outcome; "also / even when / instead" clauses and a parenthetical carrying an outcome each count | elio and task 11: one parenthetical rule -> "too many requirements" |
 | Every sentence has ONE reading; prefer the repo's own term for a state | vet "did not run" (vet prints it for outages) -> 3 sweeps and a re-lock; "turned off" = the repo's word |
@@ -85,7 +85,7 @@ family. These numbers drift upward as agents improve: re-calibrate on the newest
 
 ## 4. Checklist before the lock (all yes)
 - [ ] every sentence is an outcome, a scope line or an anchor (plus at most one line of context)
-- [ ] under 250 site words; 5-8 units, each tested; no sentence without a test; no test without a sentence
+- [ ] at most 9 requirement units (target 5-8), each tested; short (about 250 site words as guidance); no sentence without a test; no test without a sentence
 - [ ] no direction (where/how/why), no corner list, no excuse, no meta-instruction, no URI scheme
 - [ ] every key word grepped; repo's own term; one reading per sentence (reading audit clean)
 - [ ] scope words and exclusions second-read both ways; every unreachable variant named in the scope line

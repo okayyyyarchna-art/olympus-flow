@@ -27,13 +27,6 @@ def site_words(text):
     return len([w for w in re.split(r"[\s\-/]+", text.strip()) if w])
 
 
-def description_count(text):
-    # the platform's precheck count runs above the site-word split (vet: 147 site words, platform 206 ~ chars/4);
-    # the stricter of the two estimates is checked against the 250 limit
-    return max(site_words(text), round(len(text.replace("
-", "").strip()) / 4))
-
-
 def patch_files(patch):
     return re.findall(r"^diff --git a/(\S+) b/(\S+)", patch, re.M)
 
@@ -59,9 +52,7 @@ def main():
     urls = re.findall(r"\b[a-z][a-z0-9+.-]*://\S*|\bwww\.[a-z0-9-]+\.\S+", desc, re.I)
     out("FAIL" if urls else "PASS", "description has no URLs or scheme://", ", ".join(urls[:3]))
     w = site_words(desc)
-    c = description_count(desc)
-    out("FAIL" if c >= 250 else "PASS", "description length (must be under 250: max of site words and chars/4)",
-        f"{c} (site words {w}, chars/4 {round(len(desc.replace(chr(10), '').strip()) / 4)})")
+    out("WARN" if w >= 250 else "PASS", "description site words (guidance: under 250; split on space - /)", str(w))
     out("FAIL" if w > 1000 else "PASS", "description platform ceiling (1000 site words)", str(w))
     long_lines = [l for l in desc.splitlines() if l.strip()]
     wrapped = sum(1 for l in long_lines if 60 <= len(l) <= 80) >= 4 and all(len(l) <= 100 for l in long_lines)
