@@ -128,6 +128,57 @@ def slot_limit(limit, override=None):
         result = self.run_tool("round.sh", self.task, "r1", "--check", "sq-a", ROUND_SLOTS="-1")
         self.assertEqual(result.returncode, 2)
 
+    def test_round_gate_propagates_real_summary_failure(self):
+        self.mock_lanes()
+        shutil.copy(ROOT / "tools/summarize.py", self.skill / "tools/summarize.py")
+        result = self.run_tool("round.sh", self.task, "r1", "--check", "gate")
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("GATE FAIL", result.stdout)
+        self.assertFalse((self.task / "calls").exists())
+
+    def test_complete_round_passes_with_both_samples_and_union(self):
+        from test_summarize import clean_reports
+        import json
+        fixture = self.root / "reports.json"
+        fixture.write_text(json.dumps(clean_reports()))
+        shutil.copy(ROOT / "tools/summarize.py", self.skill / "tools/summarize.py")
+        (self.skill / "tools/replica.sh").write_text('''[ "${4:-}" != --validate-only ] || exit 0
+mkdir -p "$1/eval/replica"
+python -c 'import json,sys,pathlib; name=sys.argv[2]+"-"+sys.argv[3]+".json"; data=json.load(open(sys.argv[4])); pathlib.Path(sys.argv[1],"eval/replica",name).write_text(json.dumps(data[name]))' "$1" "$2" "$3" "$MOCK_REPORTS"
+''')
+        result = self.run_tool("round.sh", self.task, "r1", MOCK_REPORTS=fixture.as_posix())
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("GATE PASS", result.stdout)
+        union = json.loads((self.task / "eval/replica/sq-r1.json").read_text())
+        self.assertEqual({s["source"] for s in union["sourceReports"]}, {"sq-r1a", "sq-r1b"})
+
+    def test_claude_child_exit_and_fresh_report_are_both_required(self):
+        shutil.copy(ROOT / "tools/lib/claude2_run.sh", self.skill / "tools/lib/claude2_run.sh")
+        config = self.skill / "tools/machine.sh"
+        with config.open("a") as f:
+            f.write('''OLYMPUS_OS=linux
+OLYMPUS_CLAUDE2_CONFIG_DIR="$OLYMPUS_TOOLS/config"
+OLYMPUS_CLAUDE_CONFIG_DIR="$OLYMPUS_TOOLS/config"
+OLYMPUS_MEMORY_DIR="$OLYMPUS_TOOLS/memory"
+OLYMPUS_COORDINATOR_ROOT="$OLYMPUS_TOOLS"
+OLYMPUS_CLAUDE_BIN="$OLYMPUS_TOOLS/fake-model.sh"
+machine_host() { printf '%s\\n' "$1"; }
+machine_config() { printf '%s\\n' "$1"; }
+''')
+        model = self.skill / "tools/fake-model.sh"
+        model.write_text('''#!/usr/bin/env bash
+mkdir -p "$MOCK_TASK/eval/claude2"
+[ "${MOCK_NO_REPORT:-}" = yes ] || echo result > "$MOCK_TASK/eval/claude2/pkg-ar.md"
+exit "${MOCK_EXIT:-0}"
+''')
+        model.chmod(0o755)
+        brief = self.task / "brief.md"
+        brief.write_text("offline fixture")
+        for code, missing, expected in (("0", "no", 0), ("7", "no", 1), ("0", "yes", 1)):
+            result = self.run_tool("lib/claude2_run.sh", "ar", self.task, "pkg", brief, "high",
+                                   MOCK_TASK=self.task.as_posix(), MOCK_EXIT=code, MOCK_NO_REPORT=missing)
+            self.assertEqual(result.returncode, expected, result.stdout + result.stderr)
+
 
 if __name__ == "__main__":
     unittest.main()

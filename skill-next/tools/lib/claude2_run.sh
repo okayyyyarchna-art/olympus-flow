@@ -75,6 +75,7 @@ tables the brief points to, and add a section 'Against earlier decisions' listin
 prompt="$task
 
 $rules"
+rm -f "$report"
 args=(-p "$prompt" --effort "$effort" --permission-mode acceptEdits
       --allowedTools "Bash,Read,Grep,Glob,Write,Edit,Agent" --add-dir "$T" --add-dir "$OLYMPUS_CLAUDE_CONFIG_DIR/skills")
 [ -n "$agent" ] && args+=(--agent "$agent")
@@ -90,4 +91,7 @@ cd "$wd" && CLAUDE_CONFIG_DIR="$(machine_config "${CLAUDE2_CONFIG_DIR:-$OLYMPUS_
   < /dev/null > "$log" 2>&1
 rc=$?
 echo "claude2 $role exit=$rc (report: $report)"
-[ -s "$report" ] || echo "WARNING: no report written at $report - check $log"
+if [ "$rc" -ne 0 ] || [ ! -s "$report" ]; then
+  echo "job failed or no report written at $report - check $log" >&2
+  exit 1
+fi

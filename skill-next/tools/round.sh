@@ -30,6 +30,9 @@ main() {
     bash "$R" "$T" "$check" "$tag" --validate-only || return 2
   done
   mkdir -p "$out"
+  local audits=()
+  for c in "${checks[@]}"; do case "$c" in ref-audit-*) audits=(--ref-audits);; esac; done
+  "$PY" "$OLYMPUS_TOOLS/summarize.py" "$out" "$tag" --declare "${audits[@]}" || return 2
   # Capacity comes from the machine profile.
   local slots="$OLYMPUS_WORK_ROOT/.round-slots" slot="" pid i
   mkdir -p "$slots"
@@ -50,10 +53,17 @@ main() {
     esac
     if [ "$c" = gate ]; then
       "$PY" "$OLYMPUS_TOOLS/summarize.py" "$out" "$tag" | tee "$out/summary-$tag.md"
-      rc=${PIPESTATUS[0]}
+      local statuses=("${PIPESTATUS[@]}")
+      rc=${statuses[0]}
+      [ "${statuses[1]}" = 0 ] && [ -s "$out/summary-$tag.md" ] || rc=1
     else
       report="$out/$check-$sample.json"
       rm -f "$report" "$out/$check-${sample}_cx.json"
+      if [ "$check" = ar ] || [ "$check" = verify ]; then
+        if ! "$PY" "$OLYMPUS_TOOLS/summarize.py" "$out" "$tag" --merge-sq; then
+          failed=1; continue
+        fi
+      fi
       bash "$R" "$T" "$check" "$sample" > "$out/$check-$sample.log" 2>&1
       rc=$?
       [ -s "$report" ] || { echo "missing or empty report: $report" >&2; rc=1; }

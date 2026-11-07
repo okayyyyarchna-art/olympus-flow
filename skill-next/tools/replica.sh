@@ -40,15 +40,20 @@ done
 P="$T/pkg"; [ -f "$P/test.patch" ] || P="$T"
 desc="$P/description.md"; [ -f "$desc" ] || desc="$P/task.md"
 others=""
-latest() {  # this tag's result for a check, else its newest result (checks not re-run keep their last result)
-  if [ -f "$out/$1-$tag.json" ]; then echo "$out/$1-$tag.json"; else ls -t "$out/$1-"*.json 2>/dev/null | grep -v -E -- "-[^/]*[ab]\.json$" | head -1; fi
-}
 if [ "$check" = ar ]; then
-  for c in fairness sq dq; do f="$(latest $c)"; [ -n "$f" ] && others="$others $f"; done
+  for c in fairness sq dq; do
+    require_files "$out/$c-$tag.json" || exit 2
+    others="$others $out/$c-$tag.json"
+  done
 fi
 if [ "$check" = verify ]; then
-  for f in "$out"/sq-"$tag"?.json; do [ -f "$f" ] && others="$others $f"; done
-  for c in sq fairness ar; do f="$(latest $c)"; [ -n "$f" ] && others="$others $f"; done
+  for f in "$out/sq-${tag}a.json" "$out/sq-${tag}b.json" "$out/fairness-$tag.json" "$out/dq-$tag.json" "$out/ar-$tag.json"; do
+    require_files "$f" || exit 2
+    others="$others $f"
+  done
+  for f in "$out/ref-audit-${tag}ra.json" "$out/ref-audit-${tag}rb.json"; do
+    [ ! -f "$f" ] || others="$others $f"
+  done
 fi
 brief="$out/brief-$check-$tag.md"
 cat > "$brief" <<EOF
@@ -67,11 +72,19 @@ Task files:
 - agent runs: $( [ -d "$T/runs" ] && echo "$T/runs/" || echo "none" )
 - other replica outputs to use: ${others:-none}
 
+Finding identities for verification: source is the exact report filename without .json.
+Use SQ title, AR claim, fairness requirement (coverage) or test name (fairness/concerns),
+DQ quote, and reference-audit promise as the finding id. Dispose of every finding at
+every severity, including DQ comments and reference-audit gaps when supplied. Each
+KEEP/DROP needs evidence; each DROP needs a supported dropReason. Missing dispositions
+and every unresolved in-scope finding block the checkpoint, including Medium and Low.
+
 Write the JSON result to: $out/$check-$tag.json
 Return a short Markdown summary as your final answer (verdict line first).
 EOF
 bash "$OLYMPUS_LIB/check_codex_brief.sh" "$brief" "$out/prompts/common.md" "$out/prompts/$check.md" $kbl >/dev/null \
   || { echo "brief has flagged words; reword before launch" >&2; exit 3; }
+rm -f "$out/$check-$tag.json" "$out/$check-${tag}_cx.json"
 CODEX_MODEL="$model" CODEX_ONE_OFF_EFFORT="$effort" bash "$OLYMPUS_LIB/codex_job.sh" "$T" "replica-$check-$tag" "$brief" "$effort" judge
 rc=$?; [ "$rc" = 0 ] || exit "$rc"
 cp -f "$T/eval/codex/replica-$check-$tag.md" "$out/$check-$tag.md" 2>/dev/null || true

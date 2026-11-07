@@ -15,7 +15,7 @@ spec.loader.exec_module(precheck)
 
 class DescriptionLimit(unittest.TestCase):
     def test_boundaries_and_platform_ceiling(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(dir=Path(__file__).parent) as tmp:
             pkg = Path(tmp)
             for name in ("test.patch", "solution.patch"):
                 (pkg / name).write_text("")
