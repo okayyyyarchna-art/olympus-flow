@@ -105,7 +105,12 @@ loose example that changes the rule ("ex: app.log.1").
    a concrete case, to fix in their own words.
 10. **Word reach and reading check on every changed word**; DQ replica and precheck.py on the exact bytes.
 11. **Lock** together with the owner. Lock record: hash, pinned commit, category, the test/reference snapshot
-    reviewed, the count method and result, and the external checks still NOT VERIFIED. The locked text goes to the
+    reviewed, the count method and result, and the external checks still NOT VERIFIED. Before the lock the owner gets
+    the **lock report** without asking (vet task 2: the owner had to ask for each part): (a) the unit count, mine and
+    the DQ replica's; (b) one row per sentence: obligation, the test that checks it, and the hard point behind it
+    (implied cases listed apart); (c) the difficulty check: per hard point, the words that would give its cause away,
+    grepped in the text and absent, and what the text must reveal because it is the requirement; (d) what stays NOT
+    VERIFIED until the platform (its own extraction and DQ, the real difficulty). The locked text goes to the
     build (tests and reference by the construction cards). No local solves: the owner runs the platform checks and a
     2-2-2 rollout on the first complete draft (PIPELINE.md stage 5b).
 
