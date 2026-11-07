@@ -152,7 +152,10 @@ Tests:
 - One-line reading risk for any assertion with a second reading. [T5]
 Reference:
 1. The change sits in the layer that owns the concern, passes data through existing interfaces and reuses the repo's
-   helpers and formats. New interface methods keep unaffected implementations working by the language's own
+   helpers and formats. Read the header comments of every file you edit: they hold local rules (vet task 2: scanfile.go
+   "rows hold the record JSON next to the columns that queries filter on" -> a JSON filter cost Code Quality). List
+   every caller and consumer of a function whose result changes, and keep or decide each one's contract (vet task 2:
+   a new copy rule changed what the local code-usage enricher received). New interface methods keep unaffected implementations working by the language's own
    mechanism, and any default or fallback is proven safe for its real callers (R6). [S2, S3]
 2. Every path, store, mode, transition and fault in the Paths section is handled, or excluded by a scope sentence.
    [S1; B1, B3]
