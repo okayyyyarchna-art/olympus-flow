@@ -25,6 +25,9 @@ prepare all fields before it. This skill does not authorize platform mutations.
 | 9. Freeze and hand over | Closed candidate -> final four-cell/offline/stability proof, immutable package, exact hashes, ledger and compact hand-over | Final new-mode stability: six base and six reference runs with identical per-ID vectors; investigated differences block. Include repo URL, full pin, title/category/language, four files, image/build evidence, check IDs and remaining external gates. Call this LOCAL READY, not platform accepted. |
 | 10. Human platform validation | Exact frozen fields -> final checks, rollout to 4+ per family, FP panel | **Human runs checks/rollouts and submits.** Read results via CLI after `--help`; compare uploaded/downloaded bytes. Classify every run with [rollout.md](rollout.md). |
 
+**Every stage exit:** walk [BIAS.md](BIAS.md) (B1-B12) and write `bias check <stage>: ...` in eval/decisions.md
+before moving on. A stage is not done without that line.
+
 ## Confirmation schedule and remaining model runs
 
 1. At stage 2, two independent reading samples see draft + pinned repository only.
