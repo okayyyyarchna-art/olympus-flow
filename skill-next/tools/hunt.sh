@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # S0 when the user gives a repository: eligibility facts, clone at the tip, one shared brief, and two of the three
-# hunt lanes (Codex + claude2) in the background. The coordinator starts the third lane (in-process, read-only) with
+# hunt lanes (Codex + claude2) serially. The coordinator starts the third lane (in-process, read-only) with
 # the same brief, then decides with references/hunt.md.
 #   bash hunt.sh <github-url-or-owner/repo> ["already taken: one line per task to exclude"]
 # Output: ~/OSS/shipd/seams/work/<repo>/ (clone, brief.md, eval/codex/hunt.md, eval/claude2/hunt-free.md)
@@ -38,12 +38,17 @@ open(out, "w", encoding="utf-8", newline="\n").write(s)
 EOF
 bash "$OLYMPUS_LIB/check_codex_brief.sh" "$W/brief.md" >/dev/null || { echo "brief has flagged words; reword the exclude line" >&2; exit 3; }
 
-# lane 1: Codex (GPT Sol 6.1, search mode reads only the brief)
-( bash "$OLYMPUS_LIB/codex_job.sh" "$W" hunt "$W/brief.md" high search > "$W/eval/codex-lane.log" 2>&1 & )
+# Each child blocks; retain failures while still waiting for every lane.
+failed=0
+rm -f "$W/eval/codex/hunt.md" "$W/eval/claude2/hunt-free.md"
+bash "$OLYMPUS_LIB/codex_job.sh" "$W" hunt "$W/brief.md" high search > "$W/eval/codex-lane.log" 2>&1 || failed=1
+[ -s "$W/eval/codex/hunt.md" ] || failed=1
 # lane 2: claude2 (second Claude account, Opus)
 c2="$OLYMPUS_LIB/claude2_run.sh"
-( bash "$c2" free "$W" hunt "$W/brief.md" high > "$W/eval/claude2-lane.log" 2>&1 & )
-echo "started: Codex -> $W/eval/codex/hunt.md ; claude2 -> $W/eval/claude2/hunt-free.md"
+bash "$c2" free "$W" hunt "$W/brief.md" high > "$W/eval/claude2-lane.log" 2>&1 || failed=1
+[ -s "$W/eval/claude2/hunt-free.md" ] || failed=1
+echo "completed: Codex -> $W/eval/codex/hunt.md ; claude2 -> $W/eval/claude2/hunt-free.md"
 echo "next: start the in-process lane (read-only) with $W/brief.md, save its report to $W/eval/inprocess-hunt.md"
+return "$failed"
 }
 main "$@"; exit $?

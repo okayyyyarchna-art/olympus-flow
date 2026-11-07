@@ -1,29 +1,45 @@
 #!/usr/bin/env bash
-# S5 gap sweep (user rule 2026-11-06): ONE review round that must find every gap at once, all lanes in parallel.
-#   bash sweep.sh <task-dir> [tag]
-# Lanes started here (background, independent): claude2 olympus-auto-reviewer + olympus-sq-judge with the shared sweep
-# brief, and 2 GPT Sol 6.1 HIGH reference auditors (ref-audit). The coordinator starts the in-process lanes at the same
-# time with the Agent tool: olympus-auto-reviewer and olympus-tq-judge, each told to follow replicas/sweep-brief.md.
-# Then: merge every report, dedupe, reproduce, fix ALL gaps in one batch, prove each new test with a battery variant.
-# The platform-shaped replica round (round.sh) runs once afterwards only as the final gate.
+# Tracked: sweep.sh <task> <tag> --lane ar|sq|ref-a|ref-b (one blocking job and report).
+# Convenience aggregate: sweep.sh <task> [tag] runs all lanes serially and waits for every child.
 set -uo pipefail
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/machine.sh" || exit 2
 source "$OLYMPUS_LIB/inputs.sh"
-# the whole body is one function: bash reads it completely before running, so editing this file while a run
-# is in progress cannot break that run (vet 2026-11-06: an edit mid-run garbled the tail of solvers.sh)
 main() {
-T=$(cd "$1" && pwd); tag="${2:-s1}"; here=$(cd "$(dirname "$0")/.." && pwd)
-require_files "$here/replicas/sweep-brief.md" || exit 2
-bash "$here/tools/replica.sh" "$T" ref-audit "sw${tag}a" --validate-only || exit 2
-brief="$T/eval/sweep-brief-$tag.md"; mkdir -p "$T/eval/claude2"
-{ cat "$here/replicas/sweep-brief.md"; printf '\nTask folder: %s\n' "$T"; } > "$brief"
-bash "$OLYMPUS_LIB/check_codex_brief.sh" "$brief" >/dev/null || { echo "brief has flagged words" >&2; exit 3; }
-C2_SUFFIX="sweep-$tag" bash "$OLYMPUS_LIB/claude2_run.sh" ar "$T" pkg "$brief" high > "$T/eval/claude2/sweep-$tag-ar.log" 2>&1 &
-C2_SUFFIX="sweep-$tag" bash "$OLYMPUS_LIB/claude2_run.sh" sq "$T" pkg "$brief" high > "$T/eval/claude2/sweep-$tag-sq.log" 2>&1 &
-bash "$here/tools/replica.sh" "$T" ref-audit "sw${tag}a" > "$T/eval/sweep-$tag-ref-a.log" 2>&1 &
-sleep 2; bash "$here/tools/replica.sh" "$T" ref-audit "sw${tag}b" > "$T/eval/sweep-$tag-ref-b.log" 2>&1 &
-echo "sweep $tag started: claude2 ar + sq, ref-audit sw${tag}a + sw${tag}b; start the in-process lanes now (auto-reviewer, tq-judge)"
-wait
-echo "sweep $tag lanes done: eval/claude2/pkg-*-sweep-$tag.md, eval/replica/ref-audit-sw${tag}*.json"
+  [ "$#" -ge 1 ] || return 2
+  local T tag brief lane report rc failed=0
+  T=$(cd "$1" && pwd) || return 2; tag="${2:-s1}"
+  shift; [ "$#" = 0 ] || shift
+  local lanes=(ar sq ref-a ref-b)
+  if [ "$#" -gt 0 ]; then
+    [ "$#" = 2 ] && [ "$1" = --lane ] || return 2
+    lanes=("$2")
+  fi
+  require_files "$OLYMPUS_TOOLS/../replicas/sweep-brief.md" || return 2
+  for lane in "${lanes[@]}"; do
+    case "$lane" in
+      ar|sq) ;;
+      ref-a|ref-b) bash "$OLYMPUS_TOOLS/replica.sh" "$T" ref-audit "sw${tag}${lane#ref-}" --validate-only || return 2;;
+      *) echo "unknown lane: $lane" >&2; return 2;;
+    esac
+  done
+  mkdir -p "$T/eval/claude2" "$T/eval/replica"
+  for lane in "${lanes[@]}"; do
+    brief="$T/eval/sweep-brief-$tag-$lane.md"
+    { cat "$OLYMPUS_TOOLS/../replicas/sweep-brief.md"; printf '\nTask folder: %s\n' "$T"; } > "$brief"
+    bash "$OLYMPUS_LIB/check_codex_brief.sh" "$brief" >/dev/null || return 3
+    case "$lane" in
+      ar|sq)
+        report="$T/eval/claude2/pkg-$lane-sweep-$tag.md"; rm -f "$report"
+        C2_SUFFIX="sweep-$tag" bash "$OLYMPUS_LIB/claude2_run.sh" "$lane" "$T" pkg "$brief" high > "$T/eval/claude2/sweep-$tag-$lane.log" 2>&1
+        rc=$?;;
+      ref-*)
+        report="$T/eval/replica/ref-audit-sw${tag}${lane#ref-}.json"; rm -f "$report"
+        bash "$OLYMPUS_TOOLS/replica.sh" "$T" ref-audit "sw${tag}${lane#ref-}" > "$T/eval/sweep-$tag-$lane.log" 2>&1
+        rc=$?;;
+    esac
+    [ -s "$report" ] || { echo "missing or empty report: $report" >&2; rc=1; }
+    [ "$rc" = 0 ] || failed=1
+  done
+  return "$failed"
 }
 main "$@"; exit $?

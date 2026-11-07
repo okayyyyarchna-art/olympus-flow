@@ -63,6 +63,53 @@ OLYMPUS_SEAMS_ROOT="$OLYMPUS_TOOLS/seams"
             self.assertIn(resource, result.stderr)
             self.assertFalse(self.marker.exists())
 
+    def mock_lanes(self):
+        (self.skill / "tools/lib/check_codex_brief.sh").write_text("exit 0\n")
+        (self.skill / "tools/replica.sh").write_text('''[ "${4:-}" != --validate-only ] || exit 0
+mkdir -p "$1/eval/replica"
+echo "$2-$3" >> "$1/calls"
+sleep 0.05
+[ "${MOCK_NO_REPORT:-}" != "$2-$3" ] || exit 0
+echo '{}' > "$1/eval/replica/$2-$3.json"
+[ "${MOCK_FAIL:-}" != "$2-$3" ] || exit 7
+''')
+        (self.skill / "tools/lib/claude2_run.sh").write_text('''mkdir -p "$2/eval/claude2"
+echo "$1" >> "$2/calls"
+sleep 0.05
+[ "${MOCK_NO_REPORT:-}" != "$1" ] || exit 0
+echo 'Verdict: PASS' > "$2/eval/claude2/$3-$1-$C2_SUFFIX.md"
+[ "${MOCK_FAIL:-}" != "$1" ] || exit 7
+''')
+        (self.skill / "tools/summarize.py").write_text("print('GATE PASS')\n")
+
+    def test_single_lane_blocks_and_writes_only_its_report(self):
+        self.mock_lanes()
+        result = self.run_tool("sweep.sh", self.task, "s1", "--lane", "ref-a")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual((self.task / "calls").read_text().splitlines(), ["ref-audit-sws1a"])
+        self.assertTrue((self.task / "eval/replica/ref-audit-sws1a.json").is_file())
+        result = self.run_tool("round.sh", self.task, "r1", "--check", "sq-b")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue((self.task / "eval/replica/sq-r1b.json").is_file())
+
+    def test_aggregate_waits_for_every_lane_and_propagates_errors(self):
+        self.mock_lanes()
+        for tool, args, expected in (
+            ("sweep.sh", ("s1",), ["ar", "sq", "ref-audit-sws1a", "ref-audit-sws1b"]),
+            ("round.sh", ("r1",), ["fairness-r1", "sq-r1a", "sq-r1b", "dq-r1", "ar-r1", "verify-r1"]),
+        ):
+            for kind in ("MOCK_FAIL", "MOCK_NO_REPORT"):
+                with self.subTest(tool=tool, kind=kind):
+                    (self.task / "calls").unlink(missing_ok=True)
+                    result = self.run_tool(tool, self.task, *args, **{kind: expected[0]})
+                    self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+                    self.assertEqual((self.task / "calls").read_text().splitlines(), expected)
+
+    def test_no_unwaited_background_launches(self):
+        for name in ("sweep.sh", "round.sh", "hunt.sh"):
+            source = (ROOT / "tools" / name).read_text()
+            self.assertNotRegex(source, r"(?m)&\s*\)?\s*$", name)
+
 
 if __name__ == "__main__":
     unittest.main()
