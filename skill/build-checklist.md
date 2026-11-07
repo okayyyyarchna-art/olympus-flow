@@ -87,6 +87,9 @@ For each obligation, list every materially different value; the reference handle
     r6, G1, G2, m2, FP panel]
   - **Order and precedence**: two competing eligible items in both orders; the winner and the non-winner asserted;
     "either is fine" asserted as membership in the allowed set. [T3]
+    When code picks one item among several (a copy, a row, a manifest) by an internal key, compute that key and build
+    the fixture so the WRONG item sorts first (vet task 2: twice a test passed only because the right item happened
+    to sort first, so a half fix looked verified: the first fixture, then a removed row tied with a live copy). [T3]
   - **Exemptions**: both sides in the SAME test with exact counts (exempt `not reported` next to non-exempt `reported
     once`), an unrelated failure that must not widen the exemption, an unknown or stale selector. [T3, S1; vet s1 FP,
     typo]
