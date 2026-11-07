@@ -50,12 +50,16 @@ For each obligation, list every materially different value; the reference handle
 2. **Stores and formats**: every store and serialized form read or written, including older shapes the repo still
    reads and optional fields older versions omit (vet: last, .db, JSON, JSONL, older report). Write through the live
    path, save, reload through that form's real reader, assert the same contract (C04). [T4, S1]
+   Duplicates inside one file count too: how the parser merges two entries of one key decides the result (vet
+   task 2: a yarn.lock with a vendored and a registry entry of one version kept only the first). [S1]
    Check whether the saved form tells "absent" from "empty" (Go `omitempty`, a missing JSON key vs null, protobuf
    defaults): on vet an older report and a new scan with every plugin off both save no control list. Absent metadata
    proves nothing; positive evidence in the data (a finding of that check) does. Platform SQ took a point for
    "missing control metadata treated as proof that checks were disabled". [S1, SQ]
 3. **Modes and sibling paths**: every mode, driver, transport, fast path, compiled twin, sync/threaded variant; and
-   what exists in one mode only (vet: pull-request-only controls must not count as run in a full scan). [S1,
+   what exists in one mode only (vet: pull-request-only controls must not count as run in a full scan). A diff or
+   pull-request mode is crossed with EVERY change kind (added, removed, modified, upgraded) and its side lookups (vet
+   task 2: removed rows counted as live copies; the previous version of an upgrade looked up). [S1,
    T4; B1, main SQ 1/3 cause]
 4. **Transitions**: restart, rebalance/reassign, stop/cancel, in-flight work, continue/resume. For every "before",
    "after", "until", "once", "while": the forbidden intermediate state AND the required eventual state; keep an
@@ -137,6 +141,9 @@ Tests:
   prohibited results, duplicate effects or stale state (R4). [T7, T3]
 - A reported success or diagnostic is not proof of a separately promised state change: assert the effect at its
   observable sink (M1). [T3]
+- Test setup is design-free: a stop point, a wait or a counter in the setup must not depend on how a valid design
+  processes the case (vet task 2: a continuation test stopped on enrich progress, which a valid design never
+  reports; stop at a stage boundary instead). [T5]
 - Where an optional invalid input competes with existing error behaviour, grade the promised invariant and leave the
   precedence free unless the text or repo fixes it (C31: swift 412-over-413 FAIL_TEST_MISMATCH x5). [T5]
 - One-line reading risk for any assertion with a second reading. [T5]
