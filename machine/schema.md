@@ -23,6 +23,7 @@ fail before a tool starts work. There is no implicit Windows fallback.
 | `docker.native_platform` | `linux/amd64` or `linux/arm64`, used for daily proof runs |
 | `docker.final_platform` | must be `linux/amd64`, used for `--final` and `--stability` proof runs |
 | `docker.memory_gb` | positive integer describing Docker Desktop's allocation; configure Desktop separately |
+| `docker.min_free_gb` | number; free disk (GB) below which dockrun refuses build, buildx, pull, load and import (default 12); `DOCKRUN_MIN_FREE_GB` overrides it for one job |
 | `parallel.battery_workers` | positive integer exported for battery launchers |
 | `parallel.review_lanes` | positive integer, default maximum concurrent replica rounds |
 | `parallel.solvers` | positive integer, default solve count; 1=main Claude, 2=claude2, 3 onward=Codex |

@@ -56,7 +56,7 @@ fi
 # overrides the 120 min default; the brief gets the box and a Docker budget so the job plans for both.
 box="${CODEX_TIME_BOX_MIN:-120}"
 prompt="$prompt
-Time box: finish and write your report within $box minutes; report what is NOT VERIFIED instead of running past it. Docker budget: build at most one new image, reuse existing images, and check free disk space (at least 20 GB) before any build."
+Time box: finish and write your report within $box minutes; report what is NOT VERIFIED instead of running past it. Docker budget: build at most one new image, reuse existing images, and check free disk space (at least the machine floor, 12 GB by default) before any build."
 echo "Codex job $name -> $out (time box $box min)"
 # The final answer goes to $out.final; it replaces $out only when Codex did not write a longer report there itself
 # (2026-11-05: a brief named $out as the deliverable and the short final answer overwrote the full report).

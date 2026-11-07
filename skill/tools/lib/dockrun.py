@@ -30,10 +30,11 @@ env = dict(os.environ)
 if machine["os"] == "windows":
     env["MSYS_NO_PATHCONV"] = "1"
 # Disk floor before anything that adds images or layers: C: reached 0 GB on 2026-11-07 (product builds plus build
-# cache), Docker died mid-proof. DOCKRUN_MIN_FREE_GB overrides the 20 GB default.
+# cache), Docker died mid-proof. The floor is docker.min_free_gb of the machine profile (default 12);
+# DOCKRUN_MIN_FREE_GB overrides it for one job.
 if sys.argv[1:2] and sys.argv[1] in ("build", "buildx", "pull", "load", "import"):
     import shutil
-    need = float(os.environ.get("DOCKRUN_MIN_FREE_GB", "20"))
+    need = float(os.environ.get("DOCKRUN_MIN_FREE_GB") or machine["docker"].get("min_free_gb", 12))
     free = shutil.disk_usage(os.path.expanduser("~")).free / 2**30
     if free < need:
         sys.exit(f"dockrun: {free:.1f} GB free, below the {need:g} GB floor: prune old images and build cache "
