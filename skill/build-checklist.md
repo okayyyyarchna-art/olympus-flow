@@ -59,7 +59,8 @@ For each obligation, list every materially different value; the reference handle
    reads and optional fields older versions omit (vet: last, .db, JSON, JSONL, older report). Write through the live
    path, save, reload through that form's real reader, assert the same contract (C04). [T4, S1]
    Duplicates inside one file count too: how the parser merges two entries of one key decides the result (vet
-   task 2: a yarn.lock with a vendored and a registry entry of one version kept only the first). [S1]
+   task 2: a yarn.lock with a vendored and a registry entry of one version kept only the first). Test both entry
+   orders: one order passes a "first wins" and a "last wins" merge alike (vet task 2 sweep 2). [S1, T3]
    Check whether the saved form tells "absent" from "empty" (Go `omitempty`, a missing JSON key vs null, protobuf
    defaults): on vet an older report and a new scan with every plugin off both save no control list. Absent metadata
    proves nothing; positive evidence in the data (a finding of that check) does. Platform SQ took a point for
@@ -68,7 +69,9 @@ For each obligation, list every materially different value; the reference handle
    what exists in one mode only (vet: pull-request-only controls must not count as run in a full scan). A diff or
    pull-request mode is crossed with EVERY change kind (added, removed, modified, upgraded) and its side lookups (vet
    task 2: removed rows counted as live copies; the previous version of an upgrade looked up). [S1,
-   T4; B1, main SQ 1/3 cause]
+   T4; B1, main SQ 1/3 cause] A side lookup gets the same multiplicity as the main rule: two rows that share it, with
+   different answers, in both orders (vet task 2 sweep 2: the base version of two upgrades took the first row's
+   locality; 5 of 7 lanes found it, none of the earlier rounds). [S1, T3]
 4. **Transitions**: restart, rebalance/reassign, stop/cancel, in-flight work, continue/resume. For every "before",
    "after", "until", "once", "while": the forbidden intermediate state AND the required eventual state; keep an
    observer active through the transition; plan a too-early, a too-late/never and a finite-cap shortcut (M2). For
@@ -178,7 +181,8 @@ Tests:
   the description or an identified repo convention requires it. Allow unpromised extra metadata; never allow extra
   prohibited results, duplicate effects or stale state (R4). [T7, T3]
 - A reported success or diagnostic is not proof of a separately promised state change: assert the effect at its
-  observable sink (M1). [T3]
+  observable sink (M1). A recorded request is not the sink either: also assert the data it fetched reaches the
+  result (vet task 2 sweep 2: continue tests checked only that the version was asked for). [T3]
 - Test setup is design-free: a stop point, a wait or a counter in the setup must not depend on how a valid design
   processes the case (vet task 2: a continuation test stopped on enrich progress, which a valid design never
   reports; stop at a stage boundary instead). [T5]
@@ -193,7 +197,9 @@ Reference:
    helpers and formats. Read the header comments of every file you edit: they hold local rules (vet task 2: scanfile.go
    "rows hold the record JSON next to the columns that queries filter on" -> a JSON filter cost Code Quality). List
    every caller and consumer of a function whose result changes, and keep or decide each one's contract (vet task 2:
-   a new copy rule changed what the local code-usage enricher received). New interface methods keep unaffected implementations working by the language's own
+   a new copy rule changed what the local code-usage enricher received; a one-line report merge fix broke the
+   report's per-manifest reload, which every verification round then flagged). This holds for "cheap" Low fixes too.
+   New interface methods keep unaffected implementations working by the language's own
    mechanism, and any default or fallback is proven safe for its real callers (R6). [S2, S3]
 2. Every path, store, mode, transition and fault in the Paths section is handled, or excluded by a scope sentence.
    [S1; B1, B3]
