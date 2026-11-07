@@ -110,6 +110,24 @@ echo 'Verdict: PASS' > "$2/eval/claude2/$3-$1-$C2_SUFFIX.md"
             source = (ROOT / "tools" / name).read_text()
             self.assertNotRegex(source, r"(?m)&\s*\)?\s*$", name)
 
+    def test_round_override_cannot_raise_profile_capacity(self):
+        self.mock_lanes()
+        capacity = self.root / "capacity"
+        path = self.skill / "tools/machine.py"
+        with path.open("a") as f:
+            f.write(f'''\n_original_limit = slot_limit
+def slot_limit(limit, override=None):
+    value = _original_limit(limit, override)
+    open({capacity.as_posix()!r}, 'w').write(str(value))
+    return value
+''')
+        for override, expected in (("999", "2"), ("1", "1")):
+            result = self.run_tool("round.sh", self.task, "r1", "--check", "sq-a", ROUND_SLOTS=override)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(capacity.read_text(), expected)
+        result = self.run_tool("round.sh", self.task, "r1", "--check", "sq-a", ROUND_SLOTS="-1")
+        self.assertEqual(result.returncode, 2)
+
 
 if __name__ == "__main__":
     unittest.main()

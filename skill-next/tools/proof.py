@@ -50,6 +50,11 @@ def docker(*args):
     return subprocess.run(DOCKRUN + list(args), capture_output=True, text=True, encoding="utf-8", errors="replace", env=ENV)
 
 
+def cleanup_build_cache():
+    if MACHINE["docker"]["cleanup_allowed"] is True:
+        docker("builder", "prune", "-af")
+
+
 def junit(path):
     if not path.exists() or path.stat().st_size == 0:
         return None
@@ -136,9 +141,7 @@ def main():
             shutil.copy(pkg / "Dockerfile", work / "Dockerfile.olympus")
             b = docker("build", "--platform", platform, "-f", str(work / "Dockerfile.olympus"), "-t", image, str(ctx))
             say(b.returncode == 0, "1 image builds" + ("" if b.returncode == 0 else ": " + (b.stdout + b.stderr)[-800:]))
-            # the image is built once and reused, so its build cache is never needed again; it filled C: on vet
-            # (37.75 GB, docker_data.vhdx 72.7 GB, engine down) - drop it after every build (user 2026-11-06)
-            docker("builder", "prune", "-af")
+            cleanup_build_cache()
             if b.returncode:
                 return
         patches = work / "patches"

@@ -20,6 +20,8 @@ main() {
     checks+=(verify gate)
   fi
   local R="$OLYMPUS_TOOLS/replica.sh" out="$T/eval/replica"
+  local capacity
+  capacity=$("$PY" -c 'import sys; sys.path.insert(0, sys.argv[1]); from machine import slot_limit; print(slot_limit(int(sys.argv[2]), sys.argv[3] or None))' "$OLYMPUS_TOOLS" "$OLYMPUS_REVIEW_LANES" "${ROUND_SLOTS:-}") || return 2
   for c in "${checks[@]}"; do
     case "$c" in
       sq-a|sq-b) check=sq;; ref-audit-a|ref-audit-b) check=ref-audit;;
@@ -32,7 +34,7 @@ main() {
   local slots="$OLYMPUS_WORK_ROOT/.round-slots" slot="" pid i
   mkdir -p "$slots"
   while [ -z "$slot" ]; do
-    for i in $(seq 1 "${ROUND_SLOTS:-$OLYMPUS_REVIEW_LANES}"); do
+    for i in $(seq 1 "$capacity"); do
       if mkdir "$slots/$i" 2>/dev/null; then slot="$slots/$i"; echo "$$" > "$slot/owner"; break; fi
       pid=$(cat "$slots/$i/owner" 2>/dev/null)
       [ -z "$pid" ] || kill -0 "$pid" 2>/dev/null || rm -rf "${slots:?}/$i"

@@ -50,6 +50,8 @@ def load(profile=None):
                     raise ValueError(f"{section}.{key} must be a positive integer")
         if type(data["parallel"]["stability_parallel"]) is not bool:
             raise ValueError("parallel.stability_parallel must be true or false")
+        if type(data["docker"]["cleanup_allowed"]) is not bool:
+            raise ValueError("docker.cleanup_allowed must be true or false")
         if data["docker"]["final_platform"] != "linux/amd64":
             raise ValueError("docker.final_platform must be linux/amd64")
         if data["docker"]["native_platform"] not in ("linux/amd64", "linux/arm64"):
@@ -73,6 +75,14 @@ def load(profile=None):
         return data
     except (KeyError, TypeError, json.JSONDecodeError) as exc:
         raise ValueError(f"invalid machine profile {path}: {exc}") from exc
+
+
+def slot_limit(limit, override=None):
+    if override is None:
+        return limit
+    if not isinstance(override, str) or not override.isascii() or not override.isdecimal() or int(override) < 1:
+        raise ValueError("slot override must be a positive integer")
+    return min(limit, int(override))
 
 
 def exports(data):
