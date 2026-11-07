@@ -59,3 +59,17 @@ Time boxes (owner target 2-4 h local work; platform and human waits counted apar
 rewrite | 4 Tests 45 m | 5 Reference 45 m | 6 Closure 20 m | 7 Confirmation 3 x 35 m
 (sweeps) with replica rounds alongside | 8 Freeze 20 m. An overrun triggers a progress
 report and a decision with the owner, never an omitted gate or a post-lock scope cut.
+
+## Metrics record (every task, both machines)
+At hand-over write `metrics/<task>.json` in the product repo and commit it (the other machine pulls it): machine,
+repo, language, minutes per stage, description changes after the lock, new findings per sweep (1, 2, 3), false
+alarms, false-pass escapes (found after sweep 3 or by the platform), platform checks passing on the first run, and
+the rollout result per family. Success criteria (fixed 2026-11-07, vet task as the baseline):
+| Measure | vet baseline | Target |
+|---|---|---|
+| Description changes after the lock | 6 | 0 (the owner's single exception at most) |
+| New findings in sweeps 2-3 | many | at most 2 small ones |
+| False-pass escapes | 2 | 0 |
+| Platform checks passing on the first run | several rounds | all |
+| Total local time | ~24 h | <= 5 h Windows, <= 3.5 h Mac |
+A missed target names the stage that failed; that stage's card is fixed before the next task.
