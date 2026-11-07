@@ -22,7 +22,15 @@ EOF
   while read -r rid fam verdict; do
     d="$out/runs/$rid"; mkdir -p "$d"; echo "$fam $verdict" > "$d/verdict.txt"
     olympus runs artifact "$id" "$rid" --key solutionPatch > "$d/solution.patch" 2>/dev/null
-    olympus runs artifact "$id" "$rid" --key testLog 2>/dev/null | grep -E -i 'FAILED|failures:|panicked|assert|Error' | tail -60 > "$d/failures.txt"
+    olympus runs artifact "$id" "$rid" --key testLog > "$d/testlog.txt" 2>/dev/null
+    # Go/testscript failure lines first (a run's first failing script line), then the generic tail
+    { grep -E -e '--- FAIL|^FAIL|FAIL: |\.txtar:[0-9]+:' "$d/testlog.txt"
+      echo "--- other error lines"
+      grep -E -i 'FAILED|failures:|panicked|assert|Error' "$d/testlog.txt" | tail -60; } > "$d/failures.txt"
   done < "$out/runs.txt"
   echo "runs: $(wc -l < "$out/runs.txt") in $out/runs/"
+fi
+# The FP panel's notes (judges, adjudicator) are shown only in the web UI; the CLI has the status alone.
+if grep -q '"id": *"noFalsePositives"' "$out/view-$id.json" &&    grep -A3 '"id": *"noFalsePositives"' "$out/view-$id.json" | grep -Eq '"status": *"(warn|fail)"'; then
+  echo "FP panel: warn/fail -> ask the owner to paste the panel notes from the web UI"
 fi

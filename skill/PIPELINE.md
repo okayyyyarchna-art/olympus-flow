@@ -1,0 +1,84 @@
+# From a repository (or none) to hand-over
+
+Use a private working folder and immutable version snapshots. Never alter the
+chosen base checkout or a frozen/pasted package. The owner writes the final
+description, builds the image on the platform, and runs platform checks/rollouts.
+Draft upload is a separate action requiring authorization in the active task;
+prepare all fields before it. This skill does not authorize platform mutations.
+
+| Stage | Inputs -> construction outputs | Exit gate and human action |
+|---|---|---|
+| 0. Find and qualify | The owner's repository, or none -> picked repository, seam, ledger Identity and Profile; exact commit/tree, source inventory, CI commands, affected regressions, supported domain | [hunt.md](hunt.md): with no repository, part A finds one (platform repo rules, 3 lanes, the owner checks submission counts); with a repository, part B finds the seam (3 lanes, filters, score, top 3 verified). Confirm the problem exists at the pin and is observable offline. Record missing facts as NOT VERIFIED. No LOC quota or assumed language. |
+| 0b Repository init | Pinned repository + machine profile -> [repo_init.py](tools/repo_init.py), profile.json, init/Dockerfile and init/test.sh from language templates | Run [repo_check.py](tools/repo_check.py): locked build, native ID qualification, offline base and H6 failure probes. Resolve profile.open explicitly; base-adapter qualification does not certify feature four-cell proof or the human platform build. |
+| 1. Environment first | Profile -> Dockerfile, runner skeleton, immutable image identity, base-ID inventory | Follow E1-E5/H1-H6. Build once per complete environment identity; run baseline and adapter failure probes. **Human builds this Dockerfile on the platform**; preserve its result separately from local proof. Environment failure returns here, not to task wording. |
+| 1b. Sample and Scope Gate | Builder's own draft description + a basic test.patch (one plain test per sentence, real test files, executable test.sh from the template) + a small solution sketch -> pasted sample | Only purpose: pass the platform prechecks and reach the Scope Gate, so nothing is built on a problem the platform already has. Minutes, not a build: no proof, no gates, no check that the tests pass or fail. **Owner runs prechecks and Scope Gate.** A reject stops this candidate (never reword and retry). Later pastes mark the Scope Gate stale; the owner re-runs it on the final package. |
+| 2. Define meaning | Pinned code, working environment -> atomic obligations, path/fault inventory, discriminator and valid-alternative plans, draft | Follow description.md section 3, part A (steps 1-8: problem, obligation ledger, feasibility gate, variants, draft, word reach, two reading audits with adjudication, counts). Prove feasibility of the difficult path with a small disposable experiment; it is not the final solution. Two independent readers resolve output-changing interpretations. No undecided public behavior at lock. |
+| 3. Human wording and lock | Audited draft + fact ledger -> human's final description, meaning diff, hash | **Human writes the final words.** Follow description.md section 3, part C (steps 9-11: counterexample diff, re-check of changed words, lock record) on those exact bytes. Fix unintended meaning changes before lock. **The lock is final**: no calibration step changes the text; only the owner's one final change (description.md section 5b, an extreme case) or REDESIGN can, after an impact analysis. |
+| 4. Tests | Locked text + planned ledger -> real test.patch including executable test.sh, fixtures, stable IDs | Built by walking build-checklist.md (ledger first). Follow T1-T6/H1-H6. Base-mode/base passes; each new ID fails on base for its intended reason. |
+| 5. Reference | Same contract/path inventory -> solution.patch, native quality evidence | Follow S1-S5 and build-checklist.md step 6; every in-scope path implemented and tested. |
+| 6. Deterministic closure | Four artifacts + variants + known patches -> four-cell proof, failure-probe evidence, corpus results | Run G0, then gate order G1 -> G2 -> G3 -> G4. The corpus runner replays every wrong design (must fail), valid alternative (must pass) and platform patch. No OPEN in-scope obligation, unexplained survivor, failed valid alternative, or stale execution evidence. |
+| 6b. v1 paste (calibration) | Closed candidate -> pasted v1 | v1 is the checklist-built version. Paste, confirm the fields, then **notify the owner** (push notification + message: version, hashes, "run the checks and the calibration rollout"). The owner runs the checks and the rollout of their choice; no watcher: the owner reports results and the builder pulls read-only. The builder goes on with stage 7 at once. |
+| 7. Local confirmation | v1 files -> sweep 1, replica batch, verification batch, sweep 2 only on its trigger | Schedule below; one fix batch per step through Repair. |
+| 7b. v2 paste | Closed stage-7 candidate -> pasted v2 | One checkpoint for all stage-7 fixes. **Notify the owner** with the changed files and only the checks to re-run. |
+| 8. Rollout analysis | Platform runs (any version) -> classified runs, FP audits, shaping plan | Pull read-only; replay every agent patch on the current files (replay_plan.py + corpus); FP audits per the schedule; shape with [rollout.md](rollout.md). What the agents show about the description goes into the rulebook for the next task, never into this text. Every change is predicted by a local replay before its paste. |
+| 8b. v3 paste | Shaped candidate + predicted re-eval -> pasted v3 | **Notify the owner**: changed files, predicted result per family, checks to re-run, runs still needed to reach 4+ per family (Nova included). |
+| 9. Freeze and hand over | Closed candidate -> final four-cell/offline/stability proof, immutable package, exact hashes, ledger and compact hand-over | Final new-mode stability: six base and six reference runs with identical per-ID vectors; investigated differences block. Include repo URL, full pin, title/category/language, four files, image/build evidence, check IDs and remaining external gates. Call this LOCAL READY, not platform accepted. |
+| 10. Human platform validation | Exact frozen fields -> final checks, rollout to 4+ per family, FP panel | **Human runs checks/rollouts and submits.** Read results via CLI after `--help`; compare uploaded/downloaded bytes. Classify every run with [rollout.md](rollout.md). |
+
+## Confirmation schedule and remaining model runs
+
+1. At stage 2, two independent reading samples see draft + pinned repository only.
+   Their question is semantic ambiguity/discoverability; grep cannot decide it.
+2. No local blind solves (owner decision 2026-11-07). Solver evidence comes from the
+   platform: the owner's calibration rollout on v1 (usually 3 Orion + 3 Vega). Three runs
+   per family show the direction; the band is judged at 4+ runs per family, and Nova needs
+   4 runs before submit. Replays of one trajectory are not new runs.
+3. Stage 7 order: sweep 1 (all lanes, one round) -> triage -> one fix batch -> replica
+   batch (3 independent replicas in parallel on the same frozen files; Codex GPT Sol 6.1
+   medium; 25 min time box each) -> the builder judges every finding at once -> one fix
+   batch -> verification batch (3 replicas). If the verification batch reproduces a new
+   class of finding: sweep 2 (once) -> fix -> one more verification batch as the gate.
+   There is no sweep 3. (vet: replica rounds took 6-19 min, sweeps 28-95 min.)
+4. Every reproduced finding gets a cause. Description: it goes to the owner; the text stays
+   locked unless the owner takes the exception. Checklist: sharpen the row that should have
+   caught it (the example and why it slipped), or add a row when no rule covers it.
+   Unreproduced findings change nothing.
+5. FP audits: one per passing run; a second only when the first says NOT_DESERVED or is
+   unclear. Each audit replays its probe on the reference too (build-checklist step 8).
+6. After the final checkpoint, any fix needs Repair and affected semantic reclosure
+   on the new snapshot. Do not restart all checkpoints by default or silently
+   bless changed files with old verdicts. Unclosed findings block hand-over.
+
+All review inputs include exact artifact identities and the literal contract;
+independent lanes do not read one another's conclusions. Merge their finding union,
+not the report with the most findings. Package reviews on this machine use the
+configured fresh read-only `codex_review.sh` route and reviewer skill; do not silently
+substitute the builder session. Configure other lanes explicitly with the coordinator.
+
+Container limits come from the machine profile (machine/*.json: slots, memory,
+parallel workers, cleanup permission), never from this file; run Docker work through
+the profile's `dockrun.py` lock. Every long job is its own tracked background command
+that blocks until it ends (no `&`, no detached shells), one per lane, so each lane's
+completion is seen at once. Queue experiments while independent reading proceeds.
+
+Time boxes (owner target 2-4 h local work; platform and human waits counted apart):
+0 Qualify 20 m | 1 Environment 20 m + owner build | 2-3 Meaning and lock 40 m + owner
+rewrite | 1b Sample 15 m + owner Scope Gate | 4 Tests 45 m | 5 Reference 45 m | 6 Closure 20 m |
+7 Confirmation: sweep 1 35 m + replica batch 20 m + verification batch 20 m (sweep 2 35 m only on its
+trigger) | 9 Freeze 20 m. An overrun triggers a progress
+report and a decision with the owner, never an omitted gate or a post-lock scope cut.
+
+## Metrics record (every task, both machines)
+At hand-over write `metrics/<task>.json` in the product repo and commit it (the other machine pulls it): machine,
+repo, language, minutes per stage, description changes after the lock, new findings per sweep and replica batch,
+checklist rows sharpened or added, false alarms, false-pass escapes (found after the last verification batch or by
+the platform), platform checks passing on the first run, and
+the rollout result per family. Success criteria (fixed 2026-11-07, vet task as the baseline):
+| Measure | vet baseline | Target |
+|---|---|---|
+| Description changes after the lock | 6 | 0 |
+| New findings after sweep 1 (replica and verification batches, sweep 2) | many | at most 2 small ones |
+| False-pass escapes | 2 | 0 |
+| Platform checks passing on the first run | several rounds | all |
+| Total local time | ~24 h | <= 5 h Windows, <= 3.5 h Mac |
+A missed target names the stage that failed; that stage's card is fixed before the next task.

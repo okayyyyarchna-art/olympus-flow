@@ -52,12 +52,18 @@ Before the brief, read the shared lessons: $OLYMPUS_MEMORY_DIR/MEMORY.md (and th
 Verify every claim (probe or file:line) and mark the rest NOT VERIFIED. Rules: you may read anything, run probes and Docker, and write ONLY your report plus probe files under the task's eval/ folder with a _cx suffix; never edit package folders (wip*/ submit*/ sample*/), repo/, base-clean/ or solveN/; Docker one container at a time via \"$PY\" \"$(machine_host "$OLYMPUS_LIB/dockrun.py")\" run ...; never docker rm/rmi/prune or stop containers you did not start.
 Return only your report (Markdown), starting with a one-line Verdict."
 fi
-echo "Codex job $name -> $out (typically 5-20 min)"
+# Time box (2026-11-07: a product build ran 3h20m and filled the disk with cold images). CODEX_TIME_BOX_MIN
+# overrides the 120 min default; the brief gets the box and a Docker budget so the job plans for both.
+box="${CODEX_TIME_BOX_MIN:-120}"
+prompt="$prompt
+Time box: finish and write your report within $box minutes; report what is NOT VERIFIED instead of running past it. Docker budget: build at most one new image, reuse existing images, and check free disk space (at least 20 GB) before any build."
+echo "Codex job $name -> $out (time box $box min)"
 # The final answer goes to $out.final; it replaces $out only when Codex did not write a longer report there itself
 # (2026-11-05: a brief named $out as the deliverable and the short final answer overwrote the full report).
-"$OLYMPUS_CODEX_BIN" exec --sandbox danger-full-access --skip-git-repo-check -C "$T" "${model_args[@]}" -c model_reasoning_effort="\"$effort\"" -o "$out.final" "$prompt" \
+timeout -k 60 "${box}m" "$OLYMPUS_CODEX_BIN" exec --sandbox danger-full-access --skip-git-repo-check -C "$T" "${model_args[@]}" -c model_reasoning_effort="\"$effort\"" -o "$out.final" "$prompt" \
   < /dev/null > "$out.log" 2>&1
 rc=$?
 if [ -s "$out.final" ] && { [ ! -s "$out" ] || [ "$(wc -c < "$out.final")" -ge "$(wc -c < "$out")" ]; }; then cp "$out.final" "$out"; fi
+if [ $rc -eq 124 ]; then echo "codex job hit the $box min time box; see $out.log" >&2; fi
 if [ $rc -ne 0 ] || [ ! -s "$out" ]; then echo "codex job failed (rc=$rc); see $out.log" >&2; exit 1; fi
 echo "Report: $out"; grep -m1 -i '^verdict' "$out" || true

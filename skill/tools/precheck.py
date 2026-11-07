@@ -52,7 +52,8 @@ def main():
     urls = re.findall(r"\b[a-z][a-z0-9+.-]*://\S*|\bwww\.[a-z0-9-]+\.\S+", desc, re.I)
     out("FAIL" if urls else "PASS", "description has no URLs or scheme://", ", ".join(urls[:3]))
     w = site_words(desc)
-    out("FAIL" if w > 1000 else ("WARN" if w > 400 else "PASS"), "description site words (split on space - /)", str(w))
+    out("WARN" if w >= 250 else "PASS", "description site words (guidance: under 250; split on space - /)", str(w))
+    out("FAIL" if w > 1000 else "PASS", "description platform ceiling (1000 site words)", str(w))
     long_lines = [l for l in desc.splitlines() if l.strip()]
     wrapped = sum(1 for l in long_lines if 60 <= len(l) <= 80) >= 4 and all(len(l) <= 100 for l in long_lines)
     out("WARN" if wrapped else "PASS", "description not hard-wrapped (AI-look precheck)")

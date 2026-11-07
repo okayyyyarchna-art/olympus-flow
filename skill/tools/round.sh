@@ -1,68 +1,76 @@
 #!/usr/bin/env bash
-# S5 replica round (all checks on GPT Sol 6.1 medium): fairness, sq twice (the site SQ samples a different angle per run),
-# dq in parallel, then ar, then verify on all findings. About 25-30 min wall.
-#   bash round.sh <task-dir> [tag] [checks...]     default checks: fairness sq dq ar (S6b gate runs, tags g1 and g2)
-# optional ref-audit runs twice (tags <tag>ra, <tag>rb); S5 sweep.sh already runs it, so it is not a default here
-# Targeted re-run after a fix (S6): bash round.sh <task> r2 sq ar   (solution changed)
-#                                    bash round.sh <task> r2 fairness ar (tests changed)
-# Expects <task-dir>/pkg/{description.md,test.patch,solution.patch,Dockerfile} (or those at the task root) and repo/ (pinned commit + both patches).
+# Tracked: round.sh <task> <tag> --check fairness|sq-a|sq-b|dq|ar|verify|ref-audit-a|ref-audit-b|gate
+# Convenience aggregate: round.sh <task> [tag] [checks...] waits for every child, serially.
 set -uo pipefail
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/machine.sh" || exit 2
-# the whole body is one function: bash reads it completely before running, so editing this file while a run
-# is in progress cannot break that run (vet 2026-11-06: an edit mid-run garbled the tail of solvers.sh)
 main() {
-T=$(cd "$1" && pwd); tag="${2:-r1}"; shift 2 2>/dev/null || shift $#
-checks=("$@"); [ ${#checks[@]} -gt 0 ] || checks=(fairness sq dq ar)
-R="$(cd "$(dirname "$0")" && pwd)/replica.sh"
-mkdir -p "$T/eval/replica"; log="$T/eval/replica/round-$tag.log"; : > "$log"
-# machine-wide limit: at most ROUND_SLOTS (default 2) replica rounds at once across all sessions (Codex rate limits)
-slots="$OLYMPUS_WORK_ROOT/.round-slots"; mkdir -p "$slots"; slot=""
-while [ -z "$slot" ]; do
-  for i in $(seq 1 "${ROUND_SLOTS:-$OLYMPUS_REVIEW_LANES}"); do
-    if mkdir "$slots/$i" 2>/dev/null; then slot="$slots/$i"; echo "$T $tag $$" > "$slot/owner"; break; fi
-    # a slot left by a dead round (owner pid gone) is freed
-    pid=$(awk '{print $3}' "$slots/$i/owner" 2>/dev/null); [ -n "$pid" ] && ! kill -0 "$pid" 2>/dev/null && rm -rf "${slots:?}/$i"
+  [ "$#" -ge 1 ] || return 2
+  local T tag c check sample report rc failed=0
+  T=$(cd "$1" && pwd) || return 2; tag="${2:-r1}"
+  shift; [ "$#" = 0 ] || shift
+  local checks=()
+  if [ "${1:-}" = --check ]; then
+    [ "$#" = 2 ] || return 2
+    checks=("$2")
+  else
+    [ "$#" -gt 0 ] || set -- fairness sq dq ar
+    for c in "$@"; do
+      case "$c" in sq) checks+=(sq-a sq-b);; ref-audit) checks+=(ref-audit-a ref-audit-b);; *) checks+=("$c");; esac
+    done
+    checks+=(verify gate)
+  fi
+  local R="$OLYMPUS_TOOLS/replica.sh" out="$T/eval/replica"
+  local capacity
+  capacity=$("$PY" -c 'import sys; sys.path.insert(0, sys.argv[1]); from machine import slot_limit; print(slot_limit(int(sys.argv[2]), sys.argv[3] or None))' "$OLYMPUS_TOOLS" "$OLYMPUS_REVIEW_LANES" "${ROUND_SLOTS:-}") || return 2
+  for c in "${checks[@]}"; do
+    case "$c" in
+      sq-a|sq-b) check=sq;; ref-audit-a|ref-audit-b) check=ref-audit;;
+      fairness|dq|ar|verify) check="$c";; gate) continue;; *) echo "unknown check: $c" >&2; return 2;;
+    esac
+    bash "$R" "$T" "$check" "$tag" --validate-only || return 2
   done
-  [ -n "$slot" ] || { echo "waiting for a free replica-round slot..." >&2; sleep 30; }
-done
-trap 'rm -rf "${slot:?}"' EXIT
-want() { local c; for c in "${checks[@]}"; do [ "$c" = "$1" ] && return 0; done; return 1; }
-pids=()
-if want fairness; then bash "$R" "$T" fairness "$tag" >> "$log" 2>&1 & pids+=($!); fi
-if want sq; then
-  bash "$R" "$T" sq "${tag}a" >> "$log" 2>&1 & pids+=($!)
-  bash "$R" "$T" sq "${tag}b" >> "$log" 2>&1 & pids+=($!)
-fi
-if want dq; then bash "$R" "$T" dq "$tag" >> "$log" 2>&1 & pids+=($!); fi
-if want ref-audit; then
-  bash "$R" "$T" ref-audit "${tag}ra" >> "$log" 2>&1 & pids+=($!)
-  bash "$R" "$T" ref-audit "${tag}rb" >> "$log" 2>&1 & pids+=($!)
-fi
-for p in "${pids[@]}"; do wait "$p"; done
-# ar reads <check>-<tag>.json; give it the sq run with more issues under the plain tag
-out="$T/eval/replica"
-if want sq; then
-  "$PY" - "$out" "$tag" <<'EOF'
-import json, os, shutil, sys
-out, tag = sys.argv[1], sys.argv[2]
-best = None
-for t in (tag + "a", tag + "b"):
-    p = os.path.join(out, f"sq-{t}.json")
-    if os.path.exists(p):
-        try:
-            n = len(json.load(open(p, encoding="utf-8")).get("issues") or [])
-        except Exception:
-            continue
-        if best is None or n > best[0]:
-            best = (n, p)
-if best:
-    shutil.copy(best[1], os.path.join(out, f"sq-{tag}.json"))
-EOF
-fi
-if want ar; then bash "$R" "$T" ar "$tag" >> "$log" 2>&1; fi
-# second pass: a fresh verifier keeps or drops every sq/fairness/ar finding (calibration 2026-11-05: deep sq and ar
-# find the real Highs and also reading-dependent / combination corners; the verifier removes the latter)
-bash "$R" "$T" verify "$tag" >> "$log" 2>&1
-"$PY" "$(dirname "$0")/summarize.py" "$T/eval/replica" "$tag" | tee "$T/eval/replica/summary-$tag.md"
+  mkdir -p "$out"
+  local audits=()
+  for c in "${checks[@]}"; do case "$c" in ref-audit-*) audits=(--ref-audits);; esac; done
+  "$PY" "$OLYMPUS_TOOLS/summarize.py" "$out" "$tag" --declare "${audits[@]}" || return 2
+  # Capacity comes from the machine profile.
+  local slots="$OLYMPUS_WORK_ROOT/.round-slots" slot="" pid i
+  mkdir -p "$slots"
+  while [ -z "$slot" ]; do
+    for i in $(seq 1 "$capacity"); do
+      if mkdir "$slots/$i" 2>/dev/null; then slot="$slots/$i"; echo "$$" > "$slot/owner"; break; fi
+      pid=$(cat "$slots/$i/owner" 2>/dev/null)
+      [ -z "$pid" ] || kill -0 "$pid" 2>/dev/null || rm -rf "${slots:?}/$i"
+    done
+    [ -n "$slot" ] || sleep 2
+  done
+  trap 'rm -rf "${slot:?}"' EXIT
+  for c in "${checks[@]}"; do
+    sample="$tag"; check="$c"
+    case "$c" in
+      sq-a) check=sq; sample="${tag}a";; sq-b) check=sq; sample="${tag}b";;
+      ref-audit-a) check=ref-audit; sample="${tag}ra";; ref-audit-b) check=ref-audit; sample="${tag}rb";;
+    esac
+    if [ "$c" = gate ]; then
+      "$PY" "$OLYMPUS_TOOLS/summarize.py" "$out" "$tag" | tee "$out/summary-$tag.md"
+      local statuses=("${PIPESTATUS[@]}")
+      rc=${statuses[0]}
+      [ "${statuses[1]}" = 0 ] && [ -s "$out/summary-$tag.md" ] || rc=1
+    else
+      report="$out/$check-$sample.json"
+      rm -f "$report" "$out/$check-${sample}_cx.json"
+      if [ "$check" = ar ] || [ "$check" = verify ]; then
+        if ! "$PY" "$OLYMPUS_TOOLS/summarize.py" "$out" "$tag" --merge-sq; then
+          failed=1; continue
+        fi
+      fi
+      bash "$R" "$T" "$check" "$sample" > "$out/$check-$sample.log" 2>&1
+      rc=$?
+      [ -s "$report" ] || { echo "missing or empty report: $report" >&2; rc=1; }
+    fi
+    [ "$rc" = 0 ] || failed=1
+  done
+  rm -rf "${slot:?}"; trap - EXIT
+  return "$failed"
 }
 main "$@"; exit $?

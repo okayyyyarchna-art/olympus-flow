@@ -41,7 +41,7 @@ PY
 run reference /pkg/solution.patch
 for f in /patches/*.patch; do run "$(basename "$f" .patch)" "$f"; done
 '
-# through the machine-wide Docker slot lock (2 containers across sessions)
+# Through the machine profile's shared Docker slot lock.
 "${OLYMPUS_DOCKER_ENV[@]}" "$PY" "$(machine_host "$OLYMPUS_LIB/dockrun.py")" run --rm --network none \
   -v "$(host "$pkg")":/pkg:ro -v "$(host "$repo")":/repo:ro -v "$(host "$patches")":/patches:ro \
   --entrypoint bash "$img" -c "$inner"

@@ -1,202 +1,269 @@
 #!/usr/bin/env python3
-"""S4 in one command: every Docker proof the platform's verify checks run, through our Docker slot lock.
+"""Four-cell offline proof with strict JUnit reconciliation.
 
-usage: python proof.py <base-repo> <pkg-dir> [--stability] [--final] [--rebuild] [--build-only] [--work-root DIR]
-  --build-only: the Dockerfile gate (build or reuse the image, run base mode once), before the user's platform build.
-  The image is built once per Dockerfile + base commit and reused after that (--rebuild forces a build).
-  base-repo: pristine checkout at the pinned commit (with .git). pkg-dir: Dockerfile, test.patch, solution.patch.
-Checks (each a recorded platform failure when missing):
-  1. image builds from the checked-out repo (verifyBuild)
-  2. without solution: base passes, every new test fails; clean `new` run under 300 s (verifyTests, 688 s kill on T11)
-  3. with solution, twice: base + new pass with identical counts (verifySolution)
-  4. with solution as a uid with no passwd entry and an empty environment (`env -i`): new passes
-     (offlineUidPassed; turso T6: test.sh must set its own env)
-  5. --stability (once before the first paste): 6 runs without and 6 with the solution, identical results per test id
-     (verifyFlakiness method)
-Prints PASS/FAIL per check and one final line. Exit 1 on any FAIL.
+usage: proof.py <base-repo> <pkg-dir> --base-ids ids.json --new-ids ids.json
+       [--base-skips ids.json] [--stability] [--final] [--rebuild] [--build-only]
+       [--work-root DIR] [--timeout SECONDS]
+Expected-ID files are nonempty canonical-ID JSON arrays. Baseline skips must be
+predeclared; new-mode skips always fail. All cells use the literal H4 environment.
+Image reuse includes Dockerfile, committed context, resolved FROM digests and platform.
 """
 import argparse
 from concurrent.futures import ThreadPoolExecutor
 import hashlib
+import json
 import os
+from pathlib import Path
+import re
+import shlex
 import shutil
+import string
 import subprocess
 import sys
 import tempfile
 import time
-import xml.etree.ElementTree as ET
-from pathlib import Path
+
 from machine import load
 
-try:
-    MACHINE = load()
-except ValueError as exc:
-    sys.exit(f"machine: {exc}")
-DOCKRUN = [MACHINE["python"], str(Path(__file__).resolve().parent / "lib" / "dockrun.py")]
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+from certify import id_set, inspect_junit
+
+MACHINE = load()
+DOCKRUN = [MACHINE["python"], str(Path(__file__).resolve().parent / "lib/dockrun.py")]
 ENV = dict(os.environ)
 if MACHINE["os"] == "windows":
     ENV["MSYS_NO_PATHCONV"] = "1"
-ok = True
 MARK = "=====PROOF-JUNIT====="
+MINIMAL_PATH = "/usr/local/bin:/usr/bin:/bin"
+ok = True
 
 
-def say(good, msg):
+def say(good, message):
     global ok
     ok = ok and good
-    print(f"{'PASS' if good else 'FAIL'}  {msg}", flush=True)
+    print(f"{'PASS' if good else 'FAIL'}  {message}", flush=True)
 
 
-def docker(*args):
-    return subprocess.run(DOCKRUN + list(args), capture_output=True, text=True, encoding="utf-8", errors="replace", env=ENV)
+def docker(*args, timeout=600):
+    return subprocess.run(DOCKRUN + list(args), capture_output=True, text=True,
+                          encoding="utf-8", errors="replace", env=ENV, timeout=timeout)
 
 
-def junit(path):
-    if not path.exists() or path.stat().st_size == 0:
-        return None
-    cases = {}
-    for c in ET.parse(path).getroot().iter("testcase"):
-        key = f"{c.get('classname')}::{c.get('name')}"
-        cases[key] = "fail" if (c.find("failure") is not None or c.find("error") is not None) else \
-            "skip" if c.find("skipped") is not None else "pass"
-    return cases
+def cleanup_build_cache():
+    if MACHINE["docker"]["cleanup_allowed"] is True:
+        docker("builder", "prune", "-af")
 
 
-def run(image, patches, out, mode, solution, as_user=None, platform=None):
-    """Apply patches as root (as the platform does), then run test.sh as root or as a uid with an empty env."""
+def read_ids(path, allow_empty=False):
+    values = json.loads(Path(path).read_text(encoding="utf-8"))
+    id_set(values, "IDs", allow_empty=allow_empty)
+    return values
+
+
+def repository_id(reference):
+    repository = reference.split("@")[0]
+    if ":" in repository.rsplit("/", 1)[-1]:
+        repository = repository.rsplit(":", 1)[0]
+    parts = repository.split("/")
+    if len(parts) == 1 or ("." not in parts[0] and ":" not in parts[0] and parts[0] != "localhost"):
+        parts.insert(0, "docker.io")
+    if parts[0] == "index.docker.io":
+        parts[0] = "docker.io"
+    if parts[0] == "docker.io" and len(parts) == 2:
+        parts.insert(1, "library")
+    return "/".join(parts)
+
+
+def resolve_dockerfile(data, platform):
+    """Resolve mutable FROM references and build the exact resolved bytes."""
+    variables = {"TARGETPLATFORM": platform, "BUILDPLATFORM": MACHINE["docker"]["native_platform"]}
+    stages = set()
+    bases = []
+    lines = []
+    for line in data.decode("utf-8").splitlines():
+        match = re.match(r"\s*ARG\s+(\w+)=(.*)$", line, re.I)
+        if match:
+            variables[match[1]] = string.Template(match[2]).safe_substitute(variables)
+        match = re.match(r"(\s*FROM\s+)(.*)$", line, re.I)
+        if match:
+            parts = shlex.split(match[2])
+            stage_platform = platform
+            options = []
+            while parts and parts[0].startswith("--"):
+                option = string.Template(parts.pop(0)).safe_substitute(variables)
+                if not option.startswith("--platform="):
+                    raise ValueError(f"unsupported FROM option: {option}")
+                stage_platform = option.split("=", 1)[1]
+                if "$" in stage_platform:
+                    raise ValueError("unresolved FROM platform")
+                options.append(option)
+            if not parts:
+                raise ValueError("empty FROM")
+            ref = string.Template(parts[0]).safe_substitute(variables)
+            if "$" in ref:
+                raise ValueError(f"unresolved FROM: {ref}")
+            if ref.lower() not in stages and ref.lower() != "scratch":
+                pulled = docker("pull", "--platform", stage_platform, ref)
+                if pulled.returncode:
+                    raise ValueError("base image resolution failed: " + pulled.stderr)
+                inspected = docker("image", "inspect", "--format", "{{json .RepoDigests}}", ref)
+                if inspected.returncode:
+                    raise ValueError("base image inspect failed: " + inspected.stderr)
+                digests = json.loads(inspected.stdout)
+                matches = [d for d in digests or [] if repository_id(d) == repository_id(ref)]
+                if not matches or not re.search(r"@sha256:[0-9a-f]{64}$", matches[0]):
+                    raise ValueError(f"no resolved repository digest for {ref}")
+                ref = matches[0]
+                bases.append({"reference": parts[0], "digest": ref, "platform": stage_platform})
+            if len(parts) > 1:
+                if len(parts) != 3 or parts[1].lower() != "as":
+                    raise ValueError("unsupported FROM syntax")
+                stages.add(parts[2].lower())
+            parts[0] = ref
+            line = match[1] + " ".join(options + parts)
+        lines.append(line)
+    if not any(re.match(r"\s*FROM\s", line, re.I) for line in lines):
+        raise ValueError("Dockerfile has no FROM")
+    return ("\n".join(lines) + "\n").encode(), bases
+
+
+def image_key(dockerfile, head, tree, bases, platform):
+    identity = {"dockerfile_sha256": hashlib.sha256(dockerfile).hexdigest(),
+                "base_commit": head, "context_tree": tree, "resolved_bases": bases, "platform": platform}
+    key = hashlib.sha256(json.dumps(identity, sort_keys=True).encode()).hexdigest()
+    return key, identity
+
+
+def run(image, patches, out, mode, solution, as_user=12345, platform=None,
+        *, expected_ids, allowed_skips=(), timeout=600):
     out.mkdir(parents=True, exist_ok=True)
-    apply = "mkdir -p /out && cd /app && git apply --whitespace=nowarn /patches/test.patch"
+    prepared = out / "source"
+    prepared.mkdir()
+    platform = platform or MACHINE["docker"]["native_platform"]
+    # Populate from the built image before exposing the patched tree read-only.
+    apply = (f"if [ -f /etc/passwd ] && cut -d: -f3 /etc/passwd | grep -qx '{as_user}'; "
+             "then echo 'probe uid is present in passwd' >&2; exit 1; fi; "
+             "cp -a /app/. /prepared/ && cd /prepared && "
+             "git -c safe.directory=/prepared apply --whitespace=nowarn /patches/test.patch")
     if solution:
-        apply += " && git apply --whitespace=nowarn /patches/solution.patch"
-    cmd = f"./test.sh --output_path /out/{mode}.xml {mode}"
-    if as_user:
-        apply += f" && chown -R {as_user}:{as_user} /out"
-        cmd = (f"setpriv --reuid={as_user} --regid={as_user} --clear-groups "
-               f"env -i PATH=/usr/local/bin:/usr/bin:/bin HOME=/tmp bash -c 'cd /app && {cmd}'")
-    t0 = time.time()
-    # /out stays inside the container and the JUnit comes back on stdout after a marker: files that Docker writes
-    # through a bind mount can carry an ACL without this user (vet 2026-11-06, twice: %TEMP% and then ~/OSS after a
-    # Docker restart), and the proof then crashed with PermissionError before any check ran
-    p = docker("run", "--rm", "--platform", platform or MACHINE["docker"]["native_platform"], "--network", "none", "-v", f"{patches}:/patches:ro",
-               image, "bash", "-c", f"{{ {apply}; }} >/tmp/apply.log 2>&1 && {cmd}; echo '{MARK}'; cat /out/{mode}.xml 2>/dev/null")
-    text, _, xml = p.stdout.partition(MARK + chr(10))
-    (out / f"{mode}.log").write_text(text + p.stderr, encoding="utf-8", errors="replace")
+        apply += " && git -c safe.directory=/prepared apply --whitespace=nowarn /patches/solution.patch"
+    apply += " && chmod -R a+rX /prepared"
+    prep = docker("run", "--rm", "--platform", platform, "--network", "none",
+                  "--user", "0:0", "--entrypoint", "/bin/bash",
+                  "-v", f"{patches}:/patches:ro", "-v", f"{prepared}:/prepared:rw",
+                  image, "-c", apply, timeout=timeout)
+    (out / f"{mode}-prepare.log").write_text(prep.stdout + prep.stderr, encoding="utf-8")
+    if prep.returncode:
+        raise ValueError(f"patch preparation exit {prep.returncode}: {out}")
+    command = (f"/app/test.sh --output_path /out/{mode}.xml {mode}; status=$?; "
+               f"printf '\\n{MARK}\\n'; cat /out/{mode}.xml; exit \"$status\"")
+    t0 = time.monotonic()
+    proc = docker("run", "--rm", "--platform", platform, "--network", "none",
+                  "--user", f"{as_user}:{as_user}", "--workdir", "/",
+                  "--tmpfs", "/out:rw,mode=1777", "--tmpfs", "/tmp:rw,mode=1777",
+                  "-v", f"{prepared}:/app:ro", "--entrypoint", "/usr/bin/env", image,
+                  "-i", f"PATH={MINIMAL_PATH}", "/bin/bash", "-c", command, timeout=timeout)
+    log, marker, xml = proc.stdout.partition("\n" + MARK + "\n")
+    (out / f"{mode}.log").write_text(log + proc.stderr, encoding="utf-8")
     (out / f"{mode}.xml").write_text(xml, encoding="utf-8")
-    return junit(out / f"{mode}.xml"), time.time() - t0
-
-
-def counts(cases):
-    vals = list(cases.values())
-    return {k: vals.count(k) for k in ("pass", "fail", "skip")}
+    (out / f"{mode}-exit.json").write_text(json.dumps({"exit_code": proc.returncode}), encoding="utf-8")
+    if not marker:
+        raise ValueError(f"missing JUnit marker: {out}")
+    expect = "fail" if mode == "new" and not solution else "pass"
+    evidence = inspect_junit(xml.encode(), expected_ids, expect, proc.returncode,
+                             allowed_skips if mode == "base" else ())
+    return evidence["results"], time.monotonic() - t0
 
 
 def main():
-    ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("repo")
-    ap.add_argument("pkg")
-    ap.add_argument("--stability", action="store_true")
-    ap.add_argument("--final", action="store_true", help="run all cells on the final platform")
-    ap.add_argument("--rebuild", action="store_true")
-    ap.add_argument("--build-only", action="store_true")
-    ap.add_argument("--work-root", help="scratch root for this invocation")
-    args = ap.parse_args()
-    stability = args.stability
-    repo, pkg = Path(args.repo).resolve(), Path(args.pkg).resolve()
-    platform = MACHINE["docker"]["final_platform" if stability or args.final else "native_platform"]
-    head = subprocess.run(["git", "-C", str(repo), "rev-parse", "HEAD"], capture_output=True, text=True, check=True).stdout.strip()
-    # Build once per task (user rule 2026-11-06): the image depends only on the Dockerfile and the base commit, so it
-    # is tagged by both and reused until one of them changes. Patches are applied in each container, never baked in.
-    # A fresh clone's .git defeats Docker's layer cache (COPY . .), so rebuilding "with cache" was a full ~10 min
-    # build on every call. --rebuild forces a build.
-    key = hashlib.sha256((pkg / "Dockerfile").read_bytes() + head.encode()).hexdigest()[:12]
-    image = f"olympus-proof-{pkg.parent.name.lower()}:{key}"
-    if platform != "linux/amd64":
-        image += "-" + platform.split("/")[-1]
-    # Not %TEMP%: its ACL grants only SYSTEM, Administrators and the file owner, and the JUnit files that Docker's
-    # backend writes there became unreadable to this user after a Docker restart (vet 2026-11-06). ~/OSS grants the
-    # user full control explicitly.
-    work_root = Path(args.work_root or MACHINE["paths"]["work_root"]).resolve()
-    proof_root = work_root / "proof-work"
-    proof_root.mkdir(parents=True, exist_ok=True)
-    work = Path(tempfile.mkdtemp(prefix="proof-", dir=proof_root))
+    global ok
+    ok = True
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("repo", type=Path)
+    parser.add_argument("pkg", type=Path)
+    parser.add_argument("--base-ids", required=True, type=Path)
+    parser.add_argument("--new-ids", required=True, type=Path)
+    parser.add_argument("--base-skips", type=Path)
+    for option in ("stability", "final", "rebuild", "build-only"):
+        parser.add_argument("--" + option, action="store_true")
+    parser.add_argument("--work-root", type=Path)
+    parser.add_argument("--timeout", type=int, default=600)
+    args = parser.parse_args()
+    if not 0 < args.timeout < 688:
+        parser.error("timeout must be positive and below the 688-second platform watchdog")
+    image = "(unresolved)"
+    work = None
     try:
-        if not args.rebuild and docker("image", "inspect", image).returncode == 0:
-            say(True, f"1 image builds (reused {image}: same Dockerfile and base commit)")
-        else:
-            # a clone gives a real .git with history (test.sh restores base tests from it) and works when base/ is a
-            # git worktree; it holds exactly the committed HEAD, like the platform's checkout. One stable clone per
-            # task (user 2026-11-06, local speed only): a fresh clone each time changed .git, so COPY . . and every
-            # later layer were rebuilt; the Dockerfile stays outside the context for the same reason.
-            ctx = work_root / "proof-ctx" / pkg.parent.name
-            cur = subprocess.run(["git", "-C", str(ctx), "rev-parse", "HEAD"], capture_output=True, text=True)
-            if cur.returncode != 0 or cur.stdout.strip() != head:
-                shutil.rmtree(ctx, ignore_errors=True)
-                ctx.parent.mkdir(parents=True, exist_ok=True)
-                subprocess.run(["git", "clone", "-q", "--no-checkout", str(repo), str(ctx)], check=True)
-                subprocess.run(["git", "-C", str(ctx), "checkout", "-q", head], check=True)
-            shutil.copy(pkg / "Dockerfile", work / "Dockerfile.olympus")
-            b = docker("build", "--platform", platform, "-f", str(work / "Dockerfile.olympus"), "-t", image, str(ctx))
-            say(b.returncode == 0, "1 image builds" + ("" if b.returncode == 0 else ": " + (b.stdout + b.stderr)[-800:]))
-            # the image is built once and reused, so its build cache is never needed again; it filled C: on vet
-            # (37.75 GB, docker_data.vhdx 72.7 GB, engine down) - drop it after every build (user 2026-11-06)
-            docker("builder", "prune", "-af")
-            if b.returncode:
-                return
+        ids = {mode: read_ids(path) for mode, path in (("base", args.base_ids), ("new", args.new_ids))}
+        skips = read_ids(args.base_skips, allow_empty=True) if args.base_skips else []
+        if not set(skips) <= set(ids["base"]):
+            raise ValueError("base skip allowlist contains unexpected IDs")
+        repo, pkg = args.repo.resolve(), args.pkg.resolve()
+        platform = MACHINE["docker"]["final_platform" if args.final or args.stability else "native_platform"]
+        def git(*argv):
+            return subprocess.run(["git", "-C", str(repo), *argv], capture_output=True,
+                                  text=True, check=True).stdout.strip()
+        head, tree = git("rev-parse", "HEAD"), git("rev-parse", "HEAD^{tree}")
+        data = (pkg / "Dockerfile").read_bytes()
+        resolved, bases = resolve_dockerfile(data, platform)
+        key, identity = image_key(data, head, tree, bases, platform)
+        image = f"olympus-proof:{key}"
+        root = (args.work_root or Path(MACHINE["paths"]["work_root"])).resolve() / "proof-work"
+        root.mkdir(parents=True, exist_ok=True)
+        work = Path(tempfile.mkdtemp(prefix="proof-", dir=root))
+        (work / "identity.json").write_text(json.dumps(identity, indent=2), encoding="utf-8")
+        if args.rebuild or docker("image", "inspect", image).returncode:
+            ctx = work / "context"
+            subprocess.run(["git", "clone", "-q", "--no-local", "--no-checkout", str(repo), str(ctx)], check=True)
+            subprocess.run(["git", "-C", str(ctx), "checkout", "-q", "--detach", head], check=True)
+            dockerfile = work / "Dockerfile.resolved"
+            dockerfile.write_bytes(resolved)
+            built = docker("build", "--platform", platform, "-f", str(dockerfile), "-t", image, str(ctx))
+            if built.returncode:
+                raise ValueError("image build failed: " + built.stdout + built.stderr)
+            cleanup_build_cache()
+        say(True, f"image builds/reuses complete environment identity {key}")
         patches = work / "patches"
         patches.mkdir()
-        for f in ("test.patch", "solution.patch"):
-            shutil.copy(pkg / f, patches / f)
+        for name in ("test.patch", "solution.patch"):
+            shutil.copy(pkg / name, patches / name)
 
-        base, _ = run(image, patches, work / "nosol", "base", False, platform=platform)
-        say(bool(base) and counts(base)["fail"] == 0, f"2a without solution: base passes ({counts(base) if base else 'no JUnit'})")
+        def cell(label, mode, solution):
+            results, elapsed = run(image, patches, work / label, mode, solution, platform=platform,
+                                   expected_ids=ids[mode], allowed_skips=skips, timeout=args.timeout)
+            say(True, f"{label}: exit/report/IDs reconcile {results}")
+            return results, elapsed
+
+        cell("base-base", "base", False)
         if args.build_only:
-            # Dockerfile gate (user rule 2026-11-06): the image builds and base mode runs offline in it; the user then
-            # builds the same Dockerfile on the platform before any other stage
-            return
-        new, secs = run(image, patches, work / "nosol", "new", False, platform=platform)
-        say(bool(new) and counts(new)["pass"] == 0 and counts(new)["fail"] > 0,
-            f"2b without solution: every new test fails ({counts(new) if new else 'no JUnit'})")
-        say(secs < 300, f"2c clean new run {secs:.0f} s (< 300 s)")
-
-        seen = None
-        for i in (1, 2):
-            sb, _ = run(image, patches, work / f"sol{i}", "base", True, platform=platform)
-            sn, _ = run(image, patches, work / f"sol{i}", "new", True, platform=platform)
-            good = bool(sb) and bool(sn) and counts(sb)["fail"] == 0 and counts(sn)["fail"] == 0
-            say(good, f"3 with solution run {i}: base {counts(sb) if sb else '-'}, new {counts(sn) if sn else '-'}")
-            now = (sb, sn)
-            if seen is not None:
-                say(now == seen, "3 identical results between the two solution runs")
-            seen = now
-
-        un, _ = run(image, patches, work / "uid", "new", True, as_user=12345, platform=platform)
-        say(bool(un) and counts(un)["fail"] == 0, f"4 as uid 12345 with env -i: new {counts(un) if un else 'no JUnit'}")
-
-        if stability:
-            for label, sol in (("unsolved", False), ("solved", True)):
-                first = None
-                def cell(i):
-                    return run(image, patches, work / f"stab-{label}-{i}", "new", sol, platform=platform)[0]
-                results = map(cell, range(6))
+            return 0
+        _, elapsed = cell("new-base", "new", False)
+        say(elapsed < 300, f"new/base duration {elapsed:.1f}s (<300s)")
+        previous = None
+        for i in range(2):
+            result = (cell(f"base-reference-{i}", "base", True)[0],
+                      cell(f"new-reference-{i}", "new", True)[0])
+            if previous is not None:
+                say(result == previous, "reference per-ID vectors repeat")
+            previous = result
+        # All preceding cells already use H4; retain a separately named unknown-uid probe.
+        cell("unknown-uid", "new", True)
+        if args.stability:
+            for label, solution in (("base", False), ("reference", True)):
+                def repeat(i):
+                    return cell(f"stability-{label}-{i}", "new", solution)[0]
                 if MACHINE["parallel"]["stability_parallel"]:
                     with ThreadPoolExecutor(max_workers=MACHINE["docker"]["slots"]) as pool:
-                        results = list(pool.map(cell, range(6)))
-                for i, r in enumerate(results):
-                    if first is None:
-                        first = r
-                    elif r != first:
-                        say(False, f"5 {label} run {i + 1} differs from run 1 (flaky test ids)")
-                        break
+                        vectors = list(pool.map(repeat, range(6)))
                 else:
-                    say(True, f"5 {label}: 6 runs identical")
-    except Exception as e:  # noqa: BLE001  any crash is a FAIL, never a silent pass
-        say(False, f"proof crashed: {type(e).__name__}: {e}")
+                    vectors = [repeat(i) for i in range(6)]
+                say(all(v == vectors[0] for v in vectors), f"six {label} per-ID vectors repeat")
+    except Exception as exc:
+        say(False, f"proof crashed: {type(exc).__name__}: {exc}")
     finally:
-        # the image stays for the next proof of this task; task cleanup deletes it (memory: cleanup-keep-learning)
-        print(f"\nimage: {image}")
-        print(f"artifacts: {work}")
-        print("PROOF PASS" if ok else "PROOF FAIL")
-        sys.exit(0 if ok else 1)
+        print(f"image: {image}\nartifacts: {work}\nPROOF {'PASS' if ok else 'FAIL'}")
+    return 0 if ok else 1
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

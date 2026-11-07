@@ -1,4 +1,4 @@
-"""Run docker with a bounded number of containers at a time across agents (the machine has little RAM).
+"""Run docker within the machine profile's shared slot limit.
 
 usage: MSYS_NO_PATHCONV=1 python eval/dockrun.py run --rm ... <image> <cmd...>
 Waits for a free slot (DOCKRUN_SLOTS, default from machine profile; set 1 while solvers run), then runs ``docker <args>``.
@@ -16,17 +16,32 @@ import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from machine import load
+from machine import load, slot_limit
 
 try:
     machine = load()
+    SLOTS = slot_limit(machine["docker"]["slots"], os.environ.get("DOCKRUN_SLOTS"))
 except ValueError as exc:
     sys.exit(f"machine: {exc}")
-SLOTS = max(1, int(os.environ.get("DOCKRUN_SLOTS", machine["docker"]["slots"])))
+cleanup = any(arg in ("prune", "rm", "rmi") for arg in sys.argv[1:3])
+if cleanup and machine["docker"]["cleanup_allowed"] is not True:
+    sys.exit("machine profile forbids Docker cleanup")
 env = dict(os.environ)
 if machine["os"] == "windows":
     env["MSYS_NO_PATHCONV"] = "1"
-lock = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".docker.lock")
+# Disk floor before anything that adds images or layers: C: reached 0 GB on 2026-11-07 (product builds plus build
+# cache), Docker died mid-proof. DOCKRUN_MIN_FREE_GB overrides the 20 GB default.
+if sys.argv[1:2] and sys.argv[1] in ("build", "buildx", "pull", "load", "import"):
+    import shutil
+    need = float(os.environ.get("DOCKRUN_MIN_FREE_GB", "20"))
+    free = shutil.disk_usage(os.path.expanduser("~")).free / 2**30
+    if free < need:
+        sys.exit(f"dockrun: {free:.1f} GB free, below the {need:g} GB floor: prune old images and build cache "
+                 "(docker system df), compact the Docker disk, or set DOCKRUN_MIN_FREE_GB")
+# One lock file per machine, shared by every copy of this script (task tools and product tools), so all Docker
+# jobs on the machine share the same slots.
+lock = os.environ.get("DOCKRUN_LOCK") or os.path.join(os.path.expanduser("~"), ".olympus", "docker.lock")
+os.makedirs(os.path.dirname(lock), exist_ok=True)
 with open(lock, "a+") as f:
     slot = None
     while slot is None:
