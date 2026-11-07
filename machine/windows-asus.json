@@ -19,7 +19,8 @@
     "slots": 2,
     "native_platform": "linux/amd64",
     "final_platform": "linux/amd64",
-    "memory_gb": 4
+    "memory_gb": 4,
+    "cleanup_allowed": true
   },
   "parallel": {
     "battery_workers": 2,
