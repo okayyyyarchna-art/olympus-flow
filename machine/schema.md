@@ -1,7 +1,7 @@
 # Machine profile
 
 Profiles are JSON objects. Select one with `OLYMPUS_MACHINE=/absolute/path/profile.json`
-or a name such as `windows-asus` or `mac.example`. A path is relative to the caller's
+or a name such as `windows.example` or `mac.example`. A path is relative to the caller's
 working directory; names are resolved in the product's `machine/` directory. Without
 that variable the loader requires `machine/local.json`. Missing or invalid profiles
 fail before a tool starts work. There is no implicit Windows fallback.

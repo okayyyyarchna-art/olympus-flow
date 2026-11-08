@@ -9,7 +9,7 @@ build with a reference solution and offline tests. Do not edit the repository; w
 
 ## What makes a good candidate
 1. One clear feature or bug in stateful or rule-evaluating code. The change crosses 2-4 production files.
-2. 1-2 hard points: each is one deep rule a test can check exactly, whose stated consequences meet other subsystems
+2. 1-2 hard points (two moderate ones preferred over one extreme): each is one deep rule a test can check exactly, whose stated consequences meet other subsystems
    (ordering, scope of failure, identity, lifecycle with work in flight, partial or missing data, output in more than
    one format). No broad "everything must stay consistent" contracts. No unrelated hard points.
 3. Testable offline through the real code (the repository's own test setup and fixtures); no network, no live

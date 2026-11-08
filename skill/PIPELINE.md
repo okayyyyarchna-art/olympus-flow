@@ -13,11 +13,12 @@ prepare all fields before it. This skill does not authorize platform mutations.
 | 1. Environment first | Profile -> Dockerfile, runner skeleton, immutable image identity, base-ID inventory | Follow E1-E5/H1-H6. Build once per complete environment identity; run baseline and adapter failure probes. **Human builds this Dockerfile on the platform**; preserve its result separately from local proof. Environment failure returns here, not to task wording. |
 | 1b. Sample and Scope Gate | Builder's own draft description + a basic test.patch (one plain test per sentence, real test files, executable test.sh from the template) + a small solution sketch -> pasted sample | Only purpose: pass the platform prechecks and reach the Scope Gate, so nothing is built on a problem the platform already has. Minutes, not a build: no proof, no gates, no check that the tests pass or fail. **Owner runs prechecks and Scope Gate.** A reject stops this candidate (never reword and retry). Later pastes mark the Scope Gate stale; the owner re-runs it on the final package. |
 | 2. Define meaning | Pinned code, working environment -> atomic obligations, path/fault inventory, discriminator and valid-alternative plans, draft | Follow description.md section 3, part A (steps 1-8: problem, obligation ledger, feasibility gate, variants, draft, word reach, two reading audits with adjudication, counts). Prove feasibility of the difficult path with a small disposable experiment; it is not the final solution. Two independent readers resolve output-changing interpretations. No undecided public behavior at lock. |
-| 3. Human wording and lock | Audited draft + fact ledger -> human's final description, meaning diff, hash | **Human writes the final words.** Follow description.md section 3, part C (steps 9-11: counterexample diff, re-check of changed words, lock record) on those exact bytes. Fix unintended meaning changes before lock. **The lock is final**: no calibration step changes the text; only the owner's one final change (description.md section 5b, an extreme case) or REDESIGN can, after an impact analysis. |
-| 4. Tests | Locked text + planned ledger -> real test.patch including executable test.sh, fixtures, stable IDs | Built by walking build-checklist.md (ledger first). Follow T1-T6/H1-H6. Base-mode/base passes; each new ID fails on base for its intended reason. |
+| 3. Human wording and lock | Audited draft + fact ledger -> human's final description, meaning diff, hash | **Human writes the final words.** Follow description.md section 3, part C (steps 9-11: counterexample diff, re-check of changed words, lock record) on those exact bytes. Fix unintended meaning changes before lock. **The lock is final**: no calibration step changes the text; only a change the owner asks for (description.md section 5b) or REDESIGN can, after an impact analysis. |
+| 4. Tests | Locked text + planned ledger -> real test.patch including executable test.sh, fixtures, stable IDs | **Start with [prompts/apply-build-checklist.md](prompts/apply-build-checklist.md); `tools/checklist_gate.py check --through 5` passes before any code.** Built by walking build-checklist.md (ledger first). Follow T1-T6/H1-H6. Base-mode/base passes; each new ID fails on base for its intended reason. |
 | 5. Reference | Same contract/path inventory -> solution.patch, native quality evidence | Follow S1-S5 and build-checklist.md step 6; every in-scope path implemented and tested. |
 | 6. Deterministic closure | Four artifacts + variants + known patches -> four-cell proof, failure-probe evidence, corpus results | Run G0, then gate order G1 -> G2 -> G3 -> G4. The corpus runner replays every wrong design (must fail), valid alternative (must pass) and platform patch. No OPEN in-scope obligation, unexplained survivor, failed valid alternative, or stale execution evidence. |
-| 6b. v1 paste (calibration) | Closed candidate -> pasted v1 | v1 is the checklist-built version. Paste, confirm the fields, then **notify the owner** (push notification + message: version, hashes, "run the checks and the calibration rollout"). The owner runs the checks and the rollout of their choice; no watcher: the owner reports results and the builder pulls read-only. The builder goes on with stage 7 at once. |
+| 6a. Reference audit | Closed candidate -> one strict audit of the reference | `tools/replica.sh <task> ref-audit pre1` before v1, and `checklist_gate.py check --through 7`. Fix each reproduced BROKEN promise and add its test (vet task 2: this kind of audit found 3 of the 4 reference breaks, but only after v1). |
+| 6b. v1 paste (calibration) | Closed candidate -> pasted v1 | v1 is the checklist-built version. Paste, confirm the fields, then **notify the owner** (push notification + message: version, hashes, "run the checks and the calibration rollout"). The owner runs the checks and the rollout of their choice; the builder starts tools/watch.sh and pulls read-only. The builder goes on with stage 7 at once. |
 | 7. Local confirmation | v1 files -> sweep 1, replica batch, verification batch, sweep 2 only on its trigger | Schedule below; one fix batch per step through Repair. |
 | 7b. v2 paste | Closed stage-7 candidate -> pasted v2 | One checkpoint for all stage-7 fixes. **Notify the owner** with the changed files and only the checks to re-run. |
 | 8. Rollout analysis | Platform runs (any version) -> classified runs, FP audits, shaping plan | Pull read-only; replay every agent patch on the current files (replay_plan.py + corpus); FP audits per the schedule; shape with [rollout.md](rollout.md). What the agents show about the description goes into the rulebook for the next task, never into this text. Every change is predicted by a local replay before its paste. |
@@ -32,7 +33,8 @@ prepare all fields before it. This skill does not authorize platform mutations.
 2. No local blind solves (owner decision 2026-11-07). Solver evidence comes from the
    platform: the owner's calibration rollout on v1 (usually 3 Orion + 3 Vega). Three runs
    per family show the direction; the band is judged at 4+ runs per family, and Nova needs
-   4 runs before submit. Replays of one trajectory are not new runs.
+   4 runs before submit. Replays of one trajectory are not new runs. Runs failing a hard point, local or platform, are
+   the task working and never a reason to reword it (description.md section 5).
 3. Stage 7 order: sweep 1 (all lanes, one round) -> triage -> one fix batch -> replica
    batch (3 independent replicas in parallel on the same frozen files; Codex GPT Sol 6.1
    medium; 25 min time box each) -> the builder judges every finding at once -> one fix
@@ -44,22 +46,38 @@ prepare all fields before it. This skill does not authorize platform mutations.
    caught it (the example and why it slipped), or add a row when no rule covers it.
    Unreproduced findings change nothing.
 5. FP audits: one per passing run; a second only when the first says NOT_DESERVED or is
-   unclear. Each audit replays its probe on the reference too (build-checklist step 8).
+   unclear. Each audit replays its probe on the reference too (build-checklist step 8). Each probe runs once unless a
+   result looks flaky (vet task 2: audits repeating probes 3x held the Docker queue for about 50 min).
+   Before probe-heavy audits, add up their containers against the Docker slots: at most 2-3 audits at once, one container
+   each.
 6. After the final checkpoint, any fix needs Repair and affected semantic reclosure
    on the new snapshot. Do not restart all checkpoints by default or silently
    bless changed files with old verdicts. Unclosed findings block hand-over.
+7. The clean-repo proof certifies the exact files of a paste: run it once right before each paste and at the freeze,
+   with no other Docker jobs running (its duration limits count host load). Between pastes use only the container
+   cells and the variants job.
+8. A changed product tool is smoke-tested end to end on a known-good package before a task uses it (vet task 2: six
+   proof.py defects surfaced one per run).
 
 All review inputs include exact artifact identities and the literal contract;
 independent lanes do not read one another's conclusions. Merge their finding union,
 not the report with the most findings. Package reviews on this machine use the
 configured fresh read-only `codex_review.sh` route and reviewer skill; do not silently
 substitute the builder session. Configure other lanes explicitly with the coordinator.
+Codex runs the workflow sweeps and replica checks. Ad-hoc analysis (calibration comparisons, discriminator searches,
+verdict estimates) runs in-process plus claude2; Codex only when the owner names it or both lanes found nothing.
+
+Review briefs carry the description verbatim. Never write "not promised", "out of scope" or "known residual" unless the
+text excludes the case, never list known-and-kept items, and describe what changed, never that it resolves a finding
+(swift: a brief's scope claim preceded SQ 1/3 High on that branch).
 
 Container limits come from the machine profile (machine/*.json: slots, memory,
 parallel workers, cleanup permission), never from this file; run Docker work through
 the profile's `dockrun.py` lock. Every long job is its own tracked background command
 that blocks until it ends (no `&`, no detached shells), one per lane, so each lane's
-completion is seen at once. Queue experiments while independent reading proceeds.
+completion is seen at once. Stop a lane by its tracked job, never by matching a command line (vet task 2: a match
+killed a second lane). On Windows that stop ends only the outer shell: then find the processes whose command line
+holds that job's own unique path, `taskkill /PID <pid> /T /F` them, and re-list. Queue experiments while independent reading proceeds.
 
 Time boxes (owner target 2-4 h local work; platform and human waits counted apart):
 0 Qualify 20 m | 1 Environment 20 m + owner build | 2-3 Meaning and lock 40 m + owner

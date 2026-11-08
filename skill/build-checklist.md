@@ -1,11 +1,17 @@
 # Build checklist (S2 reference + S3 tests): write it right the first time
 
-This is HOW test.patch (tests + test.sh) and solution.patch are written, not a review after writing. Walk the eight
-steps in order. Steps 1-5 are planning written into one ledger (eval/build-ledger.md) before code; steps 6-8 build,
+This is HOW test.patch (tests + test.sh) and solution.patch are written, not a review after writing. **Start with
+[prompts/apply-build-checklist.md](prompts/apply-build-checklist.md): every rule below gets its own row, and a condensed
+plan never replaces it.** Walk the eight
+steps in order. Steps 1-5 are planning written into one ledger (the task's ledger.md) before code; steps 6-8 build,
 prove and review against it. Goal: the first draft passes Auto Review (T1-T8, S1-S4), Task Quality (fairness,
 coverage), Solution Quality (comprehensiveness, code quality), the false-pass (FP) panel, the verify checks and the
 rollouts, so the review sweep finds what is left instead of rebuilding the coverage. It does not guarantee bands or a
 sweep count; it removes the misses we already know.
+
+Shortcuts that cost a task (vet task 2), at every stage: a named artifact is filled in full, never a condensed note; a
+check reads the exact bytes it certifies; no claim about a result you have not read; gates run in the stated order, even
+under time pressure.
 
 Sources (all on or after 2026-10-16): the vet task (sweeps w1-w3, 7 replica rounds, FP audits, shadow lanes,
 batteries 1-18, final-package variants) weighted most; 8 accepted or in-review tasks (faust 9-12, turso, elio, swift,
@@ -16,12 +22,14 @@ notes, FP panel notes; eval/decisions.md); the gap study of the 9 accepted packa
 (olympus-product eval/checklist-gaps/oss70.md P1-P15, codex.md 1-8); vet task 2 (rollout 1 replay). Rule
 definitions: the platform rubric (section 9).
 
-## The ledger (eval/build-ledger.md): one file, these sections, each row linked to its contract row
+## The ledger (the task's ledger.md, copied from ledger-template.md): one file, each row linked to its contract row
 1. Contract: one row per atomic obligation (quote, outcome, allowed readings, exclusions, grounding, status).
 2. Paths: entry points, stores and formats, modes and sibling paths, transitions, faults, resource lifetimes.
 3. Discriminators: wrong-rule classes, valid alternatives, smallest differing input, killing test, disposition.
 4. Fixtures and harness: fake capabilities, expected test ids, environment assumptions, failure branches.
 5. Evidence: artifact hashes, commands, run ids, results (NOT RUN until executed), stale marks.
+6. Blueprint: every combination of entry point, change kind, copy state and lifecycle edge that differs, each closed
+   by a test, a quoted sentence or a named equivalent cell, before any code (the prompt above, step 3).
 
 ## 1. Pin inputs and feasibility
 - Record the locked description hash, the pinned commit, the image and toolchain identity, and the real grading
@@ -37,8 +45,8 @@ definitions: the platform rubric (section 9).
   cases in one script gave 0/16 platform runs on vet; the mark also decides what a re-eval may relax later
   (near-miss-release.md). [T5, FP]
 - A row whose path runs in a mode or entry point that no sentence names is HIDDEN, not implied: name the mode in
-  the description (the mode only, no mechanism) or drop the row. Re-mark every test added after the lock before each
-  paste (vet task 2: sweep fixes added pull-request tests to a description that never named pull requests; 4/4
+  the description before the lock (the mode only, no mechanism). After the lock, drop the row. Re-mark every test added
+  after the lock before each paste (vet task 2: sweep fixes added pull-request tests to a description that never named pull requests; 4/4
   rollout patches failed only those tests and the general sentences no other). [T5, FP]
 - Scope, exclusion and "keeps current behaviour" sentences are obligations too (A7). Couple each keep-behaviour
   assertion to a feature case that FAILS on base, because every new test must fail at the base commit (T1); ordinary
@@ -137,6 +145,10 @@ For each obligation, list every materially different value; the reference handle
   real async boundary and separate completion signals, and name the real behaviour (quirks too) it mirrors (P5,
   codex 6). End every lifecycle a test starts: teardown releases held gates, cancels leftover tasks and routes
   background crashes to the output; an algorithm that may cycle runs under a watchdog (C2, P10). [T5, T8]
+- Hold a background worker through observable progress on disk (a trailing regular file that moves last), not a named
+  pipe: a pipe holds only until open returns, and a valid design that refuses special files fails it (elio: five pipe
+  tests rated T5 High). Keep a pipe only when no other deterministic hold exists, behind a guard that cannot hang the
+  test binary. [T5, T2]
 - Normalize ambient inputs in the runner (umask, XDG/TMPDIR, editor, hash seed, locale); a fixed seed is not
   correctness for all seeds (codex 5). [T2, T6]
 - Generate fixtures with live runs (e.g. `stub fail <backend>`); a hand-made fixture copies the production formats and
@@ -151,6 +163,9 @@ For each obligation, list every materially different value; the reference handle
   assertion, with a comment naming the hidden test that now covers it; deselect only when that fails, exactly, with a
   reason, and with a hidden test on the same input (P6). Run the base suite against the reference AND each valid
   alternative to find them (C4). [T1, S2]
+- Deselecting a base test does not hide the change from Code Quality: if the reference makes an upstream assertion
+  stale, keep the public output unchanged and carry the new state elsewhere, or justify the change in the reference
+  (faust task 11: Code Quality Medium on a deselected test). [S2, SQ]
 - One scenario or test per independent obligation, never several obligations chained in one script: the runner stops
   at the first failing line, so a run's later failures stay hidden. That blinded the vet re-eval analysis (16 runs, one
   visible failure each) and makes the TQ coverage map coarse. [T8, TQ]
@@ -172,8 +187,17 @@ For each obligation, list every materially different value; the reference handle
   has not finished, then only the end state is asserted, so waiting and non-waiting designs both pass; "no matter how
   long" is proven by jumping the controlled clock (monotonic and wall together) far ahead (P8, codex 7). Clean new run
   < 300 s; test.sh timeout under the platform kill, or a hung run leaves no partial report (C8). [T2, verify]
+- Go 1.25+: a test of a shutdown or late-answer path runs the whole harness inside `synctest.Test`. `synctest.Wait()`
+  is the idle event (every other goroutine in the bubble durably blocked); it does not advance the clock. A late answer
+  is `synctest.Wait(); time.Sleep(30*time.Second); synctest.Wait()` on the fake clock; guard deadlocks with a fake
+  `time.After(time.Hour)`. When a library keeps timers after Close, register a one-second sleep in `t.Cleanup` first
+  inside the bubble. Mutexes, I/O and channels made outside the bubble are not durable (goka: platform T2 finding, gone
+  with the bubble). [T2]
 - No leak words (challenge/quest/olympus/Shipd), no process words, no stray build outputs; test files unique and named
   in the repo's convention (a short hash suffix by default); `./test.sh` committed with mode 100755. [prechecks]
+- Hidden-test helpers carry the file's hash suffix too (burrow-silences: an unsuffixed helper clashed with solver code
+  on 4 of 8 runs). Go: never range over a map to create subtests, and never call Fatalf on a parent t from inside
+  t.Run; both change which ids the unsolved state reports from run to run (Burrow #751). [T1, T2, verify]
 
 ## 6. Implement tests and reference against the ledger
 Tests:
@@ -188,10 +212,17 @@ Tests:
   reports; stop at a stage boundary instead). [T5]
 - Where an optional invalid input competes with existing error behaviour, grade the promised invariant and leave the
   precedence free unless the text or repo fixes it (C31: swift 412-over-413 FAIL_TEST_MISMATCH x5). [T5]
-- One-line reading risk for any assertion with a second reading. [T5]
+- An assertion with a second reading never stands alone. The same script holds neighbours showing the rule in both
+  directions and the no-change cases; a comment directly above the assertion quotes the description sentence and
+  states this case only (it prints in the failure log), with no framing word the description lacks; the test name says
+  what is checked. Reword any other comment that reads as a contradicting rule (vet task 2: 5 runs blamed on the task
+  became 0 with the same behaviour under test). [T5]
 - At every assertion with an unpromised part, accept the allowed set explicitly (membership, sorted compare,
   `None or <=`) and say so in a comment; leave the failure surface (raise, false return, logged error) free unless the
   text fixes it, and grade only the effect (P4). [T5, T7]
+- A test that came from a probe pins what the reference happens to do. Before it ships, rewrite it outcome-only: assert
+  what the description states, drop author-choice records and fields, and accept every reading a reader marked unclear
+  (faust task 7: Test Quality FAIL, 1 of 27 unfair). [T5, T7]
 Reference:
 1. The change sits in the layer that owns the concern, passes data through existing interfaces and reuses the repo's
    helpers and formats. Read the header comments of every file you edit: they hold local rules (vet task 2: scanfile.go
@@ -201,18 +232,29 @@ Reference:
    report's per-manifest reload, which every verification round then flagged). This holds for "cheap" Low fixes too.
    New interface methods keep unaffected implementations working by the language's own
    mechanism, and any default or fallback is proven safe for its real callers (R6). [S2, S3]
+   Correctness never depends on a cross-module call order a reader cannot see in the patch; decide at the owning
+   boundary from the event itself (faust task 10: 3 of 5 SQ runs read a store hook as post-write). [S1, SQ]
 2. Every path, store, mode, transition and fault in the Paths section is handled, or excluded by a scope sentence.
    [S1; B1, B3]
+   Promised entry points leave the same stored state: an asymmetry is never parked as "not observable through the API".
+   For every internal sub-request a fix issues, list which handler runs and what it writes (swift: SQ 2/3). [S1]
 3. Unknown, stale, optional and unsupported states behave as the contract and the repo's conventions require; trace
    fallback evidence to its authoritative source; an in-scope promise never silently degrades to a no-op (R6; vet
    typo, older report). A mode the text excludes keeps its exact old path behind one explicit check with a comment;
    a sibling driver the feature does not support fails with a clear error naming the supported one (P11: SQ praised
    both). [S1, S2]
+   Rejection ledger: every branch that rejects an input -> the input that reaches it -> the sentence that excludes it, or
+   proof the base rejects it too. A row with neither: make the shape work, do not narrow it (turso: SQ 1/3 three times).
+   When test.patch removes an old-behaviour test, add a positive feature test in the same file. A Medium inside a broad
+   promise is not parked because an upstream test pins nearby behaviour until a gated fix was tried and failed (swift
+   SQ 1/3). [S1, SQ]
 4. No hand-made tables of repository knowledge unless derived from code (vet per-plugin data map). [S1, S4]
 5. No kept residuals inside a promise, no excuse sentences; "the repo does the same" is no defense: fix it or cite the
    sentence that excludes it (B5: SQ 1/3-2/3 on 5 tasks). [S1]
 6. Every heuristic or threshold has its smallest breaking input in Discriminators (B6). Never weaken the reference to
    keep a passer (B7). Nothing out of scope, no unrequested cleanup or churn. [S1, S3]
+   The reference implements the widest literal reading of each promise. Sweep every any/all/every/like in the text: is
+   it general, or a hand-picked list or count rule? A heuristic never rejects a case the text names (elio: SQ 1/3). [S1]
 7. Code quality the repo enforces: its formatter and CI linters, no dead parameters or unused variables, comments
    that state what the code does, docs/glossary/CHANGELOG consistent with the code when the repo keeps them or the
    change touches them, line width as the file. [S4, SQ]
@@ -226,6 +268,7 @@ Reference:
 - Export the patches from explicit paths; check the file list, modes (`test.sh` 100755), applicability in grading
   order on a clean pinned tree, and no test/solution overlap; run through `./test.sh`; record against the exported
   patch hashes (M6). [verify, prechecks]
+- Never `git clean` the working tree: it deletes untracked new solution files. Use a disposable copy (Burrow #751).
 - The four cells on the pinned source, as the completion gate: base-mode on base PASS, new-mode on base FAIL for every
   expected id, base-mode on the reference PASS, new-mode on the reference PASS, with exit codes, parseable JUnit,
   exact ids and real failure output; no skips or unexplained missing/extra ids. Then every failure branch of the
@@ -233,6 +276,10 @@ Reference:
 - Run the wrong-rule variants and the valid alternatives. For each, record the exact diff and its state: APPLIED,
   RESTORED AWAY (the restore step removed it), DID NOT APPLY, EXECUTED; only an executed variant with its intended
   diagnostic counts. Rebuild compiled twins from the candidate source and check which binary/module was loaded (M4).
+  [FP]
+  Rust: `docker cp` keeps host mtimes, so cargo can skip the build and run the old binary; `touch` every copied source
+  first (turso: a false 40/40). Also run one variant carrying several defects at once: a human reviewer builds one with
+  about six and shows the suite passes it. Where a sentence says "like X" or "follow X", diff the reference against X.
   [FP]
 - Disposition of every survivor: grounded defect -> OPEN until a fair test or a reference fix closes it; valid choice
   -> keep it passing; legitimately OUT -> its exclusion; NOT VERIFIED -> the probe it needs. Never close a finding as
@@ -261,7 +308,7 @@ Reference:
 | T2 | deterministic: no timing, randomness, ordering | 3.4, 5 (no wall time as proof) |
 | T3 | strong tests, not permissive | 4 (discriminators), 6 (effect at the sink) |
 | T4 | extensive coverage of the behaviour and obvious edge cases | 2 (atomic obligations), 3 (paths), 4 |
-| T5 | no unspecified or undiscoverable behaviour | 2 (grounding, no reference-doc rules), 4 (oracle), 5 (fake capabilities), 6 (reading risk, competing errors) |
+| T5 | no unspecified or undiscoverable behaviour | 2 (grounding, no reference-doc rules), 4 (oracle), 5 (fake capabilities), 6 (second reading, competing errors) |
 | T6 | no network | 5 (environment) |
 | T7 | no over-pinned output | 6 (contract-relative pins) |
 | T8 | failure diagnostics intact | 5 (failure table, expected ids, status), 7 |

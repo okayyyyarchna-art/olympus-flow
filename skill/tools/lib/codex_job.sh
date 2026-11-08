@@ -46,10 +46,12 @@ $T/base-clean/, $T/solveN/ (only those exact paths; a working folder the brief n
 container at a time via the dockrun.py lock; never docker rm/rmi/prune. When done, return a short report (Markdown)
 starting with a one-line Verdict that lists every file you created or changed."
 else
+lessons=""
+[ ! -f "$OLYMPUS_MEMORY_DIR/MEMORY.md" ] || lessons="Before the brief, read the shared lessons: $OLYMPUS_MEMORY_DIR/MEMORY.md (and the memory files it points to that match your job) and your matching skill under $OLYMPUS_CODEX_HOME/skills (olympus-codex-sq-judge, olympus-codex-tq-judge, olympus-codex-auto-reviewer, olympus-codex-reviewer).
+"
 prompt="You are an independent reviewer (Codex) next to two Claude reviewers; nobody else's verdicts bind you.
 Task folder: $T. Your instructions are in this brief; read it first and follow it: $brief
-Before the brief, read the shared lessons: $OLYMPUS_MEMORY_DIR/MEMORY.md (and the memory files it points to that match your job) and your matching skill under $OLYMPUS_CODEX_HOME/skills (olympus-codex-sq-judge, olympus-codex-tq-judge, olympus-codex-auto-reviewer, olympus-codex-reviewer).
-Verify every claim (probe or file:line) and mark the rest NOT VERIFIED. Rules: you may read anything, run probes and Docker, and write ONLY your report plus probe files under the task's eval/ folder with a _cx suffix; never edit package folders (wip*/ submit*/ sample*/), repo/, base-clean/ or solveN/; Docker one container at a time via \"$PY\" \"$(machine_host "$OLYMPUS_LIB/dockrun.py")\" run ...; never docker rm/rmi/prune or stop containers you did not start.
+${lessons}Verify every claim (probe or file:line) and mark the rest NOT VERIFIED. Rules: you may read anything, run probes and Docker, and write ONLY your report plus probe files under the task's eval/ folder with a _cx suffix; never edit package folders (wip*/ submit*/ sample*/), repo/, base-clean/ or solveN/; Docker one container at a time via \"$PY\" \"$(machine_host "$OLYMPUS_LIB/dockrun.py")\" run ...; never docker rm/rmi/prune or stop containers you did not start.
 Return only your report (Markdown), starting with a one-line Verdict."
 fi
 # Time box (2026-11-07: a product build ran 3h20m and filled the disk with cold images). CODEX_TIME_BOX_MIN

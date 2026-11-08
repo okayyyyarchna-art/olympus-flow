@@ -6,7 +6,7 @@ medium: section at the end.
 
 Method: exact pasted files downloaded with `olympus problems download`; repo at the pinned commit with both patches
 applied; replicas run blind (no platform output in their inputs). Only platform verdicts that are fresh for those
-files (not stale) are compared. Data and scripts: `C:/Users/asus/OSS/shipd/workflow-build-20261105/calib/`
+files (not stale) are compared. The data and scripts of that run are not part of this repository
 (`compare.py` prints the table).
 
 Role of each package: a calibration package is a DETECTOR TEST with a known platform answer, not a model to copy.

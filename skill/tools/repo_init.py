@@ -14,6 +14,7 @@ import re
 import subprocess
 import sys
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))  # python -I drops the script folder
 from machine import load, profile_path
 
 TEMPLATES = Path(__file__).resolve().parents[1] / "templates"

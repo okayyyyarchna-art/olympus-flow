@@ -85,6 +85,29 @@ class Checkpoints(unittest.TestCase):
         with self.assertRaises(ValueError):
             summary.gate(self.folder, same)
 
+    def test_drop_row_needs_no_severity_but_keep_row_does(self):
+        self.reports["sq-r1a.json"]["issues"] = [issue("lost input")]
+        row = {"source": "sq-r1a", "id": "lost input", "severity": "unspecified", "decision": "DROP",
+               "dropReason": "code", "evidence": "line 20 handles it"}
+        self.reports["verify-r1.json"]["verdicts"] = [row]
+        self.write()
+        self.assertEqual(summary.gate(self.folder, self.manifest)[0], [])
+        row.update(decision="KEEP")
+        del row["dropReason"]
+        self.write()
+        with self.assertRaises(ValueError):
+            summary.gate(self.folder, self.manifest)
+
+    def test_parallel_declares_all_succeed_and_keep_the_audit_requirement(self):
+        command = [sys.executable, str(SCRIPT), str(self.folder), "par", "--declare"]
+        children = [subprocess.Popen(command + (["--ref-audits"] if i == 0 else []),
+                                     stdout=subprocess.PIPE, stderr=subprocess.STDOUT) for i in range(8)]
+        outputs = [child.communicate(timeout=60)[0] for child in children]
+        self.assertEqual([child.returncode for child in children], [0] * 8, outputs)
+        declared = json.loads((self.folder / "checkpoint-par.json").read_text(encoding="utf-8"))
+        self.assertTrue(any(r["kind"] == "ref-audit" for r in declared["reports"]))
+        self.assertFalse((self.folder / "checkpoint-par.json.lock").exists())
+
     def test_all_severities_require_source_specific_dispositions(self):
         for severity in ("high", "medium", "low"):
             self.reports = clean_reports()

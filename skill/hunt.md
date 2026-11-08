@@ -42,7 +42,7 @@ high, search mode), claude2 (Opus) and the in-process lane (Agent tool, read-onl
 5. **Score:** the lanes' rubric (0-8, the lowest lane's value when they differ) + 1 for each additional lane that
    found it independently + 1 for a bug whose reproduction is clear in the code - 1 per design choice the
    description would have to invent (a choice no sentence of the repo's docs or behaviour settles).
-6. **Shape check (problem-design.md section 2):** 1-2 hard points, 3-4 stated consequences, each on a different
+6. **Shape check (problem-design.md section 2):** 1-2 hard points (two moderate ones preferred over one extreme, as a suggestion), 3-4 stated consequences, each on a different
    subsystem pair. Two consequences on one pair collapse into one blind spot (goka 0/23; vet stacked two implied
    cases on "which checks ran" and got 0/16).
 7. **Verify the top 3 myself:** open every cited file:line, re-run two novelty searches, write the 3-4 consequences
@@ -60,3 +60,6 @@ high, search mode), claude2 (Opus) and the in-process lane (Agent tool, read-onl
 9. **Pick** the highest verified score; ties go to the one whose consequences meet more different subsystem pairs,
    then to the smaller change. Record the top 3 in `$OLYMPUS_SEAMS_ROOT/<owner>-<repo>.md` (seam-bank.md schema) and
    give the owner a short table: pick, why, two runners-up. The owner may override; otherwise stage 1 starts.
+10. **Cleanup:** after the pick, delete the clones, toolchains and caches the lanes created inside the hunt folder, and
+    report the space freed. Keep reports, triage tables and the chosen clone. In any cleanup keep every version folder,
+    eval report, brief and tool.

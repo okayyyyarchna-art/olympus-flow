@@ -48,6 +48,16 @@ Mechanical count method/result and actual description/precheck results stay sepa
 |---|---|---|---|---|---|
 | P01 / C01 | Fill | Fill | Fill | Fill | PLANNED |
 
+## Blueprint (fill before any code; tools/checklist_gate.py checks it)
+
+One row per combination that differs, for every contract row not OUT. Write n/a for an axis that cannot vary.
+Disposition is one of: `TESTED <test name>`, `OUT "<exact description sentence>"`, `OUT unreachable <file:line>`,
+`SAME <cell> <why it behaves the same>`.
+
+| Cell | Contract | Entry point | Change kind or mode | Copy or data state | Lifecycle edge | Expected result | Disposition |
+|---|---|---|---|---|---|---|---|
+| M01 | C01 | Fill | Fill | Fill | Fill | Fill | Fill |
+
 ## Tests, fixtures and design freedom
 
 | Canonical test ID | Contract/path IDs; exact assertions and observable sinks | Oracle derivation; data separating wrong rules | Fake capabilities/fixture provenance; valid design it must permit | Intended base failure; result records |
@@ -76,7 +86,7 @@ Mechanical count method/result and actual description/precheck results stay sepa
 |---|---|---|---|---|
 | Fill | Fill | NOT VERIFIED | STALE | Fill |
 
-| Finding ID / all sources | Quoted obligation; legal failing input; expected/actual; reproduction or disproof | Accept/reject/merge/NOT VERIFIED and reason | Changed artifacts; sibling-class fix; new assertion | Repair replay + two-audit eligibility; affected gate reclosure |
+| Finding ID / all sources | Quoted obligation; legal failing input; expected/actual; reproduction or disproof | Accept/reject/merge/NOT VERIFIED and reason | Changed artifacts; sibling-class fix; new assertion | Repair replay + FP-audit eligibility; affected gate reclosure |
 |---|---|---|---|---|
 | F01 | Fill | NOT VERIFIED | Fill | OPEN |
 

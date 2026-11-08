@@ -21,6 +21,7 @@ import time
 import uuid
 from xml.etree import ElementTree as ET
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))  # python -I drops the script folder
 from machine import load
 from repo_init import git, save
 

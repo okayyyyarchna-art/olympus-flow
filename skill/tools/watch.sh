@@ -3,7 +3,7 @@
 # when the user's runs have finished something new: a quality check, a precheck stage, or rollout runs, with nothing
 # still pending/running. Prints what changed and whether anything failed. Never triggers anything.
 #   bash watch.sh <challenge-id> <task-dir> [interval-seconds=300] [max-hours=12]
-# Optional (the owner reports results by default): run it in the background when the owner asks; when it exits: pull.sh, then stage 8 (platform.md).
+# Start it in the background after each paste (platform.md); when it exits: pull.sh, then stage 8.
 set -uo pipefail
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/machine.sh" || exit 2
 # the whole body is one function: bash reads it completely before running, so editing this file while a run

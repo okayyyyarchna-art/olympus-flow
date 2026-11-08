@@ -2,7 +2,10 @@
 
 Copy only from `accepted/` (the platform accepted these packages). `in-review/` holds packages that passed every
 check but are still in finalizing review: use them only for a language with no accepted example, and say so in
-flow-status. Draft packages are never templates.
+the ledger. Draft packages are never templates.
+
+When copying `Dockerfile.rust-elio`, drop its `cargo test --no-run` step: dockerfile.md E4 now forbids any test runner in
+RUN, and the platform has since failed compile-only runs.
 
 | Folder | Language | test.sh / Dockerfile | Source (platform status, results) |
 |---|---|---|---|

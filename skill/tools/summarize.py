@@ -5,11 +5,13 @@
 An explicit --checkpoint JSON names the evidence required for the checkpoint.
 """
 import argparse
+from contextlib import contextmanager
 import hashlib
 import json
 import os
 from pathlib import Path
 import sys
+import time
 
 
 KINDS = {"fairness", "sq", "dq", "ar", "verify", "ref-audit"}
@@ -39,7 +41,31 @@ def read(path):
 def write(path, value):
     temporary = path.with_name(f"{path.name}.{os.getpid()}.tmp")
     temporary.write_text(json.dumps(value, indent=2), encoding="utf-8")
+    # Windows refuses the rename while another process has the target open.
+    for delay in (0.05, 0.2, 0.5, 1, 2):
+        try:
+            return temporary.replace(path)
+        except PermissionError:
+            time.sleep(delay)
     temporary.replace(path)
+
+
+@contextmanager
+def locked(path, wait=30):
+    """One checkpoint update at a time: parallel --check rounds read, merge and rewrite the same file."""
+    lock = path.with_name(path.name + ".lock")
+    deadline = time.monotonic() + wait
+    while True:
+        try:
+            lock.mkdir()
+            break
+        except (FileExistsError, PermissionError):
+            require(time.monotonic() < deadline, f"checkpoint lock held: {lock} (remove it if no round is running)")
+            time.sleep(0.05)
+    try:
+        yield
+    finally:
+        lock.rmdir()
 
 
 def text(value):
@@ -151,7 +177,7 @@ def validate(kind, report):
                 "invalid verified bands")
         for row in rows(report, "verdicts"):
             require(text(row.get("source")) and text(row.get("id")) and text(row.get("evidence"))
-                    and row.get("severity") in SEVERITIES
+                    and (row.get("severity") in SEVERITIES or row.get("decision") == "DROP")
                     and row.get("decision") in ("KEEP", "DROP"), "invalid verification disposition")
             if row["decision"] == "DROP":
                 require(row.get("dropReason") in ("reading", "today", "scope", "realism", "code", "duplicate", "combination"),
@@ -243,8 +269,7 @@ def gate(folder, manifest):
         elif kind == "dq":
             if (report["verdict"] != "PASS" or report["requirementCount"]["blocking"]
                     or any(r["verdict"] != "PASS" for r in report["taskCriteria"])
-                    or not report["prechecks"]["ascii"] or not report["prechecks"]["noUrls"]
-                    or report["prechecks"]["words"] >= 250):
+                    or not report["prechecks"]["ascii"] or not report["prechecks"]["noUrls"]):
                 problems.append(f"{source}: DQ/task/precheck failure")
         elif kind == "sq":
             for field, criterion in (("solution_comprehensiveness", "comprehensiveness"), ("code_quality", "quality")):
@@ -279,12 +304,13 @@ def main():
         path = args.checkpoint or args.folder / f"checkpoint-{args.tag}.json"
         if args.declare:
             args.folder.mkdir(parents=True, exist_ok=True)
-            audits = args.ref_audits
-            if path.exists():
-                previous = read(path)
-                require(previous.get("checkpoint") == args.tag, "checkpoint tag mismatch")
-                audits = audits or any(r.get("kind") == "ref-audit" for r in rows(previous, "reports", True))
-            write(path, declaration(args.tag, audits))
+            with locked(path):
+                audits = args.ref_audits
+                if path.exists():
+                    previous = read(path)
+                    require(previous.get("checkpoint") == args.tag, "checkpoint tag mismatch")
+                    audits = audits or any(r.get("kind") == "ref-audit" for r in rows(previous, "reports", True))
+                write(path, declaration(args.tag, audits))
             print(f"Declared required reports: {path}")
             return 0
         if args.merge_sq:

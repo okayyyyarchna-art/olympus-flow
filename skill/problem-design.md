@@ -35,7 +35,9 @@ independent traps stalled every time (orange-orm 80 wips, task 5 ~30, Burrow #75
 A deep rule is hard because it has **stated consequences where it meets other subsystems**: the 2-4 boundaries the
 failing runs missed in the table above all come from ONE rule (topic start: one start_from rule -> ms lower bound,
 whole-app failure, reassignment). So: 1-2 hard points -> 3-4 stated consequences in total, all written in the
-description and each with a test. Never add unrelated traps to raise difficulty.
+description and each with a test. Never add unrelated traps to raise difficulty. Two moderate hard points are
+preferred over one extreme point, so that some agents solve it and others do not (owner 2026-11-09, a suggestion and
+never a gate; description.md section 2).
 Rough sizing: if an agent gets each stated consequence right with probability p and there are k of them, pass rate
 ~= p^k (core assumed solved). Today p ~= 0.6-0.75 (failing runs miss 1-2 of 3-4); k = 3-4 gives 13-42%; target one
 family near 25% per run.

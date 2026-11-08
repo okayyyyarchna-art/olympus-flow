@@ -1,5 +1,7 @@
 # Olympus Flow
 
+New here? Start with [GETTING-STARTED.md](GETTING-STARTED.md).
+
 Olympus Flow packages the challenge workflow, review prompts, agents and portable
 tools. Rules, playbooks and prompts are shared; the machine layer is per machine.
 Keep local settings in `machine/local.json` (gitignored), or select a profile with
@@ -12,18 +14,19 @@ installed skill. It prints a file diff summary before writing. It refuses to rep
 different existing files unless `--force` is present. An existing source
 `machine/local.json` is preserved; otherwise the named profile creates it.
 
-On this Windows machine, run in Git Bash from the checkout:
+On Windows, run in Git Bash from the checkout:
 
 ```bash
-bash install.sh --profile windows-asus --dry-run
-bash install.sh --profile windows-asus
-export OLYMPUS_MACHINE=windows-asus
+cp machine/windows.example.json machine/local.json
+# Edit machine/local.json for your workspace and installed CLI paths.
+bash install.sh --dry-run
+bash install.sh
 python skill/tools/machine.py get docker.slots
 ```
 
-Use Docker Desktop's WSL2 backend with about 4 GB allocated. The Windows profile
-keeps the existing workspace paths, four solves, two Docker slots and amd64 flags.
-MSYS conversion and Windows process-tree termination are enabled only for this OS.
+Use Docker Desktop's WSL2 backend with about 4 GB allocated. The example profile
+uses two Docker slots and amd64 flags. MSYS conversion and Windows process-tree
+termination are enabled only for this OS.
 
 On an Apple Silicon Mac, run from Bash or invoke Bash from zsh:
 
@@ -52,7 +55,7 @@ The shell loader makes the selected path absolute for its children.
 Tools live in `skill/tools/`; internal helpers live in `skill/tools/lib/`. For example:
 
 ```bash
-export OLYMPUS_MACHINE=windows-asus  # or mac.example / an absolute profile path
+export OLYMPUS_MACHINE=windows.example  # or mac.example / an absolute profile path
 python skill/tools/proof.py /path/to/base /path/to/pkg --build-only
 python skill/tools/proof.py /path/to/base /path/to/pkg --final --stability
 DOCKRUN_SLOTS=1 python skill/tools/lib/dockrun.py run --rm --network none IMAGE COMMAND

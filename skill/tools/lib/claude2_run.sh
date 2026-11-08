@@ -65,7 +65,7 @@ esac
 # brief; then add a section "Against earlier decisions" (HOLD/CONCEDE per earlier row you disagree with).
 # Shared learning (user 2026-10-17): every role except the cold reader reads the coordinator's memory first.
 mem="$OLYMPUS_MEMORY_DIR"
-case "$role" in cold) ;; *) task="Before anything else read $mem/MEMORY.md and every lesson file it lists that concerns
+[ ! -f "$mem/MEMORY.md" ] || case "$role" in cold) ;; *) task="Before anything else read $mem/MEMORY.md and every lesson file it lists that concerns
 your role (test quality, solution quality, auto review, FP/passers, hints/calibration, reviewers); they are the
 team's accumulated rules and outweigh your defaults.
 $task" ;; esac

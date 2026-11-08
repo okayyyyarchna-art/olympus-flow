@@ -2,6 +2,7 @@
 
 usage: MSYS_NO_PATHCONV=1 python eval/dockrun.py run --rm ... <image> <cmd...>
 Waits for a free slot (DOCKRUN_SLOTS, default from machine profile; set 1 while solvers run), then runs ``docker <args>``.
+DOCKRUN_TIMEOUT (seconds) limits the command itself, not the wait for a slot; exit 124 when it runs out.
 Slot 0 is the byte the earlier one-slot version locked, so a run still waiting from that version keeps its turn.
 """
 try:
@@ -32,7 +33,13 @@ if machine["os"] == "windows":
 # Disk floor before anything that adds images or layers: C: reached 0 GB on 2026-11-07 (product builds plus build
 # cache), Docker died mid-proof. The floor is docker.min_free_gb of the machine profile (default 12);
 # DOCKRUN_MIN_FREE_GB overrides it for one job.
-if sys.argv[1:2] and sys.argv[1] in ("build", "buildx", "pull", "load", "import"):
+def already_local():
+    # A pull of an image already here adds nothing (proof.py pulls every base to resolve its digest).
+    return sys.argv[1] == "pull" and subprocess.call(["docker", "image", "inspect", sys.argv[-1]], env=env,
+                                                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL) == 0
+
+
+if sys.argv[1:2] and sys.argv[1] in ("build", "buildx", "pull", "load", "import") and not already_local():
     import shutil
     need = float(os.environ.get("DOCKRUN_MIN_FREE_GB") or machine["docker"].get("min_free_gb", 12))
     free = shutil.disk_usage(os.path.expanduser("~")).free / 2**30
@@ -41,6 +48,7 @@ if sys.argv[1:2] and sys.argv[1] in ("build", "buildx", "pull", "load", "import"
                  "(docker system df), compact the Docker disk, or set DOCKRUN_MIN_FREE_GB")
 # One lock file per machine, shared by every copy of this script (task tools and product tools), so all Docker
 # jobs on the machine share the same slots.
+limit = float(os.environ.get("DOCKRUN_TIMEOUT") or 0) or None
 lock = os.environ.get("DOCKRUN_LOCK") or os.path.join(os.path.expanduser("~"), ".olympus", "docker.lock")
 os.makedirs(os.path.dirname(lock), exist_ok=True)
 with open(lock, "a+") as f:
@@ -60,7 +68,10 @@ with open(lock, "a+") as f:
         if slot is None:
             time.sleep(1)
     try:
-        code = subprocess.call(["docker", *sys.argv[1:]], env=env)
+        code = subprocess.call(["docker", *sys.argv[1:]], env=env, timeout=limit)
+    except subprocess.TimeoutExpired:
+        print(f"dockrun: stopped after {limit:g} s (DOCKRUN_TIMEOUT)", file=sys.stderr)
+        code = 124
     finally:
         f.seek(slot)
         if msvcrt:

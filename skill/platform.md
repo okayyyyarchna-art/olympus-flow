@@ -18,6 +18,10 @@ starting (login is the one physical step). Arguments: `runs artifact <challenge-
 | `runs run` | spends rollout tokens (a 12-run batch ~80) |
 | `problems lock`, `problems submit` | final; only when readiness is all green |
 
+Tokens drip hourly by tier (Iron 4 per hour when recorded). Refunds cover infrastructure failures only. If real source
+lives under build/, dist/ or target/, list those protected folders for the FP check. A contributor may submit at most
+12 tasks per repository.
+
 ## Pastes and notifications
 Pastes happen only at these points, each followed by a push notification and a message to the owner (version,
 file hashes, what changed, exactly which checks to run and which runs are still needed):
@@ -25,12 +29,19 @@ file hashes, what changed, exactly which checks to run and which runs are still 
 |---|---|---|
 | Dockerfile (stage 1) | Dockerfile only | the platform image build |
 | Sample (stage 1b) | my draft words + basic tests + a small solution sketch | prechecks, Scope Gate |
-| v1 (stage 6b) | the checklist-built package | the checks, the calibration rollout (their mix, usually 3 Orion + 3 Vega) |
+| v1 (stage 6b) | the checklist-built package | the calibration rollout (their mix, usually 3 Orion + 3 Vega); the full checks can wait for v2 (below) |
 | v2 (stage 7b) | all stage-7 fixes in one version | only the affected checks; re-eval |
 | v3 (stage 8b) | rollout shaping, predicted by a local replay | affected checks, re-eval, runs to reach 4+ per family (Nova included) |
-No watcher by default: the owner says when results are in. `tools/watch.sh` exists for when the owner asks for it.
+Before every paste and every status claim about a check, pull the platform state (`tools/pull.sh`): vet task 2 pasted
+over a finished re-eval and left about 5 h of results unread. After each paste, start `tools/watch.sh <id> <task>` as a
+tracked background job so a finished check wakes the builder; it only reads, and the owner still decides what runs.
 Every result is read against the version it graded: a check that ran on an older paste says nothing about the
 current files.
+
+v1 is for the calibration rollout. Run only the checks the rollout needs, and the full checks at v2 (vet task 2: v1 failed
+Solution Quality and still got its rollout; which checks can block a rollout is NOT VERIFIED). If a check does block it,
+contest it honestly, one note per finding: the quote plus a code trace, or "fixed in the next version, file:line". Local
+refinement goes on meanwhile.
 
 ## Sample and Scope Gate (stage 1b)
 The Scope Gate unlocks only after every precheck passes, and the AI precheck fails a stub test patch ("Tests cover
@@ -47,6 +58,12 @@ readiness ("repository verification expired" = the owner re-runs prechecks right
 "Harbor rebuild-safe" must pass; "image failed to rebuild from your committed source" = re-base onto the tip).
 Platform verdicts vary run to run (vet SQ: 2/3 then 3/3 on the same files): act on findings that reproduce and on
 every High. Keep `eval/platform-ledger.md`: one row per finding (check, quote, real/misread, fix, next result).
+Do not forecast Requirement Coverage x/y: the platform re-splits requirements per run. Triage every partial and
+suggestion in the ledger with a reason: add it if a realistic wrong design can slip through or a whole stated mode is
+untested; add it if it costs no difficulty and a paste is happening anyway; otherwise leave it and say why.
+Auto Review mirrors Solution Quality: a reproducing Medium at SQ 2/3 comes back as solution 1/3. Before the reference is
+platform-approved, close it when the fix is small. An approval "with reservations" still goes to a human reviewer, so
+clear Low notes on the tests and reference too.
 Local vs platform: put each platform verdict next to our replica verdict for the same files in
 `eval/platform/compare.md`; a mismatch names the failing layer (generator never looked, verify dropped it, pattern
 unknown, depth) and is fixed as a general rule in replicas/ (replicas/CALIBRATION.md has the method).
@@ -61,6 +78,9 @@ description and Dockerfile re-runs the same patches, so the replay predicts it e
 FP audit: one per passing run (`tools/replica.sh <task> fp-audit`), a second only when the first says NOT_DESERVED
 or is unclear; each probe is replayed on the reference too. The platform's FP panel notes are shown only in the web
 UI: pull.sh says when to ask the owner to paste them.
+The FP panel never sees the Auto Review, SQ or TQ reports, so an approving note is no evidence for a passer: predict FP
+only from the description, the tests and the patch. Before every rollout, sort the Test Fairness coverage suggestions
+into noise and true gaps.
 Gate (platform text): exactly one family in (0, 25%], the other two at 0; >= 4 runs each; Nova average > 400K
 sequence length; cheat rate < 20%; no environment blockers; passers hold under the FP panel.
 

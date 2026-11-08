@@ -25,7 +25,7 @@
    that deviates from the base image, stating why (the AI precheck failed vet's Go
    reinstall without its "base has Go 1.26, go.mod needs 1.27.3" reason). Never ship a solution-built cached binary
    as the executable graded against later candidates.
-5. **E5 - Qualify once, reuse by identity.** Build the full submitted Dockerfile through
+5. **E5 - Qualify once, reuse by identity.** Never reorder or edit the Dockerfile for local cache speed: the platform builds it from scratch. Build the full submitted Dockerfile through
    the configured lock. Key reuse by Dockerfile + source/context + resolved base image
    + platform + toolchain/dependency identities, not just a tag or HEAD. Run H6 offline
    after build, then obtain the **human's platform build result**. Record local and

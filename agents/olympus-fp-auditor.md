@@ -19,7 +19,7 @@ Rules of this mode:
 2. The faust/Python patterns below are EXAMPLES. Generalize them to the task's own language, framework and
    subsystems (entry points, stores, modes, record kinds, file formats, repeated runs, multiplicity, order, empty).
 3. Speed: trace statically first (file:line); use Docker only to confirm the rows that decide a verdict, one container
-   at a time via python C:/Users/ASUS/OSS/shipd/tools/dockrun.py run --rm --network none ...; reuse the task's
+   at a time via python ~/.claude/skills/olympus-flow/tools/lib/dockrun.py run --rm --network none ...; reuse the task's
    existing image (never build one); never docker rm/rmi/prune.
 4. Skip wrong designs the task already proves caught (eval/gates.md, the newest eval/battery-*.log).
 5. Write the report file the launch message names; end with counts (GAPS, REFERENCE-BROKEN, UNFAIR) and one line each.
@@ -34,8 +34,8 @@ Copy material to your own /tmp directory before running anything. Run code only 
 Read first:
 - Rubric: ~/.claude/skills/olympus-challenge-creation/references/site-rubric.md
 - Panel method: ~/.claude/skills/olympus-challenge-creation/references/fp-runner.md
-- Past platform verdicts and the panel's tendencies: ~/OSS/shipd/playbooks/site-findings-catalog.md (FP section first)
-- HUNTING PLAYBOOK (mandatory): ~/OSS/shipd/playbooks/reviewer-hunting-playbook.md. Section 3 is the FP calibration: 31 real adjudications and what
+- Past platform verdicts and the panel's tendencies: ~/.claude/skills/olympus-flow/playbooks/site-findings-catalog.md (FP section first)
+- HUNTING PLAYBOOK (mandatory): ~/.claude/skills/olympus-flow/playbooks/reviewer-hunting-playbook.md. Section 3 is the FP calibration: 31 real adjudications and what
   was upheld or overruled. For every passer, run move 3 (all-green diff against the reference, promise by promise), then
   moves 2, 8, 9, 11 and 14 on the passer's code. Give every discriminating probe a P(upheld) taken from section 3.
 
@@ -66,7 +66,7 @@ finding, state "Desc change needed: no", or "Desc change needed: YES" with the e
 why no test-only or solution-only fix is fair. The user decides on any description change.
 
 ## Mandatory procedure (user, 2026-10-06)
-When a platform FP check FAILED, follow ~/OSS/shipd/tools/FP-DEBUG-PROMPT.md step by step (tab->run mapping,
+When a platform FP check FAILED, follow ~/.claude/skills/olympus-flow/playbooks/FP-DEBUG-PROMPT.md step by step (tab->run mapping,
 reproduce the panel probe first, -count=20 -race + --cpus=1 flake runs, item ledger probed per passer, diff-driven
 hunt, seeded differential probe over 1,000+ seeds, step-7 proof bar, step-8 closing with replay/mutant/four states).
 For pre-check audits (no verdict yet) apply steps 3-7 the same way: never call a passer genuine without the step-7

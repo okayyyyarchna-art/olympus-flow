@@ -3,7 +3,7 @@
 
 usage: proof.py <base-repo> <pkg-dir> --base-ids ids.json --new-ids ids.json
        [--base-skips ids.json] [--stability] [--final] [--rebuild] [--build-only]
-       [--work-root DIR] [--timeout SECONDS]
+       [--work-root DIR] [--timeout SECONDS] [--build-timeout SECONDS]
 Expected-ID files are nonempty canonical-ID JSON arrays. Baseline skips must be
 predeclared; new-mode skips always fail. All cells use the literal H4 environment.
 Image reuse includes Dockerfile, committed context, resolved FROM digests and platform.
@@ -23,6 +23,7 @@ import sys
 import tempfile
 import time
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))  # python -I drops the script folder
 from machine import load
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
@@ -35,6 +36,7 @@ if MACHINE["os"] == "windows":
     ENV["MSYS_NO_PATHCONV"] = "1"
 MARK = "=====PROOF-JUNIT====="
 MINIMAL_PATH = "/usr/local/bin:/usr/bin:/bin"
+SLOT_WAIT = 3600
 ok = True
 
 
@@ -45,8 +47,9 @@ def say(good, message):
 
 
 def docker(*args, timeout=600):
-    return subprocess.run(DOCKRUN + list(args), capture_output=True, text=True,
-                          encoding="utf-8", errors="replace", env=ENV, timeout=timeout)
+    # The limit covers the command itself: dockrun applies it once a Docker slot is free.
+    return subprocess.run(DOCKRUN + list(args), capture_output=True, text=True, encoding="utf-8", errors="replace",
+                          env={**ENV, "DOCKRUN_TIMEOUT": str(timeout)}, timeout=timeout + SLOT_WAIT)
 
 
 def cleanup_build_cache():
@@ -171,7 +174,7 @@ def run(image, patches, out, mode, solution, as_user=12345, platform=None,
     (out / f"{mode}.xml").write_text(xml, encoding="utf-8")
     (out / f"{mode}-exit.json").write_text(json.dumps({"exit_code": proc.returncode}), encoding="utf-8")
     if not marker:
-        raise ValueError(f"missing JUnit marker: {out}")
+        raise ValueError(f"missing JUnit marker (exit {proc.returncode}): {out}")
     expect = "fail" if mode == "new" and not solution else "pass"
     evidence = inspect_junit(xml.encode(), expected_ids, expect, proc.returncode,
                              allowed_skips if mode == "base" else ())
@@ -191,6 +194,7 @@ def main():
         parser.add_argument("--" + option, action="store_true")
     parser.add_argument("--work-root", type=Path)
     parser.add_argument("--timeout", type=int, default=600)
+    parser.add_argument("--build-timeout", type=int, default=3600)
     args = parser.parse_args()
     if not 0 < args.timeout < 688:
         parser.error("timeout must be positive and below the 688-second platform watchdog")
@@ -221,7 +225,8 @@ def main():
             subprocess.run(["git", "-C", str(ctx), "checkout", "-q", "--detach", head], check=True)
             dockerfile = work / "Dockerfile.resolved"
             dockerfile.write_bytes(resolved)
-            built = docker("build", "--platform", platform, "-f", str(dockerfile), "-t", image, str(ctx))
+            built = docker("build", "--platform", platform, "-f", str(dockerfile), "-t", image, str(ctx),
+                           timeout=args.build_timeout)
             if built.returncode:
                 raise ValueError("image build failed: " + built.stdout + built.stderr)
             cleanup_build_cache()

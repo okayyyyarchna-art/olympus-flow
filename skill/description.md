@@ -15,7 +15,7 @@ desc-history-digest.md, desc-recipe-astra.md; decisions: olympus-product TRIAGE-
 |---|---|---|
 | PRE-LOCK | anything; every check in section 3 runs here | the lock (section 3 step 11) |
 | LOCKED | nothing in the text; findings change tests and the reference inside the stated sentences | the platform rollout result |
-| OWNER EXCEPTION | the one final change (section 5b), owner's decision only, an extreme case: an ambiguity or a too-easy text that the rollout proves and that tests and the reference cannot absorb, where one line fixes it. Never a calibration step: a text that is imperfect but whose effect tests can absorb stays (vet) | locked for good |
+| OWNER EXCEPTION | one change (section 5b), only when the owner asks for it. The builder never proposes, drafts or lists one. Usually not needed: a text that is imperfect but whose effect tests can absorb stays (vet) | locked for good |
 | REDESIGN | outside the band and no allowed lever works: the builder names the one blocker and proposes the smallest new version that clears it (new lock, fresh rollout); the owner approves it. A task is never retired: the flow ends only with an accepted task. A known false pass is never released to reach the band | owner approves the redesign |
 Hard limits: at most **9 requirement units** (target 5-8); about **250 site words is guidance**, not a limit; the
 owner writes the final words.
@@ -67,6 +67,11 @@ loose example that changes the rule ("ex: app.log.1").
 - Trap inventory, qualitative: list each trap a solver must clear and mark it explicit or implied; do not stack two
   unnamed traps on one path; every implied consequence that is required gets a test (R8). No probability numbers and
   no rate forecasts: the rollout measures.
+- Target spread (owner 2026-11-09; a behavioural suggestion, never a gate): hard points that some agents solve, not
+  all and not none. Prefer two hard points on different paths, each a little easier than extreme, over one extreme
+  point that runs all clear or all miss (vet task 2 had one: 0/4 local solves, then Orion 4/4 and Nova 4/4 once
+  wording named it). Neither is named in the text. An all-pass or all-fail rollout is still fine: rollout.md routes
+  both.
 
 ## 3. Procedure (order fixed by the owner 2026-11-07)
 **A. I scan before the owner sees the draft** (the draft handed over already passes every check):
@@ -85,6 +90,8 @@ loose example that changes the rule ("ex: app.log.1").
    as a check that was turned off. Each such neighbour that is TESTED is an implied trap; mark it, and never put two
    of them on one path (section 2: vet stacked the unknown id and the older report on one path, 0/16).
 5. **Draft** from R1-R16, precise outcome words at the first draft.
+   Name an entry-point family once ("a pull request scan", not each command that reaches it): every named command became
+   its own requirement. When the DQ replica's count equals the number of tested outcomes, stop rewording.
 6. **Word reach**: grep docs, code comments, configuration and diagnostic/error texts for every key word; every state
    the repo names with it is TESTED or the word changes. Scope words (only, any, always, every, all) and exclusions
    get a second-reading check in both directions.
@@ -135,18 +142,22 @@ loose example that changes the rule ("ex: app.log.1").
 
 ## 5. After the lock
 The text is fixed (state LOCKED). Findings from sweeps, false-pass audits and the platform rollout change tests and
-the reference inside the stated sentences, through gates.md Repair. A finding that needs a new promise goes to the
-OWNER EXCEPTION or REDESIGN state, never into the text on its own. What the calibration rollout shows about the
-text (a missed reading, a hint, a gap) updates this rulebook for the next task, not this text.
+the reference inside the stated sentences, through gates.md Repair. A finding that needs a new promise is reported
+to the owner, and enters the text only through the OWNER EXCEPTION or REDESIGN state. What the calibration rollout
+shows about the text (a missed reading, a hint, a gap) updates this rulebook for the next task, not this text.
+- Runs failing a hard point is the task working, not a wording problem, whether the runs are local or on the
+  platform. Wording that names a case the runs are failing is the hint that makes the task too easy (vet task 2).
+- Every test added after the lock quotes the sentence that literally covers its path; check this before each paste.
+  A test with no such sentence is dropped. The sentence is not added (vet task 2: tests grew past the text after
+  sweep 1, and the fix went into the text).
 
-## 5b. The one final change (OWNER EXCEPTION), an extreme case
-The goal is a text written right at the lock. This exit exists only for what the rulebook still missed.
-- **Trigger, all of these:** (1) the rollout shows runs from two or more families implementing the same other
-  reading of one sentence, and a reading audit of the locked text accepts that reading as a reading of the words (a
-  real ambiguity, not a miss: on vet the text excluded "unknown id = turned off", so that convergence was fair
-  difficulty and the text stayed); or the task is too easy after rollout.md levers 1-5; (2) tests and the reference
-  cannot absorb it: a test for either reading is unfair, accepting both releases a false pass, and loosening breaks a
-  stated outcome; (3) changing one line resolves it.
+## 5b. One description change (OWNER EXCEPTION), only when the owner asks
+The goal is a text written right at the lock, and most tasks need no change. Sometimes one is needed, once. It comes
+only from the owner asking: the builder never proposes, drafts or lists a change.
+- **When the owner asks, report first, then do it if they still want it:** (1) which rollout runs it would change, and
+  whether runs of two or more families took the same other reading that a reading audit accepts (on vet the text
+  excluded "unknown id = turned off", so that convergence was fair difficulty and the text stayed); (2) whether tests
+  or the reference could absorb it instead; (3) whether the wording names a case the runs are failing.
 - **Built once, from all the evidence:** every ambiguity and hint the rollout, the sweeps, the replicas and the FP
   audits found goes into this one change; nothing is left for a later one. Before the owner writes the words: steps
   4-8 on the changed sentence, a reading audit of the whole new text, a replay of every rollout patch under the new
@@ -163,10 +174,11 @@ The goal is a text written right at the lock. This exit exists only for what the
   1/4, elio Orion 4/4 -> 1/4, swift -> Orion 1/4, vet older-report and typo tests); fixing an assertion only when it
   pins unsupported behaviour (never because a case is rare or unnamed); dropping a test only when its case is
   unspecified (R8), with the list of wrong designs the drop would release.
-- Too easy after rollout.md levers 1-5: the OWNER EXCEPTION. Remove the wording that gave the path, or deepen or add a
-  requirement (word reach, reading audit and DQ replica first). Then a fresh rollout: replaying old patches checks
-  compatibility only, it cannot measure a new wording. Text hints overshoot (elio 0/4 -> Orion 4/4, swift 4/4, turso
-  4/4), which is why text levers come last.
+- Too easy after rollout.md levers 1-5: stay in tests (prompts/calibrate-one-passer.md). A text change happens only if
+  the owner asks (section 5b): remove the wording that gave the path, or deepen or add a requirement (word reach,
+  reading audit and DQ replica first). Then a fresh rollout: replaying old patches checks compatibility only, it
+  cannot measure a new wording. Text hints overshoot (elio 0/4 -> Orion 4/4, swift 4/4, turso 4/4, vet task 2 Orion
+  4/4 and Nova 4/4), which is why text levers come last.
 - Too hard after rollout.md levers 1-5: no text change under the lock; the REDESIGN state (owner decision).
 
 ## 7. Evidence: descriptions since the new checks (submitted on or after 2026-10-16)

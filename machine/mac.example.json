@@ -18,7 +18,7 @@
     "native_platform": "linux/arm64",
     "final_platform": "linux/amd64",
     "memory_gb": 32,
-    "cleanup_allowed": true,
+    "cleanup_allowed": false,
     "min_free_gb": 12
   },
   "parallel": {

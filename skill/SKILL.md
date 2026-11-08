@@ -21,16 +21,18 @@ Read each card right before its stage; the cards are construction instructions, 
 | 0b-1 Repository init, environment | [dockerfile.md](dockerfile.md), [harness.md](harness.md) |
 | 1b Sample, Scope Gate, every paste | [platform.md](platform.md) |
 | 2-3 Description and lock | [description.md](description.md) (the only description rulebook) |
-| 4-5 Tests and reference | [build-checklist.md](build-checklist.md) first, then [tests.md](tests.md), [harness.md](harness.md), [solution.md](solution.md) |
+| 4-5 Tests and reference | [prompts/apply-build-checklist.md](prompts/apply-build-checklist.md), then [build-checklist.md](build-checklist.md), then [tests.md](tests.md), [harness.md](harness.md), [solution.md](solution.md) |
 | 6-7 Proof, repair, sweeps, replicas | [gates.md](gates.md), [replicas/](replicas/) |
 | 8 Rollout results | [rollout.md](rollout.md), [platform.md](platform.md), [near-miss-release.md](near-miss-release.md) (owner decision) |
-| Any trigger with a known answer | [situations.md](situations.md) |
-| Stuck, looping, or unsure which fix path | [stuck-prompts.md](stuck-prompts.md) |
+| A trigger with a known answer, or stuck, looping, unsure which fix path | [situations.md](situations.md) |
 
 Fixed rules:
 - I paste, the owner runs: platform checks, rollouts, lock and submit are the owner's (platform.md).
-- The description is locked at stage 3 for good. The only exit is the owner's one final change in an extreme case
-  (description.md section 5b). About 250 site words is guidance; the hard limit is 9 requirement units.
+- The description is locked at stage 3 for good. The only exit is a change the owner asks for (description.md section
+  5b); the builder never proposes one. About 250 site words is guidance; the hard limit is 9 requirement units.
+- The build checklist is applied rule by rule through its prompt and gate; a condensed plan never replaces it.
+- Keep it simple: one clear step over several clever ones. Add a layer, file, tag or table only when a measured result
+  needs it, and remove what no result supports.
 - Implement and test every promised path; never invent a hidden requirement to reject a particular solver. Keep real
   upstream regressions and allow valid alternative designs. Agreement with the reference is not correctness.
 - No local blind solves: solver evidence comes from the platform rollout.

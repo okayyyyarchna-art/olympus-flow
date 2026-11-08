@@ -1,0 +1,29 @@
+{
+  "os": "windows",
+  "shell": "bash",
+  "python": "python",
+  "home": "~",
+  "paths": {
+    "tasks_root": "~/OSS/challenges",
+    "work_root": "~/OSS/olympus-work",
+    "seams_root": "~/OSS/seams",
+    "shared_root": "~/OSS/olympus-work",
+    "codex_home": "~/.codex",
+    "claude_bin": "claude",
+    "codex_bin": "codex"
+  },
+  "docker": {
+    "slots": 2,
+    "native_platform": "linux/amd64",
+    "final_platform": "linux/amd64",
+    "memory_gb": 4,
+    "cleanup_allowed": false,
+    "min_free_gb": 12
+  },
+  "parallel": {
+    "battery_workers": 2,
+    "review_lanes": 2,
+    "solvers": 4,
+    "stability_parallel": false
+  }
+}

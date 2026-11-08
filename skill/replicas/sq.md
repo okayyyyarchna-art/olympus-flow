@@ -29,6 +29,11 @@ compiled twin). Columns: success, refusal/error raised before a handle or future
 cancellation. Cell: the function and line that handles it in that mode. A failure handled in one mode but not in a
 sibling mode (the handler exists only on one path) is a defect candidate.
 
+### Step 2d: three sweep tables
+Counter pairing: every increment -> its decrement on every path. Interface implementations: every driver or store
+implementing a hook the patch relies on honours every parameter. Dynamic-state caches: every cache derived from a set
+that can now shrink is rebuilt at a safe point. (faust task 7: 2 High and 1 Medium that three local reviews missed.)
+
 ### Step 3: break attempts (at least 12, at least 2 per promise)
 Build counter-scenarios from these axes and trace each through the real code with file:line:
 - lifecycle edge while work is in flight: start, stop, rebalance/revoke/assign, restart, reload, cancel; an answer or
@@ -46,6 +51,13 @@ Build counter-scenarios from these axes and trace each through the real code wit
   way), engine by engine;
 - generated or shipped artifacts (bundles, dist, typings, other entry points) rebuilt from the changed source;
 - cost on large user input: time and memory of every new loop over user data (no O(n*m) over two user collections);
+- documented limits inside a promise: grep the patch's docs, CHANGELOG and comments for "unless", "except", "may", "not
+  supported"; each is a quotable gap unless a sentence excludes it;
+- stubs and no-ops reachable from the public API (an abstract default that silently does nothing should raise);
+- cleanup that awaits before the error arrives; context-local state when the user works in a helper task; exception
+  chains that carry an error the user already handled;
+- one-way flags: every flag the patch clears is re-armed on the normal path; process-global flags reset per run;
+- a hold or deferral installed before user code shows how it reads needs a release for every excluded shape;
 - user data that looks like internals: special keys (`__proto__`), in-band markers or sentinels, null vs missing.
 Each attempt: `{promise, scenario (inputs + steps), trace (file:line chain), result: holds | breaks, why}`.
 

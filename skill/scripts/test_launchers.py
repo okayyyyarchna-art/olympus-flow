@@ -152,6 +152,44 @@ python -c 'import json,sys,pathlib; name=sys.argv[2]+"-"+sys.argv[3]+".json"; da
         union = json.loads((self.task / "eval/replica/sq-r1.json").read_text())
         self.assertEqual({s["source"] for s in union["sourceReports"]}, {"sq-r1a", "sq-r1b"})
 
+    def mock_round_reports(self, tags):
+        from test_summarize import clean_reports
+        import json
+        fixture = self.root / "reports.json"
+        merged = {}
+        for tag in tags:
+            merged.update(clean_reports(tag))
+        fixture.write_text(json.dumps(merged))
+        shutil.copy(ROOT / "tools/summarize.py", self.skill / "tools/summarize.py")
+        (self.skill / "tools/replica.sh").write_text('''[ "${4:-}" != --validate-only ] || exit 0
+mkdir -p "$1/eval/replica"
+python -c 'import json,sys,pathlib; name=sys.argv[2]+"-"+sys.argv[3]+".json"; data=json.load(open(sys.argv[4])); pathlib.Path(sys.argv[1],"eval/replica",name).write_text(json.dumps(data[name]))' "$1" "$2" "$3" "$MOCK_REPORTS"
+''')
+        pkg = self.task / "pkg"
+        pkg.mkdir(exist_ok=True)
+        for name in ("description.md", "solution.patch", "test.patch"):
+            (pkg / name).write_text(name + " v1\n")
+        return fixture.as_posix(), pkg
+
+    def test_test_only_round_reuses_sq_and_dq_of_the_same_bytes(self):
+        fixture, pkg = self.mock_round_reports(["r1", "r2"])
+        self.assertEqual(self.run_tool("round.sh", self.task, "r1", MOCK_REPORTS=fixture).returncode, 0)
+        (pkg / "test.patch").write_text("test.patch v2\n")
+        result = self.run_tool("round.sh", self.task, "r2", "fairness", "ar", MOCK_REPORTS=fixture)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("reusing sq reports of round r1", result.stdout)
+        self.assertIn("reusing dq reports of round r1", result.stdout)
+        self.assertIn("GATE PASS", result.stdout)
+
+    def test_round_without_usable_reports_stops_before_running(self):
+        fixture, pkg = self.mock_round_reports(["r1", "r2"])
+        self.assertEqual(self.run_tool("round.sh", self.task, "r1", MOCK_REPORTS=fixture).returncode, 0)
+        (pkg / "solution.patch").write_text("solution.patch v2\n")
+        result = self.run_tool("round.sh", self.task, "r2", "fairness", "ar", MOCK_REPORTS=fixture)
+        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+        self.assertIn("no reports to use for: sq dq", result.stderr)
+        self.assertFalse((self.task / "eval/replica/fairness-r2.json").exists())
+
     def test_claude_child_exit_and_fresh_report_are_both_required(self):
         shutil.copy(ROOT / "tools/lib/claude2_run.sh", self.skill / "tools/lib/claude2_run.sh")
         config = self.skill / "tools/machine.sh"

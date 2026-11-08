@@ -19,7 +19,7 @@ Rules of this mode:
 2. The faust/Python patterns below are EXAMPLES. Generalize them to the task's own language, framework and
    subsystems (entry points, stores, modes, record kinds, file formats, repeated runs, multiplicity, order, empty).
 3. Speed: trace statically first (file:line); use Docker only to confirm the rows that decide a verdict, one container
-   at a time via python C:/Users/ASUS/OSS/shipd/tools/dockrun.py run --rm --network none ...; reuse the task's
+   at a time via python ~/.claude/skills/olympus-flow/tools/lib/dockrun.py run --rm --network none ...; reuse the task's
    existing image (never build one); never docker rm/rmi/prune.
 4. Skip wrong designs the task already proves caught (eval/gates.md, the newest eval/battery-*.log).
 5. Write the report file the launch message names; end with counts (GAPS, REFERENCE-BROKEN, UNFAIR) and one line each.
@@ -37,8 +37,8 @@ the base repo, and optionally agent-run patches with their scores.
 Read first:
 - Rubric (verbatim): ~/.claude/skills/olympus-challenge-creation/references/site-rubric.md
 - Self-check list: ~/.claude/skills/olympus-challenge-creation/references/auto-review-selfcheck.md
-- Past platform findings and recurring pattern families: ~/OSS/shipd/playbooks/site-findings-catalog.md. Hunt for EVERY family in it.
-- HUNTING PLAYBOOK (mandatory): ~/OSS/shipd/playbooks/reviewer-hunting-playbook.md. Apply its rule zero to every finding. Run every hunting move in
+- Past platform findings and recurring pattern families: ~/.claude/skills/olympus-flow/playbooks/site-findings-catalog.md. Hunt for EVERY family in it.
+- HUNTING PLAYBOOK (mandatory): ~/.claude/skills/olympus-flow/playbooks/reviewer-hunting-playbook.md. Apply its rule zero to every finding. Run every hunting move in
   section 1 that applies to this package (at minimum moves 1-3 and 8-11 on the solution and moves 1, 3, 5, 6, 12, 13, 19 on the tests),
   and go through the section 2 blind-spot checklist. Use the section 4 report format.
 

@@ -14,6 +14,7 @@ import os
 import re
 import sys
 from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent))  # python -I drops the script folder
 from machine import load
 
 try:

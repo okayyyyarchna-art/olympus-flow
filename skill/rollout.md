@@ -4,8 +4,15 @@ The owner runs a calibration rollout of their choice on v1 (usually 3 Orion + 3 
 later tops up to 4+ runs per family. The builder keeps closing gaps; nothing waits for it.
 The description stays locked: this file shapes tests and the reference only.
 
+Route first. Every run fails: near-miss-release.md. Too many deserved passes: prompts/calibrate-one-passer.md. The steps
+below apply on either route.
+Once a family has one genuine pass at 4+ runs, tell the owner before topping it up: another pass can take it past 25%.
+
 1. Pull every run read-only (problem view, runs show/artifact). Record per run: family,
-   eligibility (complete, clean, current version), per-test result vector, patch.
+   eligibility (complete, clean, current version), per-test result vector, patch, the verdict label with its full
+   evalResult reasoning, and the agentBlameUnfair flag. On a Fair task or environment-blocker failure read these before
+   changing anything: notes that carry no blame (vet task 2: Git shim, lint and module cache on nearly every run) are
+   no reason to touch the Dockerfile, which would lose the re-eval.
 2. Add every patch to the permanent false-pass corpus (replayed after every later fix).
    A replay runs only the delta: per patch, the scenarios whose test files changed since
    that run plus the scenario it failed (the runner stops at its first failing assertion,
@@ -33,16 +40,25 @@ The description stays locked: this file shapes tests and the reference only.
       or changing the reference to match the run, releases a false pass: both false-pass
       auditors run on the candidate before any re-eval is planned.
    4. Too easy with deserved passes: add a grounded discriminator for an unnamed variant
-      of a stated rule (tests.md T2).
+      of a stated rule (tests.md T2). Full procedure: prompts/calibrate-one-passer.md.
+      Grading an upstream test that only a non-required design breaks is a fair lever (a run that edited it counts as a
+      failure, PASS_CHEATED). Never grade a test every correct solution must edit.
    5. Too hard with valid near misses: more runs on unchanged files before any change.
    6. A proven ambiguity (runs of two or more families take one other reading that the words
-      allow) or too easy after levers 1-4: no description change by the builder. Impact
-      analysis first: which runs would change and whether tests or the reference can absorb
-      it (vet stayed on an imperfect text because they could). Only when they cannot and one
-      line fixes it: the owner's one final change (description.md section 5b), built once from
-      all the evidence, then a fresh rollout.
+      allow) or too easy after levers 1-4: stay in tests and the reference. The builder does
+      not propose a description change. If the owner asks for one (description.md section 5b):
+      report which runs it would change, whether tests or the reference could absorb it (vet
+      stayed on an imperfect text because they could) and whether the wording names a case the
+      runs are failing; then build it once from all the evidence, and run a fresh rollout.
 5. Every change goes through gates.md Repair; target: one family in (0, 25%], the
-   others at 0, with no false pass.
+   others at 0, with no false pass. Before a re-eval paste:
+   - Tests a judge can follow: build-checklist.md, the "second reading" row.
+   - Only-failure check (a warning, not a stop): from the replay, list the runs whose only failures are contested
+     tests. Give each a failure on a plainly stated case where one honestly exists, and tell the owner about the rest.
+   - Order for the owner: Test Quality, re-eval, Auto Review (before the re-eval it only reports no eligible runs),
+     FP panel.
+   - On whether a failure is blamed on the task, the per-run verdict replica outranks the Test Quality replica (vet
+     task 2: platform fairness said fair while 5 of 7 runs failing one test were blamed on the task).
 6. A task is never retired (owner rule): the flow ends only with an accepted task. When
    no lever above applies, name the one blocker (the assertion most runs fail first and
    the shared design mistake behind it), predict the smallest redesign that clears it,

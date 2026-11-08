@@ -32,6 +32,9 @@
    and every allowed event winner. A bounded watchdog detects hangs; elapsed wall
    time is not evidence of order or an unstated product latency guarantee. On
    rejection, inspect every promised side effect and resource cleanup at its sink.
+   Put a controlled-clock jump before every "not yet" and "still one copy" check. A jump also expires the harness's
+   own timers, so a harness wait that can span one counts real time (faust task 8: a valid design failed on the
+   harness TimeoutError). Run caps and delays on both sides of every boundary.
 6. **T6 - Export and demonstrate discrimination.** Name new test/fixture files with a
    collision-resistant suffix, retaining framework discovery. Export explicit paths
    with the harness; inspect removals, modes and accidental files. Keep added test

@@ -1,15 +1,49 @@
 #!/usr/bin/env bash
 # Tracked: round.sh <task> <tag> --check fairness|sq-a|sq-b|dq|ar|verify|ref-audit-a|ref-audit-b|gate
 # Convenience aggregate: round.sh <task> [tag] [checks...] waits for every child, serially.
+# A check left out of the aggregate reuses the newest round's reports with the same input bytes (sq and dq: solution +
+# description; fairness: tests + description). With none to reuse the round stops before spending anything.
 set -uo pipefail
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/machine.sh" || exit 2
+input_key() {  # input_key <task> <sq|dq|fairness>: hash of the files that check reads
+  local P="$1/pkg" desc other
+  [ -f "$P/test.patch" ] || P="$1"
+  desc="$P/description.md"; [ -f "$desc" ] || desc="$P/task.md"
+  case "$2" in fairness) other="$P/test.patch";; *) other="$P/solution.patch";; esac
+  [ -f "$desc" ] && [ -f "$other" ] || return 1
+  "$PY" -c 'import hashlib, sys; print(hashlib.sha256(b"".join(open(f, "rb").read() for f in sys.argv[1:])).hexdigest())' "$desc" "$other"
+}
+reuse_reports() {  # reuse_reports <out> <kind> <tag> <key>: copy the reports of the newest round with this key
+  local out="$1" kind="$2" tag="$3" key="$4" mark old s usable samples=("")
+  [ "$kind" != sq ] || samples=(a b)
+  while IFS= read -r mark; do
+    [ "$(cat "$mark")" = "$key" ] || continue
+    old=${mark##*/inputs-"$kind"-}; old=${old%.txt}
+    usable=1
+    for s in "${samples[@]}"; do [ -s "$out/$kind-$old$s.json" ] || usable=0; done
+    [ "$usable" = 1 ] || continue
+    if [ "$old" != "$tag" ]; then
+      for s in "${samples[@]}"; do cp -f "$out/$kind-$old$s.json" "$out/$kind-$tag$s.json" || return 1; done
+      echo "reusing $kind reports of round $old (same input bytes)"
+    fi
+    printf '%s\n' "$key" > "$out/inputs-$kind-$tag.txt"
+    return 0
+  done < <(ls -t "$out"/inputs-"$kind"-*.txt 2>/dev/null)
+  return 1
+}
+requested() {  # requested <kind>: is this check in the round? (reads main's checks)
+  local k
+  for k in "${checks[@]}"; do case "$k" in "$1"|"$1"-a|"$1"-b) return 0;; esac; done
+  return 1
+}
 main() {
   [ "$#" -ge 1 ] || return 2
   local T tag c check sample report rc failed=0
   T=$(cd "$1" && pwd) || return 2; tag="${2:-r1}"
   shift; [ "$#" = 0 ] || shift
-  local checks=()
+  local checks=() aggregate=1
   if [ "${1:-}" = --check ]; then
+    aggregate=0
     [ "$#" = 2 ] || return 2
     checks=("$2")
   else
@@ -30,6 +64,20 @@ main() {
     bash "$R" "$T" "$check" "$tag" --validate-only || return 2
   done
   mkdir -p "$out"
+  local kind key missing=()
+  for kind in fairness sq dq; do
+    key=$(input_key "$T" "$kind") || key=""
+    if requested "$kind"; then
+      [ -z "$key" ] || printf '%s\n' "$key" > "$out/inputs-$kind-$tag.txt"
+    elif [ "$aggregate" = 1 ]; then
+      { [ -n "$key" ] && reuse_reports "$out" "$kind" "$tag" "$key"; } || missing+=("$kind")
+    fi
+  done
+  [ "$aggregate" = 0 ] || requested ar || [ -s "$out/ar-$tag.json" ] || missing+=(ar)
+  if [ "${#missing[@]}" -gt 0 ]; then
+    echo "round $tag stopped before running: no reports to use for: ${missing[*]}. Add them to this round." >&2
+    return 2
+  fi
   local audits=()
   for c in "${checks[@]}"; do case "$c" in ref-audit-*) audits=(--ref-audits);; esac; done
   "$PY" "$OLYMPUS_TOOLS/summarize.py" "$out" "$tag" --declare "${audits[@]}" || return 2

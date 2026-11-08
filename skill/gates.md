@@ -37,7 +37,7 @@ and the scheduled independent confirmation (not an extra model call per row).
 | S2 | Native checks/regressions pass; patterns, interfaces and lifetimes remain compatible. | D + J |
 | S3 | Every hunk maps to required behavior/integration; no unrelated churn or grading bypass. | J + diff inventory |
 | S4 | No process residue, weird/generated comments, unjustified defenses or inconsistent conventions. | D lint + J |
-| Description | description.md (the rulebook) checklist all yes, under 250 site words; grounded, single-reading, clear, necessary text; current category/prechecks. | D mechanics + J meaning |
+| Description | description.md (the rulebook) checklist all yes, about 250 site words as guidance; grounded, single-reading, clear, necessary text; current category/prechecks. | D mechanics + J meaning |
 
 Local target is clean description/tests/solution bands (3/3/3), with every concrete
 in-scope defect closed. This is the product's stronger target, not a claim that the
@@ -51,7 +51,7 @@ RESTORED_AWAY, APPLY_ERROR, BUILD_ERROR, HARNESS_ERROR, TIMEOUT or EXECUTED sepa
 Only the intended behavioral failure proves a discriminator. For each survivor,
 either establish it is valid, cite a real exclusion/unreachability proof, or keep OPEN.
 
-Two independent auditors inspect every current passing **run**, its actual production
+One independent auditor (a second when it says NOT_DESERVED or is unclear) inspects every current passing **run**, its actual production
 patch and the literal contract. They give a per-obligation design trace and attempt
 concrete legal counterexamples. Reproduce a suspected false pass: current suite
 accepts candidate; an in-scope probe shows it violates a grounded requirement. Run
@@ -59,7 +59,7 @@ the reference on the same probe. If the reference also fails, fix both the refer
 and missing coverage; this does not excuse the passer. A reference audit alone, test
 replay alone, rarity, or reviewer agreement cannot certify a deserved pass.
 
-Gate: no confirmed or unresolved grounded FP, and two current independent dispositions
+Gate: no confirmed or unresolved grounded FP, and a current independent disposition
 per passer. Missing runs/audits are NOT VERIFIED. Zero passers vacates per-passer jobs
 but does not demonstrate solvability. No finite battery proves absence of all defects.
 
@@ -70,6 +70,10 @@ separately on the 0-3 scale; target 3/3 each. Inspect mutation exits, rejected i
 fallbacks, ownership and sibling modes, not only lines added. Native checks are D;
 architectural fit and completeness are J. In-scope defects are fixed, never retained
 as residuals because base has the same behavior. Do not alter locked text to excuse one.
+
+Test world vs real world: list what the harness simplifies (retention, time between steps, transactions and buffering,
+crashes and fencing, one clock or node, modes no test sets) and trace the reference against production code and default
+configuration for each. Mutants only break code the reference has (faust window: 2 Auto Review Highs past 60+ mutants).
 
 ## G4 - Task Quality, fourth priority
 
@@ -88,6 +92,10 @@ are different API checks; neither is inferred from the other's PASS.
    actual result and evidence. Consensus is not reproduction. Test speculative claims;
    NOT VERIFIED is neither accepted fact nor a dismissal. Reject only with concrete
    scope/valid-alternative/disproof evidence. Merge duplicates but retain every source.
+   When reviewers split, decide by what Auto Review enforces: a literal promise holds on every branch, and a wall-clock
+   timer in a test is a T2 finding. Never by majority, by "the platform did not flag it last time", or to keep a passer
+   (near-miss-release.md is the only exception). Write which rule decided the row (goka: both overruled findings came
+   back from the platform).
 2. Fix the whole demonstrated class on sibling paths in one batch. Add the smallest
    grounded discriminator for every in-contract reference fix. Repair unfair pins
    without removing the underlying promise. Never select cases merely to hit a rate.
@@ -96,7 +104,7 @@ are different API checks; neither is inferred from the other's PASS.
    patches against the repaired package. Include deep failures after relaxations or
    harness/environment changes. Record the newly accepted wrong designs a relaxation
    could release. Inspect probe postimages so restored-away edits cannot count.
-4. Audit every new/changed passer twice. An old semantic audit can carry only with an
+4. Audit every new/changed passer once (a second audit on the trigger above). An old semantic audit can carry only with an
    explicit identical read-set and sample record; uncertain dependency means re-audit.
    A changed reference may reveal coverage missing from every passer. Close G2 even
    when the fix originated in G1, G3 or G4.

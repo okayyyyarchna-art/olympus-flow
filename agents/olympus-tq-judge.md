@@ -19,7 +19,7 @@ Rules of this mode:
 2. The faust/Python patterns below are EXAMPLES. Generalize them to the task's own language, framework and
    subsystems (entry points, stores, modes, record kinds, file formats, repeated runs, multiplicity, order, empty).
 3. Speed: trace statically first (file:line); use Docker only to confirm the rows that decide a verdict, one container
-   at a time via python C:/Users/ASUS/OSS/shipd/tools/dockrun.py run --rm --network none ...; reuse the task's
+   at a time via python ~/.claude/skills/olympus-flow/tools/lib/dockrun.py run --rm --network none ...; reuse the task's
    existing image (never build one); never docker rm/rmi/prune.
 4. Skip wrong designs the task already proves caught (eval/gates.md, the newest eval/battery-*.log).
 5. Write the report file the launch message names; end with counts (GAPS, REFERENCE-BROKEN, UNFAIR) and one line each.

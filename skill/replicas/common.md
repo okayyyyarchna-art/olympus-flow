@@ -12,6 +12,8 @@ Task folder layout (paths are given in the brief):
 - `<task>/runs/` (optional): agent runs, one folder per run with `verdict.txt` and `solution.patch`.
 - `<task>/eval/replica/`: earlier replica outputs (other checks), when the brief names them.
 
+Network checks use a generic User-Agent; never put the operator's email or name in any request.
+
 Evidence rules (the site works this way; do the same):
 1. Every finding quotes its evidence exactly: a description sentence, a test line with its test name, or a repository
    line with `path:line`. No quote, no finding.
