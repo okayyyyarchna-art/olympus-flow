@@ -6,6 +6,8 @@ _olympus_python="${OLYMPUS_BOOTSTRAP_PYTHON:-$(command -v python3 || command -v 
 _olympus_exports="$("$_olympus_python" "$OLYMPUS_TOOLS/machine.py" shell)" || return 2
 eval "$_olympus_exports"
 export OLYMPUS_TOOLS OLYMPUS_LIB
+# Task repositories keep Linux line endings whatever the user's Git default is.
+export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.autocrlf GIT_CONFIG_VALUE_0=false
 export CODEX_HOME="$OLYMPUS_CODEX_HOME"
 OLYMPUS_DOCKER_ENV=()
 [ "$OLYMPUS_OS" != windows ] || OLYMPUS_DOCKER_ENV=(env MSYS_NO_PATHCONV=1)

@@ -100,7 +100,7 @@ class Discovery(unittest.TestCase):
                     "x_test.go": "package x\nfunc TestX(t *testing.T) {}\n"})
         commit = repo_init.git(self.repo, "rev-parse", "HEAD")
         task = self.repo / "task"
-        machine = TOOLS.parents[1] / "machine/windows-asus.json"
+        machine = next(d for d in (TOOLS.parents[1] / "machine", TOOLS.parent / "machine") if d.is_dir()) / "windows.example.json"
         env = dict(os.environ, OLYMPUS_MACHINE=str(machine))
         proc = subprocess.run([sys.executable, "-B", str(TOOLS / "repo_init.py"), str(self.repo), commit, str(task)],
                               env=env, capture_output=True, text=True)
@@ -162,7 +162,7 @@ class Discovery(unittest.TestCase):
             (check.out / "offline-base.json").write_text('{"seconds": 0.01}')
             return 0, '<testsuite><testcase classname="native" name="test_x[param]"><skipped/></testcase></testsuite>', ""
 
-        machine = TOOLS.parents[1] / "machine/windows-asus.json"
+        machine = next(d for d in (TOOLS.parents[1] / "machine", TOOLS.parent / "machine") if d.is_dir()) / "windows.example.json"
         with patch.dict(os.environ, OLYMPUS_MACHINE=str(machine)):
             import proof
 

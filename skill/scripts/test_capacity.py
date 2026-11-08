@@ -14,7 +14,7 @@ import machine
 def load_proof():
     spec = importlib.util.spec_from_file_location("proof", TOOLS / "proof.py")
     module = importlib.util.module_from_spec(spec)
-    with patch.dict(os.environ, {"OLYMPUS_MACHINE": "windows-asus"}):
+    with patch.dict(os.environ, {"OLYMPUS_MACHINE": "windows.example"}):
         spec.loader.exec_module(module)
     return module
 
@@ -36,7 +36,7 @@ class Capacity(unittest.TestCase):
                 self.assertEqual(docker.call_count, int(allowed))
 
     def test_dockrun_enforces_override_and_blocks_cleanup_before_docker(self):
-        with patch.dict(os.environ, {"OLYMPUS_MACHINE": "windows-asus", "DOCKRUN_SLOTS": "999"}), \
+        with patch.dict(os.environ, {"OLYMPUS_MACHINE": "windows.example", "DOCKRUN_SLOTS": "999"}), \
              patch.object(machine, "load", return_value={"docker": {"slots": 2, "cleanup_allowed": False}}), \
              patch.object(sys, "argv", ["dockrun", "builder", "prune", "-af"]), \
              patch("subprocess.call") as call:

@@ -14,6 +14,9 @@ pastes the draft to the platform. You stay in charge of everything that spends p
   review lane.
 
 ## 2. Install
+On Windows, first run `git config --global core.autocrlf false`, so repositories you clone for tasks keep Linux line
+endings.
+
 Run from a checkout of this repository, in Bash.
 
 Windows:

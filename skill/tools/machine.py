@@ -6,6 +6,9 @@ from pathlib import Path
 import shlex
 import sys
 
+# Task repositories keep Linux line endings whatever the user's Git default is: CRLF breaks patches and Linux scripts.
+os.environ.update(GIT_CONFIG_COUNT="1", GIT_CONFIG_KEY_0="core.autocrlf", GIT_CONFIG_VALUE_0="false")
+
 
 def machine_dir():
     tools = Path(__file__).resolve().parent
