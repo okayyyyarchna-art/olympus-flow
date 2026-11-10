@@ -146,20 +146,6 @@ For each obligation, list every materially different value; the reference handle
   built the config by hand, and the run was blamed on the task). An exact count needs a sentence that says once or
   exactly; otherwise assert presence (vet task 3: a sweep proposed an exact-count pin and, in the same report, a fix
   that fails it). [T5, FP]
-- Coverage to `yes`, not only fair (Test Quality marked vet 2 6/6 and vet 3 3/6 requirements `partial`; vet 1, 6/6
-  `yes`, did all four):
-  1. Scope words ("all", "any", "every", "each", "also", "including"): list in the ledger every category the repo
-     supports through the feature (ecosystem, manifest format, package kind, mode, entry point) and cover each with
-     at least one case, as one table test; where categories share one code path, one case per code path, and the
-     test comment names the categories it stands for (vet 2: "the current acceptance suite uses Cargo, npm, PyPI").
-  2. Assert content, not only counts: the message, component and value of every promised result or warning; at
-     least one case per kind uses the production text, stand-in markers only in addition (vet 3: "checks count, not
-     its message").
-  3. Every outcome a test's name states is asserted (vet 3: "...AndAddsTheNewOne" never asserted the new one).
-  4. An intermediate state the requirement covers (a stop mid-way, a partial result) is inspected, not only the final
-     status (vet 3: "checks two package statuses but not the details of partial analysis data").
-  Before paste, the fairness replica lists every requirement; each `partial` is an open gap with the wrong design
-  that passes, closed by a test. [T4, T3]
 
 ## 5. Fixtures, harness and result contracts (ledger: Fixtures and harness)
 - Run the real code end to end; stub only the outermost external system, with the repo's own stub where it has one.

@@ -44,6 +44,11 @@ first; never paste while a platform run or check is active, it would stop the ru
    batch -> verification batch (3 replicas). If the verification batch reproduces a new
    class of finding: sweep 2 (once) -> fix -> one more verification batch as the gate.
    There is no sweep 3. (vet: replica rounds took 6-19 min, sweeps 28-95 min.)
+   **Stage 7 ends after the last verification batch's fixes and their Repair** (gates.md: proof + variants + each
+   finding's witness on the exact bytes, `repair-<tag>.json`). No further full replica rounds after that, whatever
+   kind the fixed findings were; the next grade is the platform's on the paste. Run each batch's checks in parallel
+   up to the machine's slot limit (`round.sh <task> <tag> --check <name>` per check as its own tracked job, then
+   `--check verify`, then `--check gate`). Past the stage 7 time box: stop, report progress, and let the owner decide.
 4. Every reproduced finding gets a cause. Description: it goes to the owner; the text stays
    locked unless the owner takes the exception. Checklist: sharpen the row that should have
    caught it (the example and why it slipped), or add a row when no rule covers it.
