@@ -124,6 +124,10 @@ For each obligation, list every materially different value; the reference handle
     unrelated state kept; repeated with the same and with an empty configuration (C11). [T3; vet r1-r4, delete-all, m5]
   - **Repeat the trigger**: for every "once", "keeps", "stays" or "fails" promise, trigger again and assert no second
     effect, the same failure or the unchanged state (P12). [T3]
+  - **Kept results by value**: for every result a promise keeps (a finished lookup, a saved verdict, a stored
+    record), assert the kept value in the output, not only that the work was skipped; one assertion per kind of kept
+    result (vet task 3: an Auto Review High for a call count with no check that a saved malware verdict survived).
+    [T4, T3]
   - **Boundaries and caps**: exact equality and the nearest value on each side, zero/empty where valid; a supported
     large input when it exposes an unsupported cap. Never invent a size or performance limit the text does not state.
     [T3; A4, T12 exact-ms]
@@ -136,6 +140,26 @@ For each obligation, list every materially different value; the reference handle
 - Assert that the scenario really happened before asserting the outcome: every all/any/filtered assertion also
   asserts a non-empty exact count, a case picked from live state asserts it was found, a setup helper fails when its
   own precondition did not happen (P7, codex 1; an AR High on an `all()` over an empty list). [T3]
+- Valid alternatives are executed, not only listed: every fix design a reviewer, judge or sweep offers as valid becomes
+  a valid-design variant that must pass before its finding closes, and every task runs the standard variant "adds a
+  config field that only the production builder sets" (vet task 3: a rollout run did exactly that, the hidden helper
+  built the config by hand, and the run was blamed on the task). An exact count needs a sentence that says once or
+  exactly; otherwise assert presence (vet task 3: a sweep proposed an exact-count pin and, in the same report, a fix
+  that fails it). [T5, FP]
+- Coverage to `yes`, not only fair (Test Quality marked vet 2 6/6 and vet 3 3/6 requirements `partial`; vet 1, 6/6
+  `yes`, did all four):
+  1. Scope words ("all", "any", "every", "each", "also", "including"): list in the ledger every category the repo
+     supports through the feature (ecosystem, manifest format, package kind, mode, entry point) and cover each with
+     at least one case, as one table test; where categories share one code path, one case per code path, and the
+     test comment names the categories it stands for (vet 2: "the current acceptance suite uses Cargo, npm, PyPI").
+  2. Assert content, not only counts: the message, component and value of every promised result or warning; at
+     least one case per kind uses the production text, stand-in markers only in addition (vet 3: "checks count, not
+     its message").
+  3. Every outcome a test's name states is asserted (vet 3: "...AndAddsTheNewOne" never asserted the new one).
+  4. An intermediate state the requirement covers (a stop mid-way, a partial result) is inspected, not only the final
+     status (vet 3: "checks two package statuses but not the details of partial analysis data").
+  Before paste, the fairness replica lists every requirement; each `partial` is an open gap with the wrong design
+  that passes, closed by a test. [T4, T3]
 
 ## 5. Fixtures, harness and result contracts (ledger: Fixtures and harness)
 - Run the real code end to end; stub only the outermost external system, with the repo's own stub where it has one.
@@ -153,10 +177,21 @@ For each obligation, list every materially different value; the reference handle
   correctness for all seeds (codex 5). [T2, T6]
 - Generate fixtures with live runs (e.g. `stub fail <backend>`); a hand-made fixture copies the production formats and
   counts exactly. [T5; vet hand-made fixture]
+- Build configuration the way production does: where the repo has a builder or constructor for the config, options or
+  plugin set a test needs, take the object from it and change only the field under test; a hand-built struct needs a
+  recorded reason in the ledger (vet task 3: Vega #4 blamed on the task). [T5]
+- A stand-in plugin keeps every interface of the real one except the one the test is about. When it must drop one, its
+  comment cites the visible precedent by file:line (an existing test that uses the same kind of stand-in) and the code
+  that treats it the same way, so every judge sees the argument (vet task 3: two evaluators split on one stand-in
+  without UseSource; the one that found the visible precedent called the test fair). [T5]
 - test.sh: base mode = the base-commit tests of every file the reference edits, of every test file either patch
   changes, and of their sibling areas (P15: an AR High for a left-out lifecycle test file); new mode = only the hidden
-  tests; no fail-fast. Restore the base-commit test files in a scratch copy or overlay and fail (not warn) if the base
-  commit is missing; agent test edits never count (C3; a house anti-cheat rule, not a platform requirement). [T1]
+  tests; no fail-fast. Pin every input the base tests use: test files, fixtures, testdata, scripts, catalogs, golden
+  files and helper code in test-only packages. A compile-time overlay (`go -overlay`) pins only compiled files; data
+  read at run time needs a pinned copy of the tree (safe with a read-only /app). Fail (not warn) if the base commit is
+  missing; agent test edits never count (C3; a house anti-cheat rule, not a platform requirement; vet task 3: a
+  platform AR T1 Medium for acceptance scripts and a catalog read from the working tree). Prove it with
+  `proof.py --tamper` on one pinned data file and one pinned helper. [T1]
 - Hidden tests compile at the base commit (exported API only, or added in new mode in the scratch copy), so base fails
   each id for its behaviour, not as one build failure (P14, codex 8). [T8, verify]
 - A base test that pins an internal call or the old behaviour: rewrite or loosen it in place into a behaviour

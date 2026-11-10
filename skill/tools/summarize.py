@@ -255,6 +255,7 @@ def gate(folder, manifest):
     pending = {(source, ident) for source, kind, report in reports for ident in findings(kind, report)}
     decisions = {}
     problems = []
+    warnings = []
     for source, kind, report in reports:
         if kind == "verify":
             if any(report["kept"].values()):
@@ -263,7 +264,11 @@ def gate(folder, manifest):
                 problems.append(f"{source}: verified bands must all be 3")
             for row in report["verdicts"]:
                 key = (row["source"], row["id"])
-                require(key in pending, f"unexpected verification ID: {key}")
+                if key not in pending:
+                    # A verdict on an ID no report raised is noise, not a failure: a finding the verifier named
+                    # differently stays pending and still fails as unresolved below (vet task 3, round r11).
+                    warnings.append(f"verification ID matches no finding: {key}")
+                    continue
                 require(key not in decisions, f"duplicate verification ID: {key}")
                 decisions[key] = row["decision"]
         elif kind == "dq":
@@ -288,7 +293,7 @@ def gate(folder, manifest):
     for key in sorted(pending):
         if decisions.get(key) != "DROP":
             problems.append(f"unresolved finding [{key[0]}] {key[1]}")
-    return problems, sorted(pending)
+    return problems, sorted(pending), warnings
 
 
 def main():
@@ -318,11 +323,13 @@ def main():
             return 0
         manifest = read(path) if path.exists() else declaration(args.tag, args.ref_audits)
         require(manifest.get("checkpoint") == args.tag, "checkpoint tag mismatch")
-        problems, union = gate(args.folder, manifest)
+        problems, union, warnings = gate(args.folder, manifest)
         print(f"# Checkpoint {args.tag}\n")
         print("Required reports: " + ", ".join(r["file"] for r in manifest["reports"]))
         for source, ident in union:
             print(f"- finding [{source}] {ident}")
+        for warning in warnings:
+            print(f"- WARN: {warning}")
         for problem in problems:
             print(f"- FAIL: {problem}")
         print("\nGATE " + ("FAIL" if problems else "PASS"))

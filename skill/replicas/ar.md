@@ -12,7 +12,9 @@ Description (P): P1 states a real problem; P2 every tested outcome is stated or 
 sentence; P4 presentation (short sentences, no long nested parentheticals); P5 no implementation dictation; P6 no
 process instructions to the solver.
 Tests (T): T1 new tests fail on base for the right reason and pass with the solution; base mode keeps every existing
-test that guards behaviour the patch touches (excluding a lifecycle test file that guards changed code is a finding);
+test that guards behaviour the patch touches (excluding a lifecycle test file that guards changed code is a finding),
+and pins every input those tests read at run time (scripts, catalogs, fixtures, testdata, helper code), not only the
+compiled test files: ask what each base test opens while it runs;
 T2 deterministic: no wall-clock windows that decide an ordering; T3 each assertion fails for a realistic wrong
 implementation (non-empty guards, exact cardinality, both error values when two are promised); T4 every stated
 requirement and every stated mode/path has a discriminating test (use the fairness replica's partial/no rows and

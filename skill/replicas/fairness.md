@@ -20,16 +20,26 @@ For every test function in test.patch (parametrized cases count under their func
   `harness_unrealistic` (the harness produces events the real framework cannot, or skips a real layer of a stated
   mode).
 - `evidence`: why that fairness label holds (quote the sentence or repo line).
+- `qualityCheck`: one or two sentences as the site writes them: what the test covers well and what it does NOT
+  assert ("It checks X but not Y"). Every "but not" feeds Step 3.
 
-## Step 3: coverage (calibrated: the site marks most requirements of a good suite `yes`)
+## Step 3: coverage (calibrated 2026-11-10: the site marked vet 2 6/6 and vet 3 3/6 `partial`)
 The site maps each requirement to tests by name and by a discriminating assertion inside. Every scope word of the
-description ("all methods", "any bucket", "both APIs", "several rebalances") applies to every requirement row: a row
-is `yes` only when its test visibly runs across the full named scope (a loop or matrix). It marks `partial` when a
-named route/setup/state is not exercised, when a check is conditional (`if status == X: assert ...`) with no
-unconditional bound, or when one representative case stands for a general rule.
+description ("all packages", "any manifest", "both APIs", "several rebalances") applies to every requirement row: a
+row is `yes` only when its tests visibly run across the full named scope (a loop or matrix over every category the
+repo supports through the feature: each ecosystem, format, package kind, mode). It marks `partial` when:
+- a named route/setup/state is not exercised, or one representative case stands for a general rule (vet 2: "the
+  current acceptance suite uses Cargo, npm, PyPI" for "any manifest"; vet 3: "a sample of package types");
+- a check is conditional (`if status == X: assert ...`) with no unconditional bound;
+- a test asserts a count but not the content (message, component, value) of what it counts, or uses stand-in
+  diagnostics and never the production text (vet 3: "checks count, not its message");
+- a test's name states an outcome no assertion checks (vet 3: "...AndAddsTheNewOne" never asserted the new one);
+- an intermediate state the requirement covers is reached but not inspected (vet 3: "checks two package statuses
+  but not the details of partial analysis data").
 For each requirement:
-- `yes`: tests assert its main observable outcome, so the implementation a competent engineer would most plausibly get
-  wrong fails at least one test. Breadth is not required: one good discriminating test is enough.
+- `yes`: tests assert its main observable outcome by value across the full named scope, so the implementation a
+  competent engineer would most plausibly get wrong fails at least one test, and none of the `partial` causes above
+  applies.
 - `partial`: you can name ONE plausible wrong implementation (a design an engineer or coding agent would actually
   write while trying to meet the description, not a contrived special case) that passes every test.
 - `no`: no test touches it. A scope or "keeps today's behaviour" requirement is `yes` when some test asserts today's
@@ -54,7 +64,8 @@ Before deciding `yes`, consider these sweeps, and flag only gaps a plausible imp
 ```
 {"taskSummary": str,
  "requirements": [{"requirement": str, "sourceQuote": str, "covered": "yes|partial|no", "coveringTests": [str]}],
- "tests": [{"name": str, "verifies": str, "fairness": str, "concerns": [str], "evidence": str}],
+ "tests": [{"name": str, "verifies": str, "fairness": str, "concerns": [str], "evidence": str,
+            "qualityCheck": str}],
  "unfairTestCount": int,
  "coverageSuggestions": [{"area": str, "gapKind": str, "requirement": str, "sourceIfAdded": str, "suggestion": str,
                           "wrongImplementationThatPasses": str}],

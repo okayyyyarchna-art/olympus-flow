@@ -8,7 +8,8 @@ Route first. Every run fails: near-miss-release.md. Too many deserved passes: pr
 below apply on either route.
 Once a family has one genuine pass at 4+ runs, tell the owner before topping it up: another pass can take it past 25%.
 
-1. Pull every run read-only (problem view, runs show/artifact). Record per run: family,
+1. Pull every run read-only with `tools/pull.sh <id> <dir> --runs` (folders by run id: labels repeat across batches).
+   Record per run: family,
    eligibility (complete, clean, current version), per-test result vector, patch, the verdict label with its full
    evalResult reasoning, and the agentBlameUnfair flag. On a Fair task or environment-blocker failure read these before
    changing anything: notes that carry no blame (vet task 2: Git shim, lint and module cache on nearly every run) are

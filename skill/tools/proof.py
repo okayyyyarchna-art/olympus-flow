@@ -2,8 +2,11 @@
 """Four-cell offline proof with strict JUnit reconciliation.
 
 usage: proof.py <base-repo> <pkg-dir> --base-ids ids.json --new-ids ids.json
-       [--base-skips ids.json] [--stability] [--final] [--rebuild] [--build-only]
+       [--base-skips ids.json] [--stability] [--final] [--rebuild] [--tamper PATH]...
        [--work-root DIR] [--timeout SECONDS] [--build-timeout SECONDS]
+       proof.py <base-repo> <pkg-dir> --build-only   (stage 1: needs only pkg/Dockerfile)
+--tamper PATH (repo-relative, repeatable): overwrite that file with one junk line in the reference tree; base mode
+must then give the same per-ID vector as on the clean reference (the file is pinned by test.sh).
 Expected-ID files are nonempty canonical-ID JSON arrays. Baseline skips must be
 predeclared; new-mode skips always fail. All cells use the literal H4 environment.
 Image reuse includes Dockerfile, committed context, resolved FROM digests and platform.
@@ -138,7 +141,7 @@ def image_key(dockerfile, head, tree, bases, platform):
 
 
 def run(image, patches, out, mode, solution, as_user=12345, platform=None,
-        *, expected_ids, allowed_skips=(), timeout=600):
+        *, expected_ids, allowed_skips=(), timeout=600, tamper=()):
     out.mkdir(parents=True, exist_ok=True)
     prepared = out / "source"
     prepared.mkdir()
@@ -150,6 +153,8 @@ def run(image, patches, out, mode, solution, as_user=12345, platform=None,
              "git -c safe.directory=/prepared apply --whitespace=nowarn /patches/test.patch")
     if solution:
         apply += " && git -c safe.directory=/prepared apply --whitespace=nowarn /patches/solution.patch"
+    for path in tamper:
+        apply += f" && printf 'tampered by proof.py\n' > /prepared/{shlex.quote(path)}"
     apply += " && chmod -R a+rX /prepared"
     prep = docker("run", "--rm", "--platform", platform, "--network", "none",
                   "--user", "0:0", "--entrypoint", "/bin/bash",
@@ -187,8 +192,9 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("repo", type=Path)
     parser.add_argument("pkg", type=Path)
-    parser.add_argument("--base-ids", required=True, type=Path)
-    parser.add_argument("--new-ids", required=True, type=Path)
+    parser.add_argument("--base-ids", type=Path)
+    parser.add_argument("--new-ids", type=Path)
+    parser.add_argument("--tamper", action="append", default=[])
     parser.add_argument("--base-skips", type=Path)
     for option in ("stability", "final", "rebuild", "build-only"):
         parser.add_argument("--" + option, action="store_true")
@@ -198,13 +204,17 @@ def main():
     args = parser.parse_args()
     if not 0 < args.timeout < 688:
         parser.error("timeout must be positive and below the 688-second platform watchdog")
+    if not args.build_only and not (args.base_ids and args.new_ids):
+        parser.error("--base-ids and --new-ids are required unless --build-only")
     image = "(unresolved)"
     work = None
     try:
-        ids = {mode: read_ids(path) for mode, path in (("base", args.base_ids), ("new", args.new_ids))}
-        skips = read_ids(args.base_skips, allow_empty=True) if args.base_skips else []
-        if not set(skips) <= set(ids["base"]):
-            raise ValueError("base skip allowlist contains unexpected IDs")
+        ids, skips = {}, []
+        if not args.build_only:
+            ids = {mode: read_ids(path) for mode, path in (("base", args.base_ids), ("new", args.new_ids))}
+            skips = read_ids(args.base_skips, allow_empty=True) if args.base_skips else []
+            if not set(skips) <= set(ids["base"]):
+                raise ValueError("base skip allowlist contains unexpected IDs")
         repo, pkg = args.repo.resolve(), args.pkg.resolve()
         platform = MACHINE["docker"]["final_platform" if args.final or args.stability else "native_platform"]
         def git(*argv):
@@ -231,20 +241,20 @@ def main():
                 raise ValueError("image build failed: " + built.stdout + built.stderr)
             cleanup_build_cache()
         say(True, f"image builds/reuses complete environment identity {key}")
+        if args.build_only:
+            return 0
         patches = work / "patches"
         patches.mkdir()
         for name in ("test.patch", "solution.patch"):
             shutil.copy(pkg / name, patches / name)
 
-        def cell(label, mode, solution):
+        def cell(label, mode, solution, tamper=()):
             results, elapsed = run(image, patches, work / label, mode, solution, platform=platform,
-                                   expected_ids=ids[mode], allowed_skips=skips, timeout=args.timeout)
+                                   expected_ids=ids[mode], allowed_skips=skips, timeout=args.timeout, tamper=tamper)
             say(True, f"{label}: exit/report/IDs reconcile {results}")
             return results, elapsed
 
         cell("base-base", "base", False)
-        if args.build_only:
-            return 0
         _, elapsed = cell("new-base", "new", False)
         say(elapsed < 300, f"new/base duration {elapsed:.1f}s (<300s)")
         previous = None
@@ -254,6 +264,12 @@ def main():
             if previous is not None:
                 say(result == previous, "reference per-ID vectors repeat")
             previous = result
+        if args.tamper:
+            try:
+                tampered = cell("tamper-base-reference", "base", True, tamper=args.tamper)[0]
+                say(tampered == previous[0], f"base mode ignores the tampered pinned inputs {args.tamper}")
+            except ValueError as exc:
+                say(False, f"base mode changed with the tampered inputs {args.tamper}: {exc}")
         # All preceding cells already use H4; retain a separately named unknown-uid probe.
         cell("unknown-uid", "new", True)
         if args.stability:

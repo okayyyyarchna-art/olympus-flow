@@ -11,17 +11,27 @@ olympus problems view "$id" --json > "$out/view-$id.json" || { echo "pull failed
 olympus problems version list "$id" --json > "$out/versions-$id.json" 2>/dev/null
 "$PY" "$here/digest.py" "$out" "$out/digest" >/dev/null && echo "digest: $out/digest"
 if [ "${3:-}" = "--runs" ]; then
-  "$PY" - "$out/view-$id.json" <<'EOF' | tr -d '\r' > "$out/runs.txt"
-import json, sys
+  PYTHONIOENCODING=utf-8 "$PY" - "$out/view-$id.json" "$out/runs" <<'EOF' | tr -d '\r' > "$out/runs.txt"
+import json, os, sys
 d = json.load(open(sys.argv[1], encoding="utf-8"))
 r = d["runs"]["agentRuns"]; r = r if isinstance(r, list) else list(r.values())
 for x in r:
     if not x.get("stale") and x.get("jobId"):
-        print(x["id"], x.get("taskAgentCodename"), x.get("verdict") or (x.get("output") or {}).get("verdict"))
+        verdict = x.get("verdict") or (x.get("output") or {}).get("verdict")
+        # output.environmentBlocker.agentBlameUnfair is the blame flag, also when the evalResult artifact is empty
+        os.makedirs(os.path.join(sys.argv[2], x["id"]), exist_ok=True)
+        with open(os.path.join(sys.argv[2], x["id"], "output.json"), "w", encoding="utf-8") as f:
+            json.dump(x.get("output") or {}, f, indent=2)
+        print("\t".join(str(v or "") for v in (x["id"], x.get("taskAgentCodename"), verdict,
+                                                x.get("label"), x.get("batchTag"))))
 EOF
-  while read -r rid fam verdict; do
-    d="$out/runs/$rid"; mkdir -p "$d"; echo "$fam $verdict" > "$d/verdict.txt"
+  # Folders are keyed by run id: labels such as "Orion #6" repeat across batches (vet task 3).
+  while IFS=$'\t' read -r rid fam verdict label batch; do
+    d="$out/runs/$rid"; mkdir -p "$d"
+    printf '%s %s\nlabel: %s\nbatch: %s\n' "$fam" "$verdict" "$label" "$batch" > "$d/verdict.txt"
     olympus runs artifact "$id" "$rid" --key solutionPatch > "$d/solution.patch" 2>/dev/null
+    # The evaluator's verdict file: its agent_blame_unfair decides the Fair task and environment-blocker gates.
+    olympus runs artifact "$id" "$rid" --key evalResult > "$d/evalResult.json" 2>/dev/null
     olympus runs artifact "$id" "$rid" --key testLog > "$d/testlog.txt" 2>/dev/null
     # Go/testscript failure lines first (a run's first failing script line), then the generic tail
     { grep -E -e '--- FAIL|^FAIL|FAIL: |\.txtar:[0-9]+:' "$d/testlog.txt"

@@ -80,7 +80,9 @@ configuration for each. Mutants only break code the reference has (faust window:
 For each test record fair/unfair/uncertain, assertion, visible grounding and any valid
 design it rejects. For each obligation record covered/partial/missing with actual
 assertions and a plausible escaping wrong design for a claimed gap. No unfair test,
-unresolved uncertainty or missing in-scope coverage may close. These are J with D
+unresolved uncertainty or missing in-scope coverage may close. Target: every requirement `yes`
+(the site adds coverage checks; vet 2 and vet 3 passed fairness with 6 and 3 rows `partial`): a
+`partial` closes with a test, never with a note (build-checklist section 4, "Coverage to yes"). These are J with D
 probe support. Also retain the platform's distinct eight taskQuality fields: authentic
 engineering, presentation, clarity, fairness, bounded scope, nontriviality, objective
 verification and long-horizon/system-level work. `verifyFairness` and `taskQuality`

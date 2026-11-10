@@ -99,3 +99,12 @@ hold-out before/after test of the knowledge catalogs (replicas/knowledge/).
 | standby, topic start | approved | - | PASS |
 Decision: keep the catalogs (cheap, more platform findings found); watch the fairness "unfair" noise they add. Gate
 verdict right on every package; one-off findings still partly missed.
+
+## Coverage grading (2026-11-10)
+| Package | Site verifyFairness coverage | Replica (old Step 3) |
+|---|---|---|
+| vet 1 | 6/6 yes | - |
+| vet 2 | 6/6 partial (sampled ecosystems) | - |
+| vet 3 final | 3/6 partial (sampled package types, counts without messages, a name promising an unasserted outcome) | 9/9 yes |
+Decision: Step 3 drops "breadth is not required" and lists the site's partial causes; tests carry a `qualityCheck`
+line. Re-measure on the next task's first fairness round against the site.
