@@ -17,7 +17,7 @@ if [ -f "$repo/.git" ]; then
   git clone -q --no-checkout "$repo" "$tmp/r" && git -C "$tmp/r" checkout -q "$c" || { echo "clone of $repo failed" >&2; exit 2; }
   repo="$tmp/r"; trap 'rm -rf "$tmp"' EXIT
 fi
-host() { if [ "$OLYMPUS_OS" = windows ]; then machine_host "$1"; else (cd "$1" && pwd); fi; }
+host() { if [ "$OLYMPUS_OS" = windows ]; then machine_host "$(cd "$1" && pwd)"; else (cd "$1" && pwd); fi; }
 inner='
 set -u
 cp -r /repo /tmp/r && cd /tmp/r

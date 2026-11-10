@@ -81,7 +81,8 @@ opus() {  # $1 = n, $2 = main|claude2
   fi
   ( savepid "$S"; cd "$R" && "${cfg[@]}" env PATH="${SOLVE_PATH:+$SOLVE_PATH:}$PATH" timeout "${TIMEOUT_GROUP[@]}" --kill-after=60 "${cap}m" \
       "$CLAUDE_BIN" -p "$prompt" --model opus --effort high --permission-mode acceptEdits \
-      --append-system-prompt "Work only inside the repository in your current folder and with the task description you were given. Do not read, search or use any file or folder outside this repository; your work is checked for that, and a solve that leaves the repository is discarded." \n      --allowedTools "Bash,Read,Grep,Glob,Write,Edit" --output-format json < /dev/null > "$S/solve.json" 2> "$S/solve.err" )
+      --append-system-prompt "Work only inside the repository in your current folder and with the task description you were given. Do not read, search or use any file or folder outside this repository; your work is checked for that, and a solve that leaves the repository is discarded." \
+      --allowedTools "Bash,Read,Grep,Glob,Write,Edit" --output-format json < /dev/null > "$S/solve.json" 2> "$S/solve.err" )
   finish "$n" "$R"
 }
 
@@ -110,6 +111,6 @@ done
 wait
 # watcher (user rule 2026-11-06): a solve may use only its clone, the task text and the repo; only CLEAN solves count
 "$PY" "$OLYMPUS_TOOLS/solve_watch.py" "$T"
-echo "solves done: $T/solves (grade only the CLEAN ones, solves/watch.md, with replay_patches.sh)"
+echo "solves done: $T/solves (grade only the CLEAN ones, solves/watch.md, with replay_patches.sh; then start the FP audits of every passer at once, PIPELINE.md Confirmation schedule)"
 }
 main "$@"; exit $?

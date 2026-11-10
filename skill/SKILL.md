@@ -35,7 +35,8 @@ Fixed rules:
   needs it, and remove what no result supports.
 - Implement and test every promised path; never invent a hidden requirement to reject a particular solver. Keep real
   upstream regressions and allow valid alternative designs. Agreement with the reference is not correctness.
-- No local blind solves: solver evidence comes from the platform rollout.
+- No local blind solves unless the owner asks: solver evidence comes from the platform rollout. Every passer of a
+  local solve the owner asked for gets its FP audits as soon as grading ends (PIPELINE.md, Confirmation schedule).
 - Every long job is its own tracked background command that blocks until it ends (no `&`, no detached shells).
 - Codex work runs on GPT Sol 6.1 (high; replica checks medium). Briefs use neutral words (`check_codex_brief.sh`).
 - Every workflow change found during a task goes into the product's BACKLOG.md in the same reply.

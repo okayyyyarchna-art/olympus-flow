@@ -3,8 +3,8 @@
 Use a private working folder and immutable version snapshots. Never alter the
 chosen base checkout or a frozen/pasted package. The owner writes the final
 description, builds the image on the platform, and runs platform checks/rollouts.
-Draft upload is a separate action requiring authorization in the active task;
-prepare all fields before it. This skill does not authorize platform mutations.
+The Dockerfile and sample pastes are ordinary steps: paste, notify, keep going. From v1 on, ask
+first; never paste while a platform run or check is active, it would stop the run (owner 2026-11-09).
 
 | Stage | Inputs -> construction outputs | Exit gate and human action |
 |---|---|---|
@@ -30,7 +30,10 @@ prepare all fields before it. This skill does not authorize platform mutations.
 
 1. At stage 2, two independent reading samples see draft + pinned repository only.
    Their question is semantic ambiguity/discoverability; grep cannot decide it.
-2. No local blind solves (owner decision 2026-11-07). Solver evidence comes from the
+2. No local blind solves unless the owner asks for them (owner decision 2026-11-07). When the owner
+   asks, grade them as soon as they finish, and start the FP audits of every passer in the same step, without
+   asking: 1 GPT Sol 6 medium + 1 claude2 Opus 5.5 high (`REPLICA_MODEL=gpt-6-sol REPLICA_EFFORT=medium replica.sh <task> fp-audit <solve>` plus `claude2_run.sh fp <task> pkg <brief> high`).
+   Report the solver results together with the audit verdicts. Solver evidence otherwise comes from the
    platform: the owner's calibration rollout on v1 (usually 3 Orion + 3 Vega). Three runs
    per family show the direction; the band is judged at 4+ runs per family, and Nova needs
    4 runs before submit. Replays of one trajectory are not new runs. Runs failing a hard point, local or platform, are

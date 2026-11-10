@@ -86,6 +86,8 @@ Common: one clear feature or bug, 2-4 production files, a real repository subsys
 Rough guide at S0 only, never a target: a reference of about 150-500 changed production lines over 2-4 files. The
 solution is whatever the sentences need, every hunk mapped to a sentence. Beyond that, a guide for the rest: tests 10-40 functions (parametrized cases fine); 6-15
 platform-extracted requirements (verifyFairness) from <= 8 wanted outcomes in the text.
+Long horizon (Nova average above 400K) follows how deep the problem and its reasoning are, not its lines: vet tasks of 96
+and 98 production lines averaged 591K and 883K, a 476-line store 419K. A small reference is no reason to widen a task.
 
 ## 7. S0 checklist
 1. `base/` = pristine worktree at the upstream tip of the default branch (a base behind the tip fails the Harbor
