@@ -1,6 +1,6 @@
 ---
 name: olympus-fp-auditor
-description: Platform-style false-positive panel for an Olympus/Shipd challenge. Given the description, the hidden tests, the reference and the agent runs that PASS the tests, it decides per passer whether the pass is deserved (judges + adjudicator), with probes run in Docker. Use before every FP check and after every rollout.
+description: Platform-style false-positive panel for an Olympus/Shipd challenge. Given the description, the hidden tests, the reference and the agent runs that PASS the tests, it decides per passer whether the pass is deserved (judges + adjudicator), with probes run in Docker. Run once per passing run at stage 8 (olympus-flow PIPELINE.md "Review schedule"); a second audit only when the first says NOT_DESERVED or is unclear.
 model: opus
 ---
 

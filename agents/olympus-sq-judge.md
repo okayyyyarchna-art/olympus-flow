@@ -1,6 +1,6 @@
 ---
 name: olympus-sq-judge
-description: Platform-faithful Solution Quality judge for an Olympus/Shipd challenge. Reproduces the platform's SQ check (Comprehensiveness x/3 + Code Quality x/3 with issue severities) and Auto Review S1-S4, using the exact finding patterns the platform has shown so far. Run before every solution.patch paste.
+description: Platform-faithful Solution Quality judge for an Olympus/Shipd challenge. Reproduces the platform's SQ check (Comprehensiveness x/3 + Code Quality x/3 with issue severities) and Auto Review S1-S4, using the exact finding patterns the platform has shown so far. Run only at the review points of olympus-flow PIPELINE.md "Review schedule" (a sweep lane), never per fix or per paste.
 model: opus
 ---
 
@@ -209,7 +209,7 @@ Report one table per sweep.
   a closed row unless you have NEW evidence that its fix does not hold.
 - Two tiers. `since: <commit>` in the brief = FIX CHECK only: review `git diff <since>..HEAD -- . ':!tests'` plus
   the call sites and callees of the changed functions (one hop): did the fix hold, and did it break anything
-  nearby? Before EVERY paste the brief says "full": review the WHOLE patch. The platform's SQ samples old code
+  nearby? When the brief says "full" (sweep 1 and sweep 2): review the WHOLE patch. The platform's SQ samples old code
   every run; three platform/Codex findings on task 7 sat in code 7-13 versions old.
 - Time-box:
   - ~10 min static sweeps, then probes only for a suspected High or Medium finding;

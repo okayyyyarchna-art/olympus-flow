@@ -1,7 +1,9 @@
 # Shaping the task from platform rollout results
 
 The owner runs 2 Orion + 2 Vega on the locked text at stage 3 (difficulty.md section 4); v1 adds 2 Orion + 2 Vega
-+ 4 Nova, so the rollout is 4-4-4 with no repeat. Any later version is a re-eval of these stored runs, not new runs. The builder keeps closing gaps; nothing waits for it.
++ 4 Nova, so the rollout is 4-4-4 with no repeat. Any later version is a re-eval of these stored runs, not new runs;
+extra runs are the owner's call, and only a description change the owner takes (description.md section 5b) needs a
+fresh rollout. The builder keeps closing gaps; nothing waits for it.
 The description stays locked: this file shapes tests and the reference only.
 
 Route first. Every run fails: near-miss-release.md. Too many deserved passes: prompts/calibrate-one-passer.md. The steps
@@ -46,7 +48,7 @@ Once a family has one genuine pass at 4+ runs, tell the owner before topping it 
       of a stated rule (tests.md T2). Full procedure: prompts/calibrate-one-passer.md.
       Grading an upstream test that only a non-required design breaks is a fair lever (a run that edited it counts as a
       failure, PASS_CHEATED). Never grade a test every correct solution must edit.
-   5. Too hard with valid near misses: more runs on unchanged files before any change.
+   5. Too hard with valid near misses: ask the owner for more runs on unchanged files before any change.
    6. A proven ambiguity (runs of two or more families take one other reading that the words
       allow) or too easy after levers 1-4: stay in tests and the reference. The builder does
       not propose a description change. If the owner asks for one (description.md section 5b):

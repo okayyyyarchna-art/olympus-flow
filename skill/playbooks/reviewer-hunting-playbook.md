@@ -72,7 +72,7 @@ Severity = "can a realistic wrong impl pass or a user observe harm", never our o
     arriving while a reload runs and a second SIGHUP waits is dropped by os/signal. Make the reload slow on purpose
     (a cluster on a broker with 1s latency), send HUP, wait 200ms, send HUP and the stop signal, and expect an exit.
 
-## 2. Blind-spot checks before every paste (each one missed real findings in Part 2 B)
+## 2. Blind-spot checks in every sweep lane (each one missed real findings in Part 2 B)
 - [ ] An SQ reviewer ran BEFORE the first SQ check. We skipped this on 4 of 4 tasks and got ~14 first-round FAILs.
 - [ ] golangci-lint ran on the final diff. 0 local reviews ever ran it; 6 site lint findings.
 - [ ] The reviewer got this playbook + catalog. The scrape race and in-flight cache recurred 4 days apart on Burrow.

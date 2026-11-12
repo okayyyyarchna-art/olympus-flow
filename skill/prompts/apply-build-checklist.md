@@ -28,10 +28,13 @@ You are about to build test.patch and solution.patch for <task-dir>. Follow thes
 8. Before the v1 paste, run `check <task-dir> --through 7`. It also confirms every TESTED name is in test.patch.
 9. After each of steps 6 and 8, give a fresh reviewer only build-checklist.md, the sheet, ledger.md, the description and
    the files so far. Ask it to open the cited place of every APPLIED row and every NA reason, and answer: does this really
-   do what the rule says? Reopen every row it rejects, after checking its reason yourself. The gate shows a row was filled.
+   do what the rule says? Reopen every row it rejects, after checking its reason yourself, and fix it; this review runs once per step, never again
+   for the fixed rows. The gate shows a row was filled.
    This review shows it is true.
 10. After the sweeps, run `check <task-dir> --through 8`.
 11. Tell the owner: the gate output, how many rows are APPLIED and NA, every NA row with its reason, and what the
     reviewer rejected.
 
 A later checklist change makes the gate ask for a new sheet. Running `sheet` again keeps rows whose rule did not change.
+Rows sharpened during a task apply from the next task; do not regenerate the current task's sheet for them
+(PIPELINE.md "Review schedule").

@@ -16,14 +16,39 @@ first; never paste while a platform run or check is active, it would stop the ru
 | 3. Human wording and lock | Audited draft + fact ledger -> human's final description, meaning diff, hash | **Human writes the final words.** Follow description.md section 3, part C (steps 9-11: counterexample diff, re-check of changed words, lock record) on those exact bytes. Fix unintended meaning changes before lock. **The lock is final**: no calibration step changes the text; only a change the owner asks for (description.md section 5b) or REDESIGN can, after an impact analysis. **Then paste the locked text with the sample tests and notify the owner: the owner runs 2 Orion + 2 Vega** (difficulty.md section 4) so the builder sees how the agents read this text; they count toward the final 4-4-4. Stages 4-5 go on locally meanwhile; their stop signal and keeper are read as soon as they end. |
 | 4. Tests | Locked text + planned ledger -> real test.patch including executable test.sh, fixtures, stable IDs | **Start with [prompts/apply-build-checklist.md](prompts/apply-build-checklist.md); `tools/checklist_gate.py check --through 5` passes before any code.** Built by walking build-checklist.md (ledger first). Follow T1-T6/H1-H6. Base-mode/base passes; each new ID fails on base for its intended reason. Shaped on the stage-3 runs (difficulty.md section 4): the keeper and the reference pass; every gap of the other runs, V-OBVIOUS and the variants gets a fair test. |
 | 5. Reference | Same contract/path inventory -> solution.patch, native quality evidence | Follow S1-S5 and build-checklist.md step 6; every in-scope path implemented and tested. |
-| 6. Deterministic closure | Four artifacts + variants + known patches -> four-cell proof, failure-probe evidence, corpus results | Run G0, then gate order G1 -> G2 -> G3 -> G4. The corpus runner replays every wrong design (must fail), valid alternative (must pass) and platform patch. No OPEN in-scope obligation, unexplained survivor, failed valid alternative, or stale execution evidence. |
+| 6. Deterministic closure | Four artifacts + variants + known patches -> four-cell proof, failure-probe evidence, corpus results | Starts after the stage-3 runs are pulled and the keeper is chosen (difficulty.md section 4); stages 4-5 may start before. Run G0, then gate order G1 -> G2 -> G3 -> G4. The corpus runner replays every wrong design (must fail), valid alternative (must pass) and platform patch. No OPEN in-scope obligation, unexplained survivor, failed valid alternative, or stale execution evidence. |
 | 6a. Reference audit | Closed candidate -> one strict audit of the reference | `tools/replica.sh <task> ref-audit pre1` before v1, and `checklist_gate.py check --through 7`. Fix each reproduced BROKEN promise and add its test (vet task 2: this kind of audit found 3 of the 4 reference breaks, but only after v1). |
 | 7. Local confirmation | Closed candidate (not pasted yet) -> sweep 1, replica batch, verification batch, sweep 2 only on its trigger | Schedule below; one fix batch per step through Repair. |
 | 7b. v1 paste (the complete package, once) | Closed stage-7 candidate -> pasted v1 | Clean-repo proof, paste, confirm the fields, then **notify the owner** (push notification + message: version, hashes, "run the checks and the rest of the rollout"). The owner runs the full checks once, the re-eval of the four stage-3 runs, and 2 Orion + 2 Vega + 4 Nova (4-4-4 in total). The builder starts tools/watch.sh and pulls read-only. |
 | 8. Rollout analysis | Platform runs (any version) -> classified runs, FP audits, shaping plan | Pull read-only; run the calibration reserve probes on every passer, then replay every agent patch on the current files (replay_plan.py + corpus); FP audits per the schedule; shape with [rollout.md](rollout.md); update [profiles.md](profiles.md). What the agents show about the description goes into the rulebook for the next task, never into this text. Every change is predicted by a local replay before its paste. |
-| 8b. v2 paste (calibration, only when needed) | Shaped candidate + predicted re-eval -> pasted v2 | Only when the 4-4-4 is outside the band (several passers, or none) or a check failed. Re-eval readiness check passed (rollout.md step 5, one replica round on the changed files). **Notify the owner**: changed files, predicted result per family, the affected checks; a re-eval of the stored runs, no new runs. |
+| 8b. v2 paste (calibration, only when needed) | Shaped candidate + predicted re-eval -> pasted v2 | Only when the 4-4-4 is outside the band (several passers, or none) or a check failed. Re-eval readiness check passed (rollout.md step 5, one replica round on the changed files). **Notify the owner**: changed files, predicted result per family, the affected checks; a re-eval of the stored runs, no new runs. If the re-eval is still outside the band, stage 8 runs once more (v3) the same way; after that the builder names the one blocker to the owner (rollout.md step 6). |
 | 9. Freeze and hand over | Closed candidate -> final four-cell/offline/stability proof, immutable package, exact hashes, ledger and compact hand-over | Final new-mode stability: six base and six reference runs with identical per-ID vectors; investigated differences block. Include repo URL, full pin, title/category/language, four files, image/build evidence, check IDs and remaining external gates. Call this LOCAL READY, not platform accepted. |
-| 10. Human platform validation | Exact frozen fields -> final checks, rollout to 4+ per family, FP panel | **Human runs checks/rollouts and submits.** Read results via CLI after `--help`; compare uploaded/downloaded bytes. Classify every run with [rollout.md](rollout.md). |
+| 10. Human platform validation | Exact frozen fields -> readiness re-checks before submit (prechecks, rebuild-safe), the FP panel; the rollout is the 4-4-4 already run at stages 3 and 7b | **Human runs checks/rollouts and submits.** Read results via CLI after `--help`; compare uploaded/downloaded bytes. Classify every run with [rollout.md](rollout.md). |
+
+## Review schedule (overrides every other card, every agent definition and every memory note)
+Model reviews (reading audits, sweeps, replica batches, the reviewer agents, FP audits) run only at these points. A fix
+never starts a review round by itself: it is closed with deterministic evidence at once (gates.md Repair step 6) and
+re-judged at the next point in this table. A memory note or an older card that sets another cadence ("after every
+change", "before every paste", "every round runs X") is superseded by this table.
+| Point | What runs | How many times |
+|---|---|---|
+| Stage 2 step 7 | two reading audits (description.md) | once per draft; step 10 re-checks only the changed words |
+| Stage 2 steps 8 and 10 | DQ replica | once at step 8, once on the owner's final bytes |
+| Stage 4 (checklist step 9) | one fresh checklist reviewer after checklist steps 6 and 8 | once each; the builder fixes the rows it rejects, no second review |
+| Stage 6a | `replica.sh <task> ref-audit pre1` | once, before v1 |
+| Stage 7 | sweep 1 -> fix batch -> replica batch -> fix batch -> verification batch | once each |
+| Stage 7, only on its trigger | sweep 2 -> fix batch -> one more verification batch | once; there is no sweep 3 |
+| Stage 8 | one FP audit per passing run (a second only when the first says NOT_DESERVED or is unclear) | once per run |
+| Stage 8b, before a calibration paste | one replica round on the changed files (rollout.md step 5, item 4b) | once per paste |
+
+Terms: a **sweep** is `tools/sweep.sh <task> <tag>` with every lane following replicas/sweep-brief.md (the reviewer
+agents olympus-auto-reviewer, olympus-sq-judge and olympus-tq-judge are its in-process lanes). A **replica batch** and a
+**verification batch** are each one `tools/round.sh <task> <tag>` run (fairness, sq, dq and ar replicas, ar after dq,
+then verify and the gate). A **new class of finding** is a finding whose kind no earlier finding of this task had; a new
+instance of a known kind is fixed through Repair and never triggers sweep 2. If the last verification batch still
+reproduces a finding: fix it through Repair, prove the fix deterministically, and report it to the owner; no further
+batch runs. Checklist rows sharpened during a task (item 4 below) apply from the next task; the current task's sheet
+is not regenerated for them.
 
 ## Confirmation schedule and remaining model runs
 
@@ -45,7 +70,8 @@ first; never paste while a platform run or check is active, it would stop the ru
    There is no sweep 3. (vet: replica rounds took 6-19 min, sweeps 28-95 min.)
 4. Every reproduced finding gets a cause. Description: it goes to the owner; the text stays
    locked unless the owner takes the exception. Checklist: sharpen the row that should have
-   caught it (the example and why it slipped), or add a row when no rule covers it.
+   caught it (the example and why it slipped), or add a row when no rule covers it. The row applies from the next
+   task (Review schedule above).
    Unreproduced findings change nothing.
 5. FP audits: one per passing run; a second only when the first says NOT_DESERVED or is
    unclear. Each audit replays its probe on the reference too (build-checklist step 8). Each probe runs once unless a

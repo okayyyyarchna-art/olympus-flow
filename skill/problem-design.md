@@ -99,7 +99,7 @@ and 98 production lines averaged 591K and 883K, a 476-line store 419K. A small r
 3. Fit: stateful framework code; 2-4 production files; core outcome assertable offline through real objects; >= 4
    1-2 hard points (one deep rule each) whose stated consequences sit on different subsystem pairs; no "consistent
    across every lifecycle event" contract.
-4. Every task (user rule 2026-11-05, also on a repo that already has a task): paste a sample (locked description +
-   the real test.patch + a stub solution.patch; stub tests fail the "good quality" precheck, which locks the Scope Gate) right after the S1 lock so a Scope Gate reject costs nothing; the user runs the Scope Gate. S2 starts
-   only after it passes. Never run DQ or Task Quality on a stub-patch sample: they grade whatever test.patch is pasted
+4. Every task, also on a repo that already has a task: the sample and Scope Gate of PIPELINE.md stage 1b (the
+   builder's draft words + basic real tests + a small solution sketch, before stage 2; platform.md has the details);
+   a stub test patch fails the "good quality" precheck, which locks the Scope Gate. Never run DQ or Task Quality on a stub-patch sample: they grade whatever test.patch is pasted
    (the same text failed with one test.patch and passed with the next).

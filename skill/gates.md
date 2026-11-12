@@ -86,7 +86,7 @@ engineering, presentation, clarity, fairness, bounded scope, nontriviality, obje
 verification and long-horizon/system-level work. `verifyFairness` and `taskQuality`
 are different API checks; neither is inferred from the other's PASS.
 
-## Repair - mandatory after every fix
+## Repair - mandatory after every fix (deterministic; model reviews follow PIPELINE.md "Review schedule")
 
 1. Mark the candidate DIRTY. Record the finding's exact quote, legal input, expected/
    actual result and evidence. Consensus is not reproduction. Test speculative claims;
@@ -114,9 +114,11 @@ are different API checks; neither is inferred from the other's PASS.
    applicable semantic scope; D changes rederive all meaning and fresh solve evidence.
    Include fixtures, expected IDs, selectors and tool sources. Unrestricted reviews
    depend on everything they could read. Refresh final stability if its inputs changed.
-6. Close affected G1 -> G2 -> G3 -> G4 on exact repaired bytes. Required independent
-   samples have different IDs even on identical inputs; do not reuse one as another.
-   No open/stale required record at hand-over. If repair cannot satisfy locked meaning,
+6. Close affected G1 -> G2 -> G3 -> G4 on exact repaired bytes with deterministic evidence now: the proof, the
+   variant corpus, the finding's own probe (fails on the wrong design, passes on the reference) and the linters.
+   Semantic records that step 5 marks stale are refreshed at the next point of PIPELINE.md "Review schedule", never
+   by a review round started for this fix. Required independent samples have different IDs even on identical
+   inputs; do not reuse one as another. No open/stale required record at hand-over. If repair cannot satisfy locked meaning,
    report the concrete blocker and the smallest redesign that clears it; do not loop paid checks.
    Never propose retiring a task: the flow ends only with an accepted task (owner rule).
 

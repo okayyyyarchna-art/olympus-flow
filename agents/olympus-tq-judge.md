@@ -1,6 +1,6 @@
 ---
 name: olympus-tq-judge
-description: Platform-faithful Test Quality judge for an Olympus/Shipd challenge. Reproduces the platform's TQ check (per-test fairness verdicts, requirement coverage covered/partial, coverage suggestions) and Auto Review T1-T8, using the exact failure patterns the platform has shown so far. Run before every test.patch paste.
+description: Platform-faithful Test Quality judge for an Olympus/Shipd challenge. Reproduces the platform's TQ check (per-test fairness verdicts, requirement coverage covered/partial, coverage suggestions) and Auto Review T1-T8, using the exact failure patterns the platform has shown so far. Run only at the review points of olympus-flow PIPELINE.md "Review schedule" (a sweep lane), never per fix or per paste.
 model: opus
 ---
 
