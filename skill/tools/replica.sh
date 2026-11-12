@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# Run one platform-replica check with Codex (GPT Sol 6.1, medium effort; user rule 2026-11-05).
+# Run one platform-replica check with Codex (GPT Sol 6, medium effort; owner 2026-11-13, was GPT Sol 6.1).
 #   bash replica.sh <task-dir> <fairness|sq|dq|ar> [tag]
 # Task dir: pkg/{description.md,test.patch,solution.patch,Dockerfile} (directory contract; files at the task root
 # are used when pkg/test.patch is missing), repo/ (pinned commit + both patches),
 # optional runs/<id>/{verdict.txt,solution.patch}. Output: <task-dir>/eval/replica/<check>-<tag>.json (+ .md summary).
-# Model (user rule 2026-11-05): every check runs on GPT Sol 6.1 at MEDIUM effort. "The model is not the check": the
+# Model (owner 2026-11-13): every check runs on GPT Sol 6 at MEDIUM effort (was GPT Sol 6.1 from 2026-11-05). "The model is not the check": the
 # hardness comes from the prompts, schemas, break-attempt tables, two sq runs, the verify pass and the knowledge
 # catalogs. Override only for an experiment: REPLICA_MODEL / REPLICA_EFFORT. ar and verify read earlier outputs of
 # the same tag, so they run last (round.sh orders them).
@@ -17,9 +17,9 @@ here=$(cd "$(dirname "$0")/.." && pwd)
 case "$check" in
   fairness|sq|dq|ar|verify|fp-audit|ref-audit) ;; *) echo "unknown check $check" >&2; exit 2 ;;
 esac
-model="${REPLICA_MODEL:-gpt-6.1-sol}"; effort="${REPLICA_EFFORT:-medium}"
+model="${REPLICA_MODEL:-gpt-6-sol}"; effort="${REPLICA_EFFORT:-medium}"
 # strict false-pass audits (passers and the reference) run at HIGH effort (user rule 2026-11-06)
-case "$check" in fp-audit|ref-audit) effort="${REPLICA_EFFORT:-high}" ;; esac
+case "$check" in fp-audit|ref-audit) model="${REPLICA_MODEL:-gpt-6.1-sol}"; effort="${REPLICA_EFFORT:-high}" ;; esac
 # knowledge catalogs (every way the site passed or failed packages, 2026-11-05): which check reads which
 case "$check" in
   sq|verify|fp-audit|ref-audit) kb="solution tests" ;; fairness) kb="tests" ;; dq) kb="description" ;; ar) kb="solution tests description" ;;

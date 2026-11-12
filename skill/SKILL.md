@@ -38,7 +38,7 @@ Fixed rules:
 - No local blind solves unless the owner asks: solver evidence comes from the platform rollout. Every passer of a
   local solve the owner asked for gets its FP audits as soon as grading ends (PIPELINE.md, Confirmation schedule).
 - Every long job is its own tracked background command that blocks until it ends (no `&`, no detached shells).
-- Codex work runs on GPT Sol 6.1 (high; replica checks medium). Briefs use neutral words (`check_codex_brief.sh`).
+- Codex work runs on GPT Sol 6.1 high; replica checks run on GPT Sol 6 medium (owner 2026-11-13). Briefs use neutral words (`check_codex_brief.sh`).
 - Every workflow change found during a task goes into the product's BACKLOG.md in the same reply.
 
 Tools live in [tools/](tools/) and read the machine profile (machine/*.json) for every machine-specific value;

@@ -63,7 +63,7 @@ is not regenerated for them.
    4 runs before submit. Replays of one trajectory are not new runs. Runs failing a hard point, local or platform, are
    the task working and never a reason to reword it (description.md section 5).
 3. Stage 7 order: sweep 1 (all lanes, one round) -> triage -> one fix batch -> replica
-   batch (3 independent replicas in parallel on the same frozen files; Codex GPT Sol 6.1
+   batch (3 independent replicas in parallel on the same frozen files; Codex GPT Sol 6
    medium; 25 min time box each) -> the builder judges every finding at once -> one fix
    batch -> verification batch (3 replicas). If the verification batch reproduces a new
    class of finding: sweep 2 (once) -> fix -> one more verification batch as the gate.
