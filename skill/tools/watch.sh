@@ -28,7 +28,7 @@ while [ $SECONDS -lt $end ]; do
   if [ -n "$changes" ] && [ "${active:-1}" = "0" ]; then
     echo "$now" > "$base"
     echo "CHANGED (all user runs finished):"; echo "$changes" | sed 's/^> /  /'
-    if echo "$changes" | grep -q -i -E '\|(fail|failed|FAIL|warning|revision_requested|reject|rejected)|FAIL_|PASS_CHEATED'; then
+    if echo "$changes" | grep -q -i -E '\|(fail|failed|FAIL|error|ERROR|warning|revision_requested|reject|rejected)|FAIL_|PASS_CHEATED'; then
       echo "RESULT: something failed -> pull.sh + S9 loop"
     else
       echo "RESULT: all new results passed"
