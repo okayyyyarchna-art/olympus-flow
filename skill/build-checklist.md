@@ -66,6 +66,14 @@ For each obligation, list every materially different value; the reference handle
 2. **Stores and formats**: every store and serialized form read or written, including older shapes the repo still
    reads and optional fields older versions omit (vet: last, .db, JSON, JSONL, older report). Write through the live
    path, save, reload through that form's real reader, assert the same contract (C04). [T4, S1]
+   **Round trip, every persisted value (owner 2026-11-13: hidden tests must cover round tripping more).** For each
+   value the feature writes or changes, the Blueprint holds a cell for each of: (a) live -> save -> reload through
+   every real reader and every command that reads the saved form (report show, policy on a saved scan, resume),
+   asserted through that command's output, not the struct; (b) the not-set / empty state survives the round trip as
+   not-set (absent stays absent, empty stays empty); (c) reload -> continue or resume -> save again -> reload keeps
+   the value and its not-set cases; (d) a file of the older shape without the field reads as not-set, never as an
+   error or a zero value; (e) the reloaded value is used, not recomputed (change the inputs it was computed from
+   before the reload where the repo allows it). OUT only with an exact sentence or an unreachable file:line. [T4, S1]
    Duplicates inside one file count too: how the parser merges two entries of one key decides the result (vet
    task 2: a yarn.lock with a vendored and a registry entry of one version kept only the first). Test both entry
    orders: one order passes a "first wins" and a "last wins" merge alike (vet task 2 sweep 2). [S1, T3]
@@ -100,6 +108,17 @@ For each obligation, list every materially different value; the reference handle
   alternative that could challenge a pin; counts are observations, not gates (R3). Typical classes: collapse any/all,
   wrong key, overwrite instead of accumulate, one path only, special-case the tested instance, delete-all, skip on any
   failure, header/metadata-only, first-only, presence instead of effect. [FP, T3]
+- **Edge-case matrix, every obligation (owner 2026-11-13: more edge cases, more behavioural tests).** Built at stage 4
+  from the ledger, never added by a review round (PIPELINE.md "Review schedule"; a breadth suggestion from a
+  reviewer is triaged at its scheduled point). For each obligation the Blueprint carries a cell, TESTED or OUT/SAME
+  with its reason, for every axis below that can vary: boundary on each side; empty, none and nothing-to-do;
+  multiplicity with different answers in both orders and the wrong item sorting first; the same entity under two
+  names; each exception's neighbour states (unknown, missing, failed, partial, older); the repeated trigger; kept
+  results by value; every row of the difficulty.md inventory and reserve that the text covers. Parametrized cases
+  keep the function count inside the size guide (problem-design.md section 6).
+- **Behavioural first:** every obligation has at least one test through its public entry point (the CLI command or
+  public API a user runs), asserting the user-visible output; package-level tests may add cases but never replace
+  it. [T4, T7]
 - Give each class the smallest differing input, drawn from these axes:
   - **Multiplicity**: two of a kind sharing scope, never one per scope: two items per topic/partition/file, two rules
     each winning a different item, one rule winning then losing, exact duplicates, two instances of every exemption

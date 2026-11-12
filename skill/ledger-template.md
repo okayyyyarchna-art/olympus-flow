@@ -63,6 +63,9 @@ Mechanical count method/result and actual description/precheck results stay sepa
 ## Blueprint (fill before any code; tools/checklist_gate.py checks it)
 
 One row per combination that differs, for every contract row not OUT. Write n/a for an axis that cannot vary.
+"Copy or data state" includes the round-trip states of build-checklist.md section 3 item 2 (live, saved and
+reloaded per reader, reloaded then resumed, older shape); "Lifecycle edge" includes the repeated trigger. The
+edge-case matrix of section 4 lands here as cells too.
 Disposition is one of: `TESTED <test name>`, `OUT "<exact description sentence>"`, `OUT unreachable <file:line>`,
 `SAME <cell> <why it behaves the same>`.
 
