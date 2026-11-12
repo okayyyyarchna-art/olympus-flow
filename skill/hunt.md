@@ -31,7 +31,8 @@ high, search mode), claude2 (Opus) and the in-process lane (Agent tool, read-onl
 ## B. Repository given or picked: find the seam
 1. `bash tools/hunt.sh <repo> "<already taken: one line per task to exclude>"` writes the facts (stars, licence,
    last push, language, merged PRs, list hits), clones the tip, writes `brief.md` from `templates/hunt-brief.md`
-   and runs the Codex and claude2 lanes; start the in-process lane with the same brief at once (read-only: it never
+   and prints the Codex and claude2 lane commands. Start the three lanes at the same time, each its own tracked
+   background call: the two printed commands and the in-process lane with the same brief (read-only: it never
    builds or runs the repository's code; reproductions are written tests marked NOT RUN). Exclude every task already
    built on the repository, ours and those the owner names from the platform.
 2. A blocker in the facts (rule fail of part A step 1) stops the hunt: tell the owner before the lanes finish.

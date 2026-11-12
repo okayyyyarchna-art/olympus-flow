@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# S0 when the user gives a repository: eligibility facts, clone at the tip, one shared brief, and two of the three
-# hunt lanes (Codex + claude2) serially. The coordinator starts the third lane (in-process, read-only) with
-# the same brief, then decides with hunt.md (part B).
+# S0 when the user gives a repository: eligibility facts, clone at the tip and one shared brief. It prints the
+# Codex and claude2 lane commands; the coordinator starts them and the in-process lane at once, then decides
+# with hunt.md (part B).
 #   bash hunt.sh <github-url-or-owner/repo> ["already taken: one line per task to exclude"]
-# Output: $OLYMPUS_SEAMS_ROOT/work/<repo>-<yyyymmdd>/ (clone, brief.md, eval/codex/hunt.md, eval/claude2/hunt-free.md)
+# Output: $OLYMPUS_SEAMS_ROOT/work/<repo>-<yyyymmdd>/ (clone, brief.md, eval/facts.txt)
 set -uo pipefail
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/machine.sh" || exit 2
 # the whole body is one function: bash reads it completely before running, so editing this file while a run
@@ -40,17 +40,13 @@ open(out, "w", encoding="utf-8", newline="\n").write(s)
 EOF
 bash "$OLYMPUS_LIB/check_codex_brief.sh" "$W/brief.md" >/dev/null || { echo "brief has flagged words; reword the exclude line" >&2; exit 3; }
 
-# Each child blocks; retain failures while still waiting for every lane.
-failed=0
+# The three lanes run at the same time, each as the coordinator's own tracked background call (vet 2026-11-13: run
+# here one after the other, the claude2 lane waited the whole Codex lane for nothing; neither lane uses Docker).
 rm -f "$W/eval/codex/hunt.md" "$W/eval/claude2/hunt-free.md"
-bash "$OLYMPUS_LIB/codex_job.sh" "$W" hunt "$W/brief.md" high search > "$W/eval/codex-lane.log" 2>&1 || failed=1
-[ -s "$W/eval/codex/hunt.md" ] || failed=1
-# lane 2: claude2 (second Claude account, Opus)
-c2="$OLYMPUS_LIB/claude2_run.sh"
-bash "$c2" free "$W" hunt "$W/brief.md" high > "$W/eval/claude2-lane.log" 2>&1 || failed=1
-[ -s "$W/eval/claude2/hunt-free.md" ] || failed=1
-echo "completed: Codex -> $W/eval/codex/hunt.md ; claude2 -> $W/eval/claude2/hunt-free.md"
-echo "next: start the in-process lane (read-only) with $W/brief.md, save its report to $W/eval/inprocess-hunt.md"
-return "$failed"
+echo "prepared: $W (brief.md, eval/facts.txt, repo at $commit)"
+echo "start these two as separate tracked background calls, and the in-process lane (read-only) with the same brief:"
+echo "  bash \"$OLYMPUS_LIB/codex_job.sh\" \"$W\" hunt \"$W/brief.md\" high search   # -> $W/eval/codex/hunt.md"
+echo "  bash \"$OLYMPUS_LIB/claude2_run.sh\" free \"$W\" hunt \"$W/brief.md\" high       # -> $W/eval/claude2/hunt-free.md"
+echo "  in-process lane report -> $W/eval/inprocess-hunt.md"
 }
-main "$@"; exit $?
+main "$@"
