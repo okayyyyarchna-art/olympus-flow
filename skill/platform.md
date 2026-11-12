@@ -1,4 +1,4 @@
-# Platform work through the Olympus CLI (stages 1, 1b, 6b, 7b, 8b, 10)
+# Platform work through the Olympus CLI (stages 1, 1b, 3, 7b, 8b, 10)
 
 **I paste, the owner runs.** I create or edit the draft (`problems create`, `problems edit` with the four files,
 title, category, repo, commit) and confirm the fields with `problems view` and a download. I never run
@@ -29,17 +29,16 @@ file hashes, what changed, exactly which checks to run and which runs are still 
 |---|---|---|
 | Dockerfile (stage 1) | Dockerfile only | the platform image build |
 | Sample (stage 1b) | my draft words + basic tests + a small solution sketch | prechecks, Scope Gate |
-| v1 (stage 6b) | the checklist-built package | the calibration rollout (their mix, usually 3 Orion + 3 Vega); the full checks can wait for v2 (below) |
-| v2 (stage 7b) | all stage-7 fixes in one version | only the affected checks; re-eval |
-| v3 (stage 8b) | rollout shaping, predicted by a local replay | affected checks, re-eval, runs to reach 4+ per family (Nova included) |
+| Locked text (stage 3) | the locked description + the sample tests | 2 Orion + 2 Vega, for the builder's picture of the agents (difficulty.md section 4); they count toward the 4-4-4 |
+| v1 (stage 7b) | the complete package after stage 7, shaped on the stage-3 runs | the full checks once, the re-eval of the four stage-3 runs, 2 Orion + 2 Vega + 4 Nova |
+| v2 (stage 8b), only when needed | calibration, predicted by a local replay, after one replica round | the affected checks, re-eval (no new runs) |
 Before every paste and every status claim about a check, pull the platform state (`tools/pull.sh`): vet task 2 pasted
 over a finished re-eval and left about 5 h of results unread. After each paste, start `tools/watch.sh <id> <task>` as a
 tracked background job so a finished check wakes the builder; it only reads, and the owner still decides what runs.
 Every result is read against the version it graded: a check that ran on an older paste says nothing about the
 current files.
 
-v1 is for the calibration rollout. Run only the checks the rollout needs, and the full checks at v2 (vet task 2: v1 failed
-Solution Quality and still got its rollout; which checks can block a rollout is NOT VERIFIED). If a check does block it,
+v1 is the complete package: the owner runs the full checks once, not per paste (owner 2026-11-12). If a check blocks it,
 contest it honestly, one note per finding: the quote plus a code trace, or "fixed in the next version, file:line". Local
 refinement goes on meanwhile.
 

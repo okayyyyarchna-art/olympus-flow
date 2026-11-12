@@ -79,7 +79,7 @@ opus() {  # $1 = n, $2 = main|claude2
     [ -n "$C2DIR" ] || { echo "claude2 needs paths.claude2_config_dir" >&2; return 2; }
     cfg=(env CLAUDE_CONFIG_DIR="$C2DIR")
   fi
-  ( savepid "$S"; cd "$R" && "${cfg[@]}" env PATH="${SOLVE_PATH:+$SOLVE_PATH:}$PATH" timeout "${TIMEOUT_GROUP[@]}" --kill-after=60 "${cap}m" \
+  ( savepid "$S"; cd "$R" && ${cfg[@]+"${cfg[@]}"} env PATH="${SOLVE_PATH:+$SOLVE_PATH:}$PATH" timeout "${TIMEOUT_GROUP[@]}" --kill-after=60 "${cap}m" \
       "$CLAUDE_BIN" -p "$prompt" --model opus --effort high --permission-mode acceptEdits \
       --append-system-prompt "Work only inside the repository in your current folder and with the task description you were given. Do not read, search or use any file or folder outside this repository; your work is checked for that, and a solve that leaves the repository is discarded." \
       --allowedTools "Bash,Read,Grep,Glob,Write,Edit" --output-format json < /dev/null > "$S/solve.json" 2> "$S/solve.err" )

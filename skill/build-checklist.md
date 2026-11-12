@@ -171,7 +171,11 @@ For each obligation, list every materially different value; the reference handle
   that treats it the same way, so every judge sees the argument (vet task 3: two evaluators split on one stand-in
   without UseSource; the one that found the visible precedent called the test fair). [T5]
 - test.sh: base mode = the base-commit tests of every file the reference edits, of every test file either patch
-  changes, and of their sibling areas (P15: an AR High for a left-out lifecycle test file); new mode = only the hidden
+  changes, and of their sibling areas (P15: an AR High for a left-out lifecycle test file), plus the upstream tests of
+  every public caller of a changed function: grep the tests for each changed function's name outside the selected
+  directories (edsl: question.add_question() wraps Survey.add_question; tests/questions/test_Question.py and test_cli
+  TestOpen were left out because selectors were chosen by directory, an AR T1 High in the verification batch); new
+  mode = only the hidden
   tests; no fail-fast. Pin every input the base tests use: test files, fixtures, testdata, scripts, catalogs, golden
   files and helper code in test-only packages. A compile-time overlay (`go -overlay`) pins only compiled files; data
   read at run time needs a pinned copy of the tree (safe with a read-only /app). Fail (not warn) if the base commit is
@@ -235,7 +239,10 @@ Tests:
   precedence free unless the text or repo fixes it (C31: swift 412-over-413 FAIL_TEST_MISMATCH x5). [T5]
 - An assertion with a second reading never stands alone. The same script holds neighbours showing the rule in both
   directions and the no-change cases; a comment directly above the assertion quotes the description sentence and
-  states this case only (it prints in the failure log), with no framing word the description lacks; the test name says
+  states this case only (it prints in the failure log), with no framing word the description lacks; for an implied
+  case the comment also gives the repo file:line that decides it and the one-line reasoning from the sentence to
+  this outcome (vet direct-deps: platform verifyFairness flagged 3 cases of one implied assertion until the reason
+  sat next to it); the test name says
   what is checked. Reword any other comment that reads as a contradicting rule (vet task 2: 5 runs blamed on the task
   became 0 with the same behaviour under test). [T5]
 - At every assertion with an unpromised part, accept the allowed set explicitly (membership, sorted compare,

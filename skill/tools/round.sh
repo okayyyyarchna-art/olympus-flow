@@ -80,7 +80,7 @@ main() {
   fi
   local audits=()
   for c in "${checks[@]}"; do case "$c" in ref-audit-*) audits=(--ref-audits);; esac; done
-  "$PY" "$OLYMPUS_TOOLS/summarize.py" "$out" "$tag" --declare "${audits[@]}" || return 2
+  "$PY" "$OLYMPUS_TOOLS/summarize.py" "$out" "$tag" --declare ${audits[@]+"${audits[@]}"} || return 2  # Bash 3.2 (macOS): an empty "${a[@]}" is unbound under set -u
   # Capacity comes from the machine profile.
   local slots="$OLYMPUS_WORK_ROOT/.round-slots" slot="" pid i
   mkdir -p "$slots"

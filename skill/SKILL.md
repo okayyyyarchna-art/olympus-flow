@@ -17,13 +17,13 @@ omission blocks hand-over.
 Read each card right before its stage; the cards are construction instructions, not reviews to run afterwards:
 | Stage | Read |
 |---|---|
-| 0 Find the repository and seam | [hunt.md](hunt.md), [problem-design.md](problem-design.md), [seam-bank.md](seam-bank.md) |
+| 0 Find the repository and seam | [hunt.md](hunt.md), [difficulty.md](difficulty.md) (with [profiles.md](profiles.md)), [problem-design.md](problem-design.md), [seam-bank.md](seam-bank.md) |
 | 0b-1 Repository init, environment | [dockerfile.md](dockerfile.md), [harness.md](harness.md) |
 | 1b Sample, Scope Gate, every paste | [platform.md](platform.md) |
-| 2-3 Description and lock | [description.md](description.md) (the only description rulebook) |
+| 2-3 Description and lock | [description.md](description.md) (the only description rulebook), [difficulty.md](difficulty.md) section 3 (spike) |
 | 4-5 Tests and reference | [prompts/apply-build-checklist.md](prompts/apply-build-checklist.md), then [build-checklist.md](build-checklist.md), then [tests.md](tests.md), [harness.md](harness.md), [solution.md](solution.md) |
 | 6-7 Proof, repair, sweeps, replicas | [gates.md](gates.md), [replicas/](replicas/) |
-| 8 Rollout results | [rollout.md](rollout.md), [platform.md](platform.md), [near-miss-release.md](near-miss-release.md) (owner decision) |
+| 8 Rollout results | [rollout.md](rollout.md), [difficulty.md](difficulty.md) section 5 (reserve), [profiles.md](profiles.md), [platform.md](platform.md), [near-miss-release.md](near-miss-release.md) (owner decision) |
 | A trigger with a known answer, or stuck, looping, unsure which fix path | [situations.md](situations.md) |
 
 Fixed rules:

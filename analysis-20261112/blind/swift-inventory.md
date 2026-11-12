@@ -1,0 +1,53 @@
+# Decision inventory: S3 If-None-Match: * (swift 6adb10d738f6)
+
+Requirement: S3 writes with `If-None-Match: *` create only when the key is absent, else 412, also in versioned
+buckets; a refused write leaves nothing behind.
+
+Baseline facts (all paths: `swift/...`):
+- s3api already lets `If-None-Match: *` through on PUT (`common/middleware/s3api/s3request.py:1569-1574`) and on
+  Complete Multipart Upload (`common/middleware/s3api/controllers/multi_upload.py:664-671`).
+- The Swift core enforces it: object server 412 when the file exists (`obj/server.py:866-869`), proxy turns any
+  backend 412 into 412 (`proxy/controllers/obj.py:727-735`, `:1958-1962`), s3api maps PUT 412 to PreconditionFailed
+  (`s3request.py:2099`). Unversioned PUT and unversioned MPU complete already work and are tested
+  (`test/functional/s3api/test_object.py:461-470`, `test/functional/s3api/test_multi_upload.py:763-791`).
+- Pipeline: s3api sits before auth, so before `copy ... slo dlo versioned_writes symlink`
+  (`etc/proxy-server.conf-sample:160`, `:643`). Every s3api subrequest copies the client environ, so it carries the
+  client's `If-None-Match` (`s3request.py:1858`).
+- In an Enabled versioned bucket a PUT is `handle_put` (`common/middleware/versioned_writes/object_versioning.py:940-941`):
+  `_copy_current` (`:567`), then the client body is written to the versions container (`:570-572`, `:381-441`), then
+  a symlink is PUT to the primary container (`:575-577`, `:443-475`).
+
+## Decisions
+
+| # | Decision | Nearest repo idiom or helper (file:line) and what it would decide | Right or wrong for the requirement (one concrete input where the two differ) | Kind | Fair route |
+|---|---|---|---|---|---|
+| 1 | Where the existence check runs for a plain (unversioned) PUT | `s3request.py:1569-1574` passes `*` on; `obj/server.py:866-869` + `proxy/controllers/obj.py:727-735` refuse with 412 before any data is stored | Right: unversioned PUT on an existing key already returns 412 and leaves nothing behind | none | `test/functional/s3api/test_object.py:461-470` |
+| 2 | Order of steps in a versioned PUT: data first or check first | `object_versioning.py:549-577` writes the client body to the versions container first; `copy_header_subset(req, put_req, non_expiry_header)` (`:414`, `:291-292`) also copies `If-None-Match: *` onto that write, but the version name is new (`:382-383`), so it always succeeds; only the later symlink PUT (`:443-475`) hits the 412 | Wrong. Versioning Enabled, key `k` exists, PUT `k` with `If-None-Match: *` and body `B`: the client gets 412 (symlink 412 -> `s3request.py:2099`) but a new version holding `B` stays in the versions container; ListObjectVersions shows one more version and `GET ?versionId=<new id>` returns `B` | K3 | Requirement: "also in versioned buckets" + "must not leave anything behind"; `_copy_current` already does the existence probe the fix needs (`object_versioning.py:510-515`) |
+| 3 | What `_copy_current` does before the refusal | `handle_put` calls `_copy_current` unconditionally (`object_versioning.py:567`); for a plain (pre-versioning) object it copies the object into the versions container (`:494-547`) | Wrong. Write `k` with versioning off, enable versioning, PUT `k` with `If-None-Match: *`: 412, but the versions container now holds a copy with a timestamp version id while the primary still holds the plain object; the version listing merges both (`:1277-1289` null entry + versions listing), so `k` appears twice | K6 | Same words; the probe result at `object_versioning.py:515` already says the key exists before any copy is made |
+| 4 | Which "exists" counts in a versioned bucket (current version vs any version; delete marker) | Object server checks only the primary container entry (`obj/server.py:859-869`); a versioned DELETE removes the primary entry and writes the marker in the versions container (`object_versioning.py:579-628`) | Right: after DELETE (marker current) the primary is a tombstone, `orig_metadata` is empty (`obj/server.py:859-861`), the PUT succeeds; a live symlink or plain object gives 412 | none | `object_versioning.py:620-622` |
+| 5 | Suspended versioning | `handle_put` passes straight through when not enabled (`object_versioning.py:562-564`) | Right: the primary holds the symlink or plain object, so the core 412 applies and nothing is written | none | `object_versioning.py:562-564` |
+| 6 | Where to put the fix: s3api object controller vs the versioning layer | A fix in `ObjectController.PUT` (`s3api/controllers/obj.py:168-200`) is the nearest S3 site, but MPU complete writes its manifest through its own PUT (`multi_upload.py:805-811`), which goes through SLO and then `handle_put` again | Wrong when fixed only in `obj.py`. Versioned bucket, key exists, Complete Multipart Upload with `If-None-Match: *`: 412 (`multi_upload.py:829-831`) but a version manifest stays in the versions container (same mechanism as #2) | K3 | Requirement says "S3 writes"; `multi_upload.py:664-671` shows MPU complete already accepts `*`; `# TODO: add support for versioning` at `multi_upload.py:806` flags the path |
+| 7 | CopyObject (PUT with `x-amz-copy-source`) with `If-None-Match: *` | `_validate_headers` does not exclude copy (`s3request.py:1569-1574`); `to_swift_req` keeps `HTTP_IF_NONE_MATCH` (`:1858`); the copy middleware builds the source GET with `req.copy_get()` (`common/middleware/copy.py:394`, `common/swob.py:1114-1124`) and `make_subrequest(... headers=req.headers)` (`copy.py:230-234`), so the source GET carries `*`; `Match.__contains__` is true for `*` (`swob.py:724-725`) -> 304 (`swob.py:1356-1358`); copy returns it (`copy.py:471-472`); 304 is not a PUT success or error code (`s3request.py:2000-2003`, `:2096-2104`) -> `InternalError` (`s3request.py:2256`). The s3api source HEAD clears it (`s3request.py:1734-1746`, `swob.py:288-290`) but the copy middleware GET does not | Wrong (by reading). Source `s` exists, destination `d` absent, CopyObject to `d` with `If-None-Match: *`: expected 200 and `d` created; the nearest code returns 500 and creates nothing. The condition belongs to the destination only | K4 | Requirement says "S3 writes"; `s3request.py:1734-1746` shows the repo's own rule that copy-source conditions are separate (`x-amz-copy-source-if-none-match`) from destination headers |
+| 8 | If the fix keeps the data-first order and deletes the orphan after the 412: what if that cleanup fails | No existing undo in `handle_put`; `_check_response_error` raises 503/412 on backend errors (`object_versioning.py:477-492`) | Depends on design. A check-first design (probe at `:510-515` before `_copy_current` and before the versions write) avoids the cleanup in the normal case; a cleanup-only design leaves the version behind when its DELETE fails or the versions container is gone (`:424-428`) | K6 | "must not leave anything behind"; not counted: needs fault injection |
+| 9 | Race: two concurrent `If-None-Match: *` PUTs on an absent key in a versioned bucket | A check-first probe (`object_versioning.py:510-515`) is read-then-write; the atomic check is only on the primary symlink PUT (`obj/server.py:866-869`) | A probe-only fix lets both pass the probe; the loser's version data stays behind after its symlink 412. Right answer keeps `If-None-Match` on the symlink PUT and removes the loser's version on 412 | K5 | Same words; not counted: not a fair deterministic input |
+| 10 | s3api-side existence probe (if the implementer probes in `obj.py` with `req.get_response(self.app, 'HEAD')`) | The probe inherits the client's `If-None-Match: *` (`s3request.py:1858`); an existing key answers 304, which is a HEAD success code (`s3request.py:1989-1993`), not 200 | Wrong if the probe tests `status == 200`: existing key -> 304 -> no refusal -> write proceeds into `handle_put` -> orphan as in #2. Absent key -> NoSuchKey (`s3request.py:2088`) | K4 | `multi_upload.py:665-666` comment ("so the headers can't bleed into the HEAD") names the bleed; counted under #2, not separately |
+| 11 | Retried Complete Multipart Upload with `If-None-Match: *` after the upload already completed | Fast path returns 200 when the key's stored S3 etag equals the new one (`multi_upload.py:765-770`), before any PUT, so the condition is never checked | Contested: literal requirement says the key exists -> 412; repo treats a retried complete as idempotent success. Not counted | K3 | Requirement wording only; no repo line decides it |
+| 12 | Refused unversioned MPU complete: should the upload (marker + segments) be removed | On 412 the upload marker and segments stay (`multi_upload.py:829-831`; marker DELETE at `:852-857` runs only on success) and existing tests expect a 412 only (`test/functional/s3api/test_multi_upload.py:783-791`) | Contested: the upload existed before the refused request, so it is arguably not "left behind" by it. Not counted | K6 | none |
+| 13 | 412 status and S3 error code | `s3request.py:2099` maps PUT 412 -> PreconditionFailed; the versioned symlink 412 reaches it unchanged (`object_versioning.py:470-475`) | Right | none | `s3request.py:2099` |
+
+## Result: GREEN
+
+Wrong-by-default decisions (counted):
+- #2 K3, `object_versioning.py:549-577` / `:414`: versioned bucket, key exists, PUT `If-None-Match: *` -> 412 but the refused body stays as a new version (visible in ListObjectVersions and `GET ?versionId=`).
+- #3 K6, `object_versioning.py:567` / `:494-547`: plain pre-versioning object, versioning enabled, PUT `If-None-Match: *` -> 412 but `_copy_current` already copied the object, so the key is listed twice.
+- #6 K3, `multi_upload.py:805-811` -> SLO -> `object_versioning.py:549`: a fix only in `s3api/controllers/obj.py` misses MPU complete; versioned bucket + existing key + Complete MPU `If-None-Match: *` -> 412 plus a leftover version manifest.
+- #7 K4, `copy.py:394` / `:230-234` + `swob.py:1356-1358` -> `s3request.py:2256`: CopyObject to an absent destination with `If-None-Match: *` -> source GET answers 304 -> 500 instead of 200 (found by reading; not run).
+
+Rated none:
+- #1 unversioned PUT: the core object server and proxy already refuse with 412 and store nothing.
+- #4 meaning of "exists" in versioned buckets: the primary-entry check gives the right answer (delete marker -> create).
+- #5 suspended versioning: pass-through, the core 412 applies.
+- #13 status/error mapping: PUT 412 -> PreconditionFailed already.
+
+Not counted (contested or not a fair deterministic input): #8 cleanup failure, #9 concurrent race, #10 probe sees 304
+(sub-trap of #2), #11 retried MPU complete fast path, #12 leftover upload after a refused unversioned complete.

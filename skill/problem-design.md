@@ -29,6 +29,7 @@ history (MAP.md).
   tests: their boundaries all hit the same blind spot (assuming a failed local write did not change storage).
 
 ## 2. The difficulty model (use it to size every task)
+The stage-0 gate that applies it is [difficulty.md](difficulty.md); per-kind rates are in [profiles.md](profiles.md).
 **Shape: 1-2 hard points, each one deep rule an oracle can check** (user rule; every accepted task on both machines
 had one: "closed once", "same as RocksDB", "412 leaves nothing", "the standby with the most changes"). Many
 independent traps stalled every time (orange-orm 80 wips, task 5 ~30, Burrow #751, goka 0/23).

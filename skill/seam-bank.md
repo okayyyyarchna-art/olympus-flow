@@ -14,6 +14,8 @@ active repo. Refill it with one Codex lane while a task is in S2-S6 (no conflict
 - novelty searches: <queries + result counts, issue/PR numbers seen>
 - offline test plan: <real objects used, what is faked at the network edge>
 - risks: <undiscoverable parts, timing needs, broad lifecycle contract>
+- decisions (difficulty.md section 1): <decision> | nearest helper file:line | right/wrong | kind K1-K6 | fair route | right answer near or far
+- calibration reserve (difficulty.md section 5): <input> -> <expected> | grounding | probe
 - score: boundaries independent (0-2) + offline real-object testability (0-2) + novelty (0-2) + size 2-4 files (0-2)
 ```
 

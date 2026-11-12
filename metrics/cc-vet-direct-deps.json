@@ -1,0 +1,124 @@
+{
+  "task": "cc-vet-direct-deps",
+  "machine": "windows-asus (DESKTOP-VPE4E3J)",
+  "repo": "https://github.com/safedep/vet",
+  "commit": "2eb6e8e0c85744411bf116d57a00eae400eff811",
+  "language": "go",
+  "category": "feature_request",
+  "platform_id": "kh7fwq8s9ckc0w22xvf339rghn8hzwqk",
+  "final_hashes": {
+    "test.patch": "d890995f680f1416",
+    "solution.patch": "4da36aa0c2e4b56c",
+    "description.md": "c02601e760e062f7",
+    "Dockerfile": "7ee6836e0b848ecd"
+  },
+  "minutes_per_stage_note": "approximate, from file timestamps 2026-11-10/11; the hunt before the base clone was not timed",
+  "minutes_per_stage": {
+    "1b_sample_and_scope_gate": 7,
+    "2_3_description_and_lock": 66,
+    "4_5_tests_reference_checklist_dockerfile": 167,
+    "7_sweep_1_and_fixes": 101,
+    "7_replica_batch_r1_and_fix_batch": 123,
+    "7_verification_batch_r2": 42,
+    "7_repair_and_v4_paste": 99,
+    "9_freeze_proof": 40
+  },
+  "total_local_hours_from_base_clone": 10.5,
+  "description_changes_after_lock": 1,
+  "pastes": [
+    "sample",
+    "Dockerfile",
+    "v1",
+    "v2",
+    "v3",
+    "v4"
+  ],
+  "review_rounds": {
+    "sweeps": 1,
+    "replica_batches": 1,
+    "verification_batches": 1,
+    "extra_rounds": 1,
+    "extra_round_note": "r3 on v4, owner-requested for a measured local score: gate PASS 3/3/3"
+  },
+  "findings": {
+    "sweep_1": [
+      {
+        "finding": "SQ Medium: RootReach rebuilt per finding (performance)",
+        "class": "existing rule not executed"
+      },
+      {
+        "finding": "AR G1 High: a direct dependency that another direct dependency needs (jest/core) accepted either way",
+        "class": "existing rule not executed (decide two readings by the text)"
+      },
+      {
+        "finding": "AR G3 cycle, G4 dashed Cargo name, G5 test/dev root has no list, G6 unknown root with a known path",
+        "class": "existing rule not executed (path and boundary inventory)"
+      },
+      {
+        "finding": "ref A: only the first finding of a package checked",
+        "class": "existing rule not executed (multiplicity)"
+      }
+    ],
+    "replica_batch_r1": [
+      {
+        "finding": "AR T4 High: other lockfile formats (yarn, pnpm, bun, uv) untested",
+        "class": "out-of-scope suggestion under today's rules (it came from the coverage-to-yes rule the owner removed on 2026-11-11)"
+      },
+      {
+        "finding": "SQ Medium: eager RootReach memory O(roots x packages)",
+        "class": "existing rule not executed"
+      },
+      {
+        "finding": "fairness 9/9 partial breadth suggestions",
+        "class": "out-of-scope suggestion under today's rules (coverage-to-yes, removed)"
+      },
+      {
+        "finding": "DQ: curly apostrophe in the locked description",
+        "class": "real, dismissed by me as a false alarm; the platform ASCII precheck failed on it (BACKLOG #114)"
+      }
+    ],
+    "verification_batch_r2": [
+      {
+        "finding": "High: introducers deduplicated by name pass when two direct dependencies share a name (verified mutant)",
+        "class": "missing rule (identity of each member of a promised list, not only membership)"
+      },
+      {
+        "finding": "Low: RootReach memory comment overstated",
+        "class": "existing rule not executed (every comment true)"
+      },
+      {
+        "finding": "DQ: curly apostrophe (again)",
+        "class": "real, dismissed by me as a false alarm; the platform ASCII precheck failed on it (BACKLOG #114)"
+      }
+    ]
+  },
+  "new_findings_after_sweep_1": {
+    "count": 3,
+    "target": "at most 2 small ones",
+    "met": false,
+    "failed_stage": "4 Tests (the same-name identity case and the formats were not in the first build)"
+  },
+  "false_alarms": 0,
+  "false_pass_escapes": "none known (no platform rollout yet)",
+  "platform_checks_first_run": {
+    "Solution Quality": "PASS 3/3, 3/3 (v4)",
+    "Task Quality": "PASS (v4)",
+    "Description Quality": "PASS",
+    "verifyFairness": "PASS 0 unfair, 8/9 yes (v4)",
+    "verifyTests": "PASS 35/35 fail on clean",
+    "verifySolution": "PASS with a false-positive offline-install warning (a yarn.lock comment)",
+    "verifyFlakiness": "PASS",
+    "Prechecks": "4/5: ASCII failed (curly apostrophe); fix pasted, re-run pending",
+    "Docker build": "FAIL first; PASS with vet 3's Dockerfile after the owner's rerun",
+    "Rebuild-safe / Harbor": "PASS"
+  },
+  "rollout": "none yet",
+  "proof": "eval/proof-final.log PROOF PASS on v4: four cells, tamper, unknown uid, six base + six reference vectors repeat; new mode 32 s",
+  "wrong_designs_caught": "20 of 20 (V01-V10, V15-V22)",
+  "valid_designs": "V11 and V13 pass; V12 (config field only the production builder sets) fails all 35: owner decision 2026-11-10, kept as a recorded risk",
+  "workflow_changes_from_this_task": [
+    "#110 coverage-to-yes removed (owner)",
+    "#113 rules D and E and the Mac fixes adopted from the other machine (owner)"
+  ],
+  "description_change_note": "owner-approved one-character ASCII fix (curly apostrophe), forced by the platform precheck; our DQ replica had flagged it every round and I dismissed it (BACKLOG #114)"
+}

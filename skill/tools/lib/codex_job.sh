@@ -62,7 +62,7 @@ Time box: finish and write your report within $box minutes; report what is NOT V
 echo "Codex job $name -> $out (time box $box min)"
 # The final answer goes to $out.final; it replaces $out only when Codex did not write a longer report there itself
 # (2026-11-05: a brief named $out as the deliverable and the short final answer overwrote the full report).
-timeout -k 60 "${box}m" "$OLYMPUS_CODEX_BIN" exec --sandbox danger-full-access --skip-git-repo-check -C "$T" "${model_args[@]}" -c model_reasoning_effort="\"$effort\"" -o "$out.final" "$prompt" \
+timeout -k 60 "${box}m" "$OLYMPUS_CODEX_BIN" exec --sandbox danger-full-access --skip-git-repo-check -C "$T" ${model_args[@]+"${model_args[@]}"} -c model_reasoning_effort="\"$effort\"" -o "$out.final" "$prompt" \
   < /dev/null > "$out.log" 2>&1
 rc=$?
 if [ -s "$out.final" ] && { [ ! -s "$out" ] || [ "$(wc -c < "$out.final")" -ge "$(wc -c < "$out")" ]; }; then cp "$out.final" "$out"; fi

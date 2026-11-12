@@ -32,6 +32,18 @@ of unreachability. No untested in-scope row may become OUT or a reserve waiver.
 | New selectors / expected base-ID and new-ID JSON paths | Fill | NOT VERIFIED |
 | uid/gid / passwd absence / PATH / HOME / cwd / mounts / network / watchdog | Fill | NOT VERIFIED |
 
+## Difficulty (difficulty.md; fill at stage 0, spike at stage 2, reserve used at stage 8)
+
+| Decision | Nearest helper (file:line) and what it decides | Right/wrong (separating input) | Kind | Fair route | Right answer near/far |
+|---|---|---|---|---|---|
+| Fill | | | | | |
+
+Inventory author (fresh reader): Fill. V-OBVIOUS: decisions it fails (needs 2): Fill. Fallback used (runner-up / widen): Fill.
+
+| Reserve probe | Input -> expected | Grounding | Probe command | Passers that fail it (stage 8) |
+|---|---|---|---|---|
+| Fill | | | | |
+
 ## Contract and meanings
 
 | ID | Exact public quote + pinned-repo grounding | Atomic effect/condition; allowed readings/results | Outside / preserve / reject distinction | Known separating input; word-reach/reader disposition | Status |

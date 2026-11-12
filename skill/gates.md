@@ -80,9 +80,7 @@ configuration for each. Mutants only break code the reference has (faust window:
 For each test record fair/unfair/uncertain, assertion, visible grounding and any valid
 design it rejects. For each obligation record covered/partial/missing with actual
 assertions and a plausible escaping wrong design for a claimed gap. No unfair test,
-unresolved uncertainty or missing in-scope coverage may close. A `partial` row is triaged, not
-closed by default: add a test only when a realistic wrong design passes or a whole stated mode is
-untested; otherwise record the reason and leave it (platform.md). These are J with D
+unresolved uncertainty or missing in-scope coverage may close. These are J with D
 probe support. Also retain the platform's distinct eight taskQuality fields: authentic
 engineering, presentation, clarity, fairness, bounded scope, nontriviality, objective
 verification and long-horizon/system-level work. `verifyFairness` and `taskQuality`
@@ -116,13 +114,6 @@ are different API checks; neither is inferred from the other's PASS.
    applicable semantic scope; D changes rederive all meaning and fresh solve evidence.
    Include fixtures, expected IDs, selectors and tool sources. Unrestricted reviews
    depend on everything they could read. Refresh final stability if its inputs changed.
-   **What refresh means after a review round (owner rule 2026-11-11):** deterministic evidence only. Re-run the
-   proof on the exact repaired bytes, the variants corpus (with each fixed finding's wrong design added as a
-   variant), and each kept finding's own witness (it fails on the wrong design and passes on the reference). Write
-   `eval/replica/repair-<tag>.json` (summarize.py docstring): the round's gate then passes on those bytes. Do NOT
-   start another full replica round (fairness, SQ, DQ, AR, verify) to re-grade a repaired finding: the platform's
-   checks on the paste are the next grade. A new full round runs only where PIPELINE.md stage 7 names one (sweep 1,
-   the replica batch, the verification batch, sweep 2 and its one verification batch), or when the owner asks.
 6. Close affected G1 -> G2 -> G3 -> G4 on exact repaired bytes. Required independent
    samples have different IDs even on identical inputs; do not reuse one as another.
    No open/stale required record at hand-over. If repair cannot satisfy locked meaning,

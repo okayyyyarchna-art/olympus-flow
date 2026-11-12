@@ -2,12 +2,15 @@ import os
 from pathlib import Path
 import shutil
 import subprocess
+import sys
 import tempfile
 import unittest
 
 
 ROOT = Path(__file__).resolve().parents[1]
 BASH = shutil.which("bash")
+# The interpreter running these tests: macOS has no bare `python`, only `python3`.
+PYTHON = Path(sys.executable).as_posix()
 
 
 class Launchers(unittest.TestCase):
@@ -22,7 +25,7 @@ class Launchers(unittest.TestCase):
         self.task.mkdir()
         (self.skill / "tools/machine.sh").write_text('''OLYMPUS_TOOLS="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 OLYMPUS_LIB="$OLYMPUS_TOOLS/lib"
-PY=python
+PY="''' + PYTHON + '''"
 OLYMPUS_WORK_ROOT="$OLYMPUS_TOOLS/work"
 OLYMPUS_REVIEW_LANES=2
 OLYMPUS_SEAMS_ROOT="$OLYMPUS_TOOLS/seams"
@@ -144,7 +147,7 @@ def slot_limit(limit, override=None):
         shutil.copy(ROOT / "tools/summarize.py", self.skill / "tools/summarize.py")
         (self.skill / "tools/replica.sh").write_text('''[ "${4:-}" != --validate-only ] || exit 0
 mkdir -p "$1/eval/replica"
-python -c 'import json,sys,pathlib; name=sys.argv[2]+"-"+sys.argv[3]+".json"; data=json.load(open(sys.argv[4])); pathlib.Path(sys.argv[1],"eval/replica",name).write_text(json.dumps(data[name]))' "$1" "$2" "$3" "$MOCK_REPORTS"
+"''' + PYTHON + '''" -c 'import json,sys,pathlib; name=sys.argv[2]+"-"+sys.argv[3]+".json"; data=json.load(open(sys.argv[4])); pathlib.Path(sys.argv[1],"eval/replica",name).write_text(json.dumps(data[name]))' "$1" "$2" "$3" "$MOCK_REPORTS"
 ''')
         result = self.run_tool("round.sh", self.task, "r1", MOCK_REPORTS=fixture.as_posix())
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
@@ -163,7 +166,7 @@ python -c 'import json,sys,pathlib; name=sys.argv[2]+"-"+sys.argv[3]+".json"; da
         shutil.copy(ROOT / "tools/summarize.py", self.skill / "tools/summarize.py")
         (self.skill / "tools/replica.sh").write_text('''[ "${4:-}" != --validate-only ] || exit 0
 mkdir -p "$1/eval/replica"
-python -c 'import json,sys,pathlib; name=sys.argv[2]+"-"+sys.argv[3]+".json"; data=json.load(open(sys.argv[4])); pathlib.Path(sys.argv[1],"eval/replica",name).write_text(json.dumps(data[name]))' "$1" "$2" "$3" "$MOCK_REPORTS"
+"''' + PYTHON + '''" -c 'import json,sys,pathlib; name=sys.argv[2]+"-"+sys.argv[3]+".json"; data=json.load(open(sys.argv[4])); pathlib.Path(sys.argv[1],"eval/replica",name).write_text(json.dumps(data[name]))' "$1" "$2" "$3" "$MOCK_REPORTS"
 ''')
         pkg = self.task / "pkg"
         pkg.mkdir(exist_ok=True)

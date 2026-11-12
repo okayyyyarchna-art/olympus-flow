@@ -40,8 +40,10 @@ high, search mode), claude2 (Opus) and the in-process lane (Agent tool, read-onl
    declines it; the README says unsupported; needs network, live services or injected timing; more than 2 hard
    points or a contract over every lifecycle event; more than 4 production files (situations.md P-1..P-7).
 5. **Score:** the lanes' rubric (0-8, the lowest lane's value when they differ) + 1 for each additional lane that
-   found it independently + 1 for a bug whose reproduction is clear in the code - 1 per design choice the
-   description would have to invent (a choice no sentence of the repo's docs or behaviour settles).
+   found it independently + 1 for a bug whose reproduction is clear in the code + 1 for each decision of a
+   difficulty.md kind (K1-K6) the lanes cite with file:line - 1 per design choice the description would have to
+   invent (a choice no sentence of the repo's docs or behaviour settles) - 1 when the nearest repo helper already
+   computes the core outcome.
 6. **Shape check (problem-design.md section 2):** 1-2 hard points (two moderate ones preferred over one extreme, as a suggestion), 3-4 stated consequences, each on a different
    subsystem pair. Two consequences on one pair collapse into one blind spot (goka 0/23; vet stacked two implied
    cases on "which checks ran" and got 0/16).
@@ -56,7 +58,9 @@ high, search mode), claude2 (Opus) and the in-process lane (Agent tool, read-onl
    - sibling paths of the same rule (other queries, modes, the pull-request base side, counts) that the reference
      must also cover (task 11 SQ FAIL x2 on an unread driver path);
    - situations.md P-1..P-7, side effects across scans (caches), and the base at the current tip;
-   - difficulty: the hard points and why a strong agent misses them, and the problem-design.md p^k sizing.
+   - difficulty: the decision inventory of difficulty.md section 1, written by a fresh reader (the planned
+     separators for the stage-2 spike); record the calibration reserve (difficulty.md section 5) in the seam bank
+     entry. Keep the runner-up verified too: it is the first fallback when the spike fails (difficulty.md section 2).
 9. **Pick** the highest verified score; ties go to the one whose consequences meet more different subsystem pairs,
    then to the smaller change. Record the top 3 in `$OLYMPUS_SEAMS_ROOT/<owner>-<repo>.md` (seam-bank.md schema) and
    give the owner a short table: pick, why, two runners-up. The owner may override; otherwise stage 1 starts.

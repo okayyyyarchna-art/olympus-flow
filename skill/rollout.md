@@ -1,7 +1,7 @@
 # Shaping the task from platform rollout results
 
-The owner runs a calibration rollout of their choice on v1 (usually 3 Orion + 3 Vega) and
-later tops up to 4+ runs per family. The builder keeps closing gaps; nothing waits for it.
+The owner runs 2 Orion + 2 Vega on the locked text at stage 3 (difficulty.md section 4); v1 adds 2 Orion + 2 Vega
++ 4 Nova, so the rollout is 4-4-4 with no repeat. Any later version is a re-eval of these stored runs, not new runs. The builder keeps closing gaps; nothing waits for it.
 The description stays locked: this file shapes tests and the reference only.
 
 Route first. Every run fails: near-miss-release.md. Too many deserved passes: prompts/calibrate-one-passer.md. The steps
@@ -14,6 +14,8 @@ Once a family has one genuine pass at 4+ runs, tell the owner before topping it 
    evalResult reasoning, and the agentBlameUnfair flag. On a Fair task or environment-blocker failure read these before
    changing anything: notes that carry no blame (vet task 2: Git shim, lint and module cache on nearly every run) are
    no reason to touch the Dockerfile, which would lose the re-eval.
+   Then, before any lever: run every calibration reserve probe (difficulty.md section 5) on every passer and record
+   the split in the ledger; add what the runs show to profiles.md section 2.
 2. Add every patch to the permanent false-pass corpus (replayed after every later fix).
    A replay runs only the delta: per patch, the scenarios whose test files changed since
    that run plus the scenario it failed (the runner stops at its first failing assertion,
@@ -56,6 +58,18 @@ Once a family has one genuine pass at 4+ runs, tell the owner before topping it 
    - Tests a judge can follow: build-checklist.md, the "second reading" row.
    - Only-failure check (a warning, not a stop): from the replay, list the runs whose only failures are contested
      tests. Give each a failure on a plainly stated case where one honestly exists, and tell the owner about the rest.
+   - **Re-eval readiness (all yes before the paste):**
+     1. every stored patch replayed on the new files (replay_plan.py), giving the exact predicted result per family;
+     2. every new test passes the fairness replica, and each assertion on an implied case carries its sentence
+        words, repo file:line and reason (build-checklist.md, the second-reading row);
+     3. every predicted new failure fails on a stated sentence or a cited repo line, so a Fair-task judge blames the
+        agent, not the task;
+     4. the FP audit has run on every predicted passer (each probe replayed on the reference too);
+     4b. one replica round on the changed files, once (never a loop): fairness and Auto Review T1-T8 when tests
+        changed, SQ when the reference changed; DQ only if the text changed (it cannot after the lock);
+     5. no single assertion carries the band (difficulty.md section 6), or the owner was told;
+     6. no Dockerfile or description change; the clean-repo proof passes on the exact files;
+     7. pass counts per family come from the view JSON, infrastructure replacements included.
    - Order for the owner: Test Quality, re-eval, Auto Review (before the re-eval it only reports no eligible runs),
      FP panel.
    - On whether a failure is blamed on the task, the per-run verdict replica outranks the Test Quality replica (vet

@@ -290,40 +290,10 @@ def gate(folder, manifest):
                 problems.append(f"{source}: unexplained AR rejection")
         elif kind == "fairness" and report["verdict"] != "PASS" and not findings(kind, report):
             problems.append(f"{source}: unexplained fairness failure")
-    repaired = repairs(Path(folder), manifest.get("checkpoint"))
-    if repaired:
-        kept = {key for key, decision in decisions.items() if decision != "DROP"}
-        whole = {source for source, ident in repaired if ident == "*"}
-        problems = [p for p in problems
-                    if not (p.split(":", 1)[0] in whole
-                            or (p.endswith(("kept in-scope findings", "verified bands must all be 3"))
-                                and kept <= repaired))]
     for key in sorted(pending):
-        if decisions.get(key) != "DROP" and key not in repaired:
+        if decisions.get(key) != "DROP":
             problems.append(f"unresolved finding [{key[0]}] {key[1]}")
     return problems, sorted(pending), warnings
-
-
-def repairs(folder, tag):
-    """Findings closed by the Repair step (gates.md) instead of another round: repair-<tag>.json lists, per kept
-    finding, the fix and the deterministic evidence on the exact repaired bytes (the finding's own witness fails on
-    the wrong design and passes on the reference, plus the proof). It holds the sha256 of pkg/test.patch and
-    pkg/solution.patch it was made on; a later change to either makes it stale and the gate fails again.
-    {"inputs": {"test.patch": sha, "solution.patch": sha},
-     "repairs": [{"source": str, "id": str or "*", "fix": str, "evidence": str}]}"""
-    path = folder / f"repair-{tag}.json"
-    if not tag or not path.exists():
-        return set()
-    record = read(path)
-    pkg = folder.parent.parent / "pkg"
-    for name in ("test.patch", "solution.patch"):
-        actual = hashlib.sha256((pkg / name).read_bytes()).hexdigest()
-        require(record.get("inputs", {}).get(name) == actual, f"{path.name} is stale: {name} changed since the repair")
-    out = set()
-    for row in rows(record, "repairs", False):
-        require(all(text(row.get(k)) for k in ("source", "id", "fix", "evidence")), f"{path.name}: incomplete repair row")
-        out.add((row["source"], row["id"]))
-    return out
 
 
 def main():
