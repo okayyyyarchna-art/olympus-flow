@@ -1,4 +1,8 @@
-# Gap sweep brief (S5, one round, every lane in parallel; user rule 2026-11-06)
+# Gap sweep brief (every lane in parallel; user rule 2026-11-06)
+
+When this runs (PIPELINE.md Review schedule): not in the regular flow. The regular flow closes gaps by execution
+(tq-once.md, sq-once.md, the fast check) and one replica round; a sweep is launched only at the owner's request, for a
+platform finding the repair loop cannot place. Every lane carries a 40-minute time box and writes its report at the box.
 
 You are one of several independent reviewers running at the same time. The goal of this round is to find EVERY gap
 at once, not the most important one: a later round that finds one more gap is a failure of this round.

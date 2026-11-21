@@ -41,3 +41,30 @@
 "Upstream also does it", "rare", "not observed by today's tests", or "another judge
 passed it" cannot waive a defect inside the promise. A speculative claim still needs
 a grounded failing scenario; record NOT VERIFIED until investigated, not a new feature.
+
+## Hard rules (from vet task 6)
+
+- The site's SQ executes inputs: blocking means a wrong output on an executed input or a slowdown on the normal path.
+  Design / Clutter / Practice notes are fixed when free, else declined with a written reason the next round copies.
+- List every decision point of the patch with the hidden test that fails when only it changes (tq-once.md). A
+  constant at a real limit names its source and matches the platform the grader runs (Linux: 40 links, PATH_MAX 4096).
+- Sibling forms that the tool or format defines are inside a universal word: Terraform builds its lock from *.tf and
+  *.tf.json; npm lockfiles come in versions 1, 2 and 3; a build tool that uses one of two files.
+- A second pass over the same input repeats no side effect of the first (diagnostics, counts, recorded fields).
+- Shared code paths: run the same input outside the described mode; change that output only if the description asks
+  (scope growth is an SQ risk).
+- One logic in one place (vet 6 SQ note: the npm entry canonical form was written twice).
+- Unit tests added in solution.patch are not graded; keep them compiling, count only hidden tests as coverage.
+- Reference scope = test scope: a behaviour the reference implements that no hidden test checks is tested (if a
+  sentence states it) or removed (vet 6: an untested deleted-link reader carried a cache bug and a hang finding).
+- Before changing an unexported type, field or signature, grep the upstream `*_test.go` (or the language's test
+  files) of the package: a white-box upstream test pins it for every solver (vet 6: the engine package stopped
+  compiling). A question about the base is answered with a model of the base, never with head state that the change
+  may have edited; add a test where the change edits the very state a fallback would read.
+- For every write the solution removes or makes conditional (a file, a map entry, a temp-tree entry), grep its
+  readers (Stat, Open, ReadDir, lookups) in every package and keep one executed case per reader (vet 6 platform SQ:
+  an extractor in another package relied on a link text the solution stopped writing).
+- Before promising a "one-line change" to the owner, grep the repository's own tests at the site and at every
+  consumer of the changed value, and run a one-minute targeted check (the new test plus the touched packages' tests).
+- Walk [sq-once.md](sq-once.md) before buying Solution Quality; mirror an existing mechanism by consuming its
+  decisions, not by re-running its rules on other input (count-, order- and state-dependent rules diverge).

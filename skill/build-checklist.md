@@ -1,13 +1,15 @@
-# Build checklist (S2 reference + S3 tests): write it right the first time
+# Build checklist (stages 4-5: tests and reference): write it right the first time
 
 This is HOW test.patch (tests + test.sh) and solution.patch are written, not a review after writing. **Start with
 [prompts/apply-build-checklist.md](prompts/apply-build-checklist.md): every rule below gets its own row, and a condensed
 plan never replaces it.** Walk the eight
 steps in order. Steps 1-5 are planning written into one ledger (the task's ledger.md) before code; steps 6-8 build,
-prove and review against it. Goal: the first draft passes Auto Review (T1-T8, S1-S4), Task Quality (fairness,
-coverage), Solution Quality (comprehensiveness, code quality), the false-pass (FP) panel, the verify checks and the
-rollouts, so the review sweep finds what is left instead of rebuilding the coverage. It does not guarantee bands or a
-sweep count; it removes the misses we already know.
+prove and review against it. Goal: the first draft passes the platform's checks on their first paid run (Test
+Quality: no wrong solution passes every test and no correct one fails; Solution Quality: no wrong output on an
+executed input and no normal-path slowdown; Verify Tests/Solution/Flakiness; Reward Hacking; Category Alignment; Task
+Prompt Quality), the false-pass audits and the rollout criteria, so the one replica round of stage 7 finds little
+instead of rebuilding the coverage. It removes the misses we already know; the executed closure (tq-once.md,
+sq-once.md, `tools/fastcheck.sh`) is the proof.
 
 Shortcuts that cost a task (vet task 2), at every stage: a named artifact is filled in full, never a condensed note; a
 check reads the exact bytes it certifies; no claim about a result you have not read; gates run in the stated order, even
@@ -19,7 +21,7 @@ docker proxy); Codex's own platform-CLI study (vet eval/checklist-cx.md, C01-C31
 eval/checklist-review-astra.md, M1-M6, R1-R8); vet eval/checklist-evidence-platform.md (rows A-E) and
 eval/checklist-evidence-accepted.md; the vet platform phase (wip02 rollout of 16 runs, wip03 re-eval, platform SQ/AR
 notes, FP panel notes; eval/decisions.md); the gap study of the 9 accepted packages after 2026-10-12
-(olympus-product eval/checklist-gaps/oss70.md P1-P15, codex.md 1-8); vet task 2 (rollout 1 replay). Rule
+(olympus-product eval/checklist-gaps/oss70.md P1-P15, the Codex items 1-8 of the same study); vet task 2 (rollout 1 replay). Rule
 definitions: the platform rubric (section 9).
 
 ## The ledger (the task's ledger.md, copied from ledger-template.md): one file, each row linked to its contract row
@@ -36,6 +38,13 @@ definitions: the platform rubric (section 9).
   interface: `./test.sh base|new --output_path`, offline, an arbitrary uid without a passwd entry, cleared HOME/env.
 - Run the repo's base suite once on the pinned commit: note slow, flaky, network and internal-call tests (C4).
 - Read profile.json (language, runner, JUnit, test/production paths) from repo init.
+- Record the three sources every platform reviewer judges by, and cite one of them in every COVERED or OUT decision
+  below: the locked text read literally; the behaviour before the change on that input (the base code and the upstream
+  test that pinned it); a contract the repository documents (a comment, an upstream test, the sibling mechanism the new
+  code mirrors). A hang on an input where the base finished is always a defect (#182). [TQ, SQ, FP]
+- Record the stage-0 length design and test-grid budget (problem-design.md sections 2 and 7) and the length spike
+  result from the lock report: the budget caps the decision points and the universal-word cells the tests must
+  cover, and no row below may widen the seam to add length. [TQ]
 
 ## 2. Atomic obligations and scope (ledger: Contract)
 - Split every behavioral sentence into atomic obligations: each verb, subject or kind, condition, quantifier and
@@ -54,6 +63,15 @@ definitions: the platform rubric (section 9).
 - Status per row: COVERED (a test asserts it), OUT (an exact exclusion sentence, or a demonstrated unreachable case),
   OPEN (in scope, not yet covered: blocks completion), NOT VERIFIED (a hypothesis with the probe it needs) (R2). An
   in-scope obligation never becomes "not tested".
+- Split every sentence on its triggers (every / any / each / all, lists, "X or Y", "with or without", "added or
+  modified"): a list of N needs N rows plus one off the list; a universal word needs an input nobody would hard-code;
+  the sibling forms a tool or format defines inside one word are rows of their own (Terraform builds its lock from
+  *.tf and *.tf.json; npm lockfile versions 1, 2 and 3; a build tool that uses one of two files) (tq-once.md list 3;
+  vet 6 platform blocking items). [T4, TQ, S1]
+- One row per existing behaviour at each site the patch touches (the data, diagnostics and counts the code already
+  produces there) with a keeping test, cited as "behaviour before the change" at file:line; a second pass over the same
+  input (a pre-walk, a second parse) repeats no side effect of the first (vet 6: a quiet second walk printed an
+  unreadable-path warning "(4 times)" and passed every test; platform blocking) (#199). [T4, S1, SQ]
 - Nothing the reference's own new docs say becomes a requirement: solvers never see them (vet directory order). [T5]
 
 ## 3. Paths, transitions and faults (ledger: Paths; one inventory used by the reference AND the tests)
@@ -66,14 +84,8 @@ For each obligation, list every materially different value; the reference handle
 2. **Stores and formats**: every store and serialized form read or written, including older shapes the repo still
    reads and optional fields older versions omit (vet: last, .db, JSON, JSONL, older report). Write through the live
    path, save, reload through that form's real reader, assert the same contract (C04). [T4, S1]
-   **Round trip, every persisted value (owner 2026-11-13: hidden tests must cover round tripping more).** For each
-   value the feature writes or changes, the Blueprint holds a cell for each of: (a) live -> save -> reload through
-   every real reader and every command that reads the saved form (report show, policy on a saved scan, resume),
-   asserted through that command's output, not the struct; (b) the not-set / empty state survives the round trip as
-   not-set (absent stays absent, empty stays empty); (c) reload -> continue or resume -> save again -> reload keeps
-   the value and its not-set cases; (d) a file of the older shape without the field reads as not-set, never as an
-   error or a zero value; (e) the reloaded value is used, not recomputed (change the inputs it was computed from
-   before the reload where the repo allows it). OUT only with an exact sentence or an unreachable file:line. [T4, S1]
+   The full round-trip cell set (not-set states, resume -> save -> reload, older files, reloaded vs recomputed) is a
+   calibration lever, not a build rule (owner 2026-11-16): prompts/calibrate-one-passer.md Lever L.
    Duplicates inside one file count too: how the parser merges two entries of one key decides the result (vet
    task 2: a yarn.lock with a vendored and a registry entry of one version kept only the first). Test both entry
    orders: one order passes a "first wins" and a "last wins" merge alike (vet task 2 sweep 2). [S1, T3]
@@ -102,23 +114,39 @@ For each obligation, list every materially different value; the reference handle
    (C12). [S1, T4] Per stage, inject the dependency's own error, a foreign exception type, a refusal, and a
    cancellation of the caller apart from a cancellation of the underlying work, one knob per stage. When a batch
    fails or is cancelled midway, grade which items completed and which did not, item by item (P9, codex 3). [S1, T4]
+6. **Mirrored mechanisms (K7)**: when the new code must agree with an existing walk, reader, limit or comparison,
+   consume that mechanism's decisions where possible; re-running its rules on other input (another tree, another order)
+   is a second implementation whose count-, order- or state-dependent rules diverge (vet 6: a base walk with its own
+   link budget reported folders the head read as REMOVED; 4 of 6 Orion runs built the same mirror). Diff the rules of
+   the new code against the code it mirrors line by line: every rule of the old code is an obligation, also one the
+   reference forgot. Plan one test that changes the input of the rule and one whose order differs (#184, fairness
+   G8). [S1, T3]
+7. **Open input spaces and OS limits**: for a sentence over links, outputs or "every X the tool knows", the boundary
+   the text names (description.md R12) decides the rows; inside it, the state matrix per item kind (added, kept,
+   edited, removed, moved, renamed, type change) and the sameness the repository already uses (CRLF, links, canonical
+   text); a constant at a real limit matches the platform the grader runs (Linux: 40 links, PATH_MAX 4096) and the
+   tests gate such cases on the OS (#195, #202). [S1, T4]
+8. **Normal-path cost and scope growth**: list every per-item step the reference adds on a path that does not need the
+   feature (the full scan, the other modes); time base against reference at 1x and 2x input, best of 3, alone on the
+   slot: superlinear growth or more than about 5% added time is a defect (platform SQ blocked on a full scan 1.34x
+   slower at 4000 entries). Run the same input outside the described mode: a changed output there needs a sentence
+   (#176, #202). [SQ, S3]
+9. **Removed or conditional writes**: for every write the reference removes or makes conditional (a file, a map entry,
+   a temp-tree entry), grep its readers in every package (Stat, Open, ReadDir, lookups) and keep one executed case per
+   reader (vet 6 platform SQ: an extractor in another package relied on a link text the reference stopped writing)
+   (#203). [S1, SQ]
 
 ## 4. Discriminators and valid alternatives (ledger: Discriminators)
 - For each obligation, name every distinct plausible wrong-rule class and every materially different valid
   alternative that could challenge a pin; counts are observations, not gates (R3). Typical classes: collapse any/all,
   wrong key, overwrite instead of accumulate, one path only, special-case the tested instance, delete-all, skip on any
   failure, header/metadata-only, first-only, presence instead of effect. [FP, T3]
-- **Edge-case matrix, every obligation (owner 2026-11-13: more edge cases, more behavioural tests).** Built at stage 4
-  from the ledger, never added by a review round (PIPELINE.md "Review schedule"; a breadth suggestion from a
-  reviewer is triaged at its scheduled point). For each obligation the Blueprint carries a cell, TESTED or OUT/SAME
-  with its reason, for every axis below that can vary: boundary on each side; empty, none and nothing-to-do;
-  multiplicity with different answers in both orders and the wrong item sorting first; the same entity under two
-  names; each exception's neighbour states (unknown, missing, failed, partial, older); the repeated trigger; kept
-  results by value; every row of the difficulty.md inventory and reserve that the text covers. Parametrized cases
-  keep the function count inside the size guide (problem-design.md section 6).
-- **Behavioural first:** every obligation has at least one test through its public entry point (the CLI command or
-  public API a user runs), asserting the user-visible output; package-level tests may add cases but never replace
-  it. [T4, T7]
+- **Not brittle (owner 2026-11-15: required):** assert outcomes a user can see (results, counts, saved files, exit
+  status, rendered report), never private names, struct fields, call order, exact log or error wording, map order or
+  the file or function a fix must touch, unless a sentence or the repo's public contract states it. A test that fails
+  a correct alternative design is a broken test: repair it before any other finding. The edge-case matrix and the
+  extra behavioural cells through each public entry point are calibration levers (owner 2026-11-16):
+  prompts/calibrate-one-passer.md Lever K. [T4, T7, T5]
 - Give each class the smallest differing input, drawn from these axes:
   - **Multiplicity**: two of a kind sharing scope, never one per scope: two items per topic/partition/file, two rules
     each winning a different item, one rule winning then losing, exact duplicates, two instances of every exemption
@@ -159,12 +187,35 @@ For each obligation, list every materially different value; the reference handle
 - Assert that the scenario really happened before asserting the outcome: every all/any/filtered assertion also
   asserts a non-empty exact count, a case picked from live state asserts it was found, a setup helper fails when its
   own precondition did not happen (P7, codex 1; an AR High on an `all()` over an empty list). [T3]
+- Every task executes at least one materially different fair design besides the reference, passing both modes
+  (owner 2026-11-15: a task never has only one solution; seed it from the seam's second design, problem-design.md
+  section 7 step 3b), and every wrong-rule variant fails.
 - Valid alternatives are executed, not only listed: every fix design a reviewer, judge or sweep offers as valid becomes
   a valid-design variant that must pass before its finding closes, and every task runs the standard variant "adds a
   config field that only the production builder sets" (vet task 3: a rollout run did exactly that, the hidden helper
   built the config by hand, and the run was blamed on the task). An exact count needs a sentence that says once or
   exactly; otherwise assert presence (vet task 3: a sweep proposed an exact-count pin and, in the same report, a fix
   that fails it). [T5, FP]
+- **Decision rows (tq-once.md list 1)**: one row per decision point of the planned reference (each if / else / case
+  arm, each term of a compound condition, each list member, default, cap, constant, cast, early return, special case)
+  with the test that fails when only that row changes, and a kept scripted wrong version per row
+  (eval/wrong/kept/<name>.py: EDITS, KIND wrong / control / held, EXPECT leaves; `tools/wrong_versions.py` runs them
+  on every final suite). A wrong version for a design that differs in structure from the reference changes the
+  structure, with a same-structure control that isolates the one decision (#200, #218). [T3, TQ]
+- **Field lists**: for every function that compares or copies a list of fields, one wrong version per field (vet 6: a
+  saved-report comparison of 12 fields had tests for the 5 upstream already had; platform blocking) (#206). [T3, TQ]
+- **Absent, several, merged**: each compared or copied field absent on one side, removed, added, empty; two and three
+  items with one key in both orders (a later item must not decide when an earlier one already does, and the reverse);
+  for every merge or override, every result field and which input it must come from (vet 6 platform blocking items:
+  no test removed an integrity hash; "first copy wins" aggregations) (fairness G1-G3). [T3, TQ]
+- **Equivalence by execution only**: a passing variant is EQUIVALENT only after an executed search for a
+  distinguishing input finds none; "defensive" is not a class; a loop guard, a visited set or a limit is never closed by
+  reasoning; a parked variant ("check later", "only the full scan") is open (vet 6: two parked variants became
+  platform blockers) (#181, #182, #199). [FP, TQ]
+- **Values every reader tells apart**: never pin a value common readers of the format cannot distinguish (JSON
+  integers above 2^53: npm and Go's default decoder read one value), a field the description does not name, or a
+  behaviour only a solution review asked for; keep the correct code an unfair finding rejected as a control (#199,
+  fairness G15). [T5, T7]
 
 ## 5. Fixtures, harness and result contracts (ledger: Fixtures and harness)
 - Run the real code end to end; stub only the outermost external system, with the repo's own stub where it has one.
@@ -203,6 +254,23 @@ For each obligation, list every materially different value; the reference handle
   `proof.py --tamper` on one pinned data file and one pinned helper. [T1]
 - Hidden tests compile at the base commit (exported API only, or added in new mode in the scratch copy), so base fails
   each id for its behaviour, not as one build failure (P14, codex 8). [T8, verify]
+- T1 is per leaf and no new test skips: every new leaf fails on the clean base on its own (loop axis members inside
+  one leaf; a scenario that would pass on base joins a leaf led by one that fails there; re-run the base check after
+  every test edit); a user-dependent input (chmod) compares with an oracle (as root both sides 0, as uid 1000 both N)
+  behind a non-root presence guard; a leaf with several scenarios names each in its assertion messages (vet 6: 15
+  leaves passed on base after a split into subtests; a skipped leaf counts as passing) (#202, #206). [T1, T8]
+- test.sh follows the platform's interface and base-mode rules: an optional `--output_path F`, an optional `--mode`,
+  and the mode word base or new, in any order, default base, the runner's text output (`--- PASS:` lines for Go) next
+  to the JUnit file; base mode runs only tests
+  the pinned commit has; restores with `tar -x --no-overwrite-dir` and leaves restored files writable; pins every
+  test-only helper package of a base-mode package; runs every package with tests that imports changed code or lists
+  it with a reason; puts wall-clock-bounded and root-skipping upstream tests on the skip allowlist with the reason
+  (`tools/tests_lint.py <pkg> <base>`, `tools/precheck.py <pkg>` before every paste) (#158, #159, #172, #174, #197,
+  #213, #222). [T1, T6, verify]
+- The two-user order of verifySolution is run before every paste: root baseline in base mode, then the solution
+  applied by uid 1000 in /app, new and base as that user, and the five sets empty (baseline failures, new not
+  passing, new also in baseline, after extras not skipped, pass-to-pass not passing after:
+  `tools/fastcheck.sh`, `proof.py --root-base --two-user --plain-new`, `tools/junit_sets.py`) (#172, #174). [verify]
 - A base test that pins an internal call or the old behaviour: rewrite or loosen it in place into a behaviour
   assertion, with a comment naming the hidden test that now covers it; deselect only when that fails, exactly, with a
   reason, and with a hidden test on the same input (P6). Run the base suite against the reference AND each valid
@@ -230,7 +298,7 @@ For each obligation, list every materially different value; the reference handle
   Bounded watchdogs that end a hung test with a real diagnostic are fine (R7). A gate releases a held step only if it
   has not finished, then only the end state is asserted, so waiting and non-waiting designs both pass; "no matter how
   long" is proven by jumping the controlled clock (monotonic and wall together) far ahead (P8, codex 7). Clean new run
-  < 300 s; test.sh timeout under the platform kill, or a hung run leaves no partial report (C8). [T2, verify]
+  under 6 minutes (target under 300 s); test.sh timeout under the platform kill, or a hung run leaves no partial report (C8). [T2, verify]
 - Go 1.25+: a test of a shutdown or late-answer path runs the whole harness inside `synctest.Test`. `synctest.Wait()`
   is the idle event (every other goroutine in the bubble durably blocked); it does not advance the clock. A late answer
   is `synctest.Wait(); time.Sleep(30*time.Second); synctest.Wait()` on the fake clock; guard deadlocks with a fake
@@ -310,6 +378,17 @@ Reference:
    test, REVIEW.md rule 4; rule 8 asks a user guarantee to bring an acceptance script and a catalog row). When those
    rules ask for it, the reference carries its own regression test in the repo's style, in files the hidden tests do
    not touch; 8 of 9 accepted packages without such a rule had none. [SQ, S2]
+9. Reference scope = test scope: before the proof, list every behaviour the reference implements that no hidden test
+   checks; test it when a sentence states it, otherwise remove it (vet 6: an untested deleted-link reader carried a
+   cache bug and a hang finding; the platform can flag untested behaviour and the code carries its own bugs). [S1, S3]
+10. Before changing an unexported type, field or function signature, grep the upstream test files of the package: a
+   white-box upstream test pins it for every solver (vet 6: the engine package stopped compiling under test.sh). A
+   question about the base is answered with a model of the base, never with head state the change may edit; add a
+   test where the change edits the very state a fallback would read. [S2, T1]
+11. For every write the reference removes or makes conditional (a file, a map entry, a temp-tree entry), list its
+   readers in every package (Stat, Open, ReadDir, lookups) and keep one executed case per reader (vet 6 platform SQ:
+   an extractor in another package relied on a link text the reference stopped writing). For every function that
+   compares or copies a list of fields, one kept wrong version per field (tq-once.md). [S1, SQ]
 
 ## 7. Export and prove (ledger: Evidence)
 - Export the patches from explicit paths; check the file list, modes (`test.sh` 100755), applicability in grading
@@ -320,6 +399,15 @@ Reference:
   expected id, base-mode on the reference PASS, new-mode on the reference PASS, with exit codes, parseable JUnit,
   exact ids and real failure output; no skips or unexplained missing/extra ids. Then every failure branch of the
   harness table separately (M3). [T1, T8, verify]
+- The fast check (`tools/fastcheck.sh`) runs the cells with T1 per leaf, the platform's two-user order (root baseline,
+  the solution applied as uid 1000, new and base as that user) with the JUnit set check of verifySolution, every kept
+  wrong version (`tools/wrong_versions.py`), lint, and the clean-repository run; its baseline snapshot is reused while
+  test.sh is byte-identical. Base mode runs only tests the pinned commit has (a runner the reference adds is filtered
+  by the pinned file list), else "after extras not skipped" fails the platform check (vet 6 fx7). [verify]
+- The mutant sweep (`tools/mutants.py`, one pass with and one without the coverage filter) over the reference's changed
+  lines: every survivor is triaged by execution (a test, or a recorded reason with the three sources checked);
+  "defensive" and "equivalent by reasoning" are not closures; a parked survivor is open (vet 6: a parked guard became a
+  site blocker). [TQ, FP]
 - Run the wrong-rule variants and the valid alternatives. For each, record the exact diff and its state: APPLIED,
   RESTORED AWAY (the restore step removed it), DID NOT APPLY, EXECUTED; only an executed variant with its intended
   diagnostic counts. Rebuild compiled twins from the candidate source and check which binary/module was loaded (M4).
@@ -343,12 +431,16 @@ Reference:
   this reason, while local auditors that skipped the step were stricter than the platform. [FP]
 - On any edit, mark dependent evidence stale and re-run the affected proof after the repair batch; never treat an old
   PASS or a summary label as current proof (M5).
+- A test cell removed for a rollout (a near miss fails only it) lists the code path it leaves untested; a replacement
+  case the near miss passes and the natural wrong design fails goes in its place, or the owner sees the hole before
+  the paste (near-miss-release.md rules 8-9; vet 6: a removed cell came back as a platform Test Quality blocker). [TQ]
 - After each task, classify every reproduced finding: missing rule, existing rule not executed, unclear wording,
   harness defect, or out-of-scope suggestion; amend or merge the existing rule instead of appending a duplicate; track
   later findings, false alarms and effort per task. The sweep count is decided from that data with the user, not
   from a fixed threshold (R8).
 
-## 9. Rule map (platform rubric, verbatim 2026-10-04)
+## 9. Rule map (the Auto Review rubric of 2026-10-04, still the local structure rubric; the platform's blocking checks
+since 2026-11 are the last four rows)
 | Rule | Rubric text (short) | Secured in |
 |---|---|---|
 | T1 | 100% fail at the base commit, 100% pass after the solution | 2 (keep-behaviour coupling), 5 (restore, deselects), 7 (four cells) |
@@ -363,15 +455,21 @@ Reference:
 | S2 | no regressions, existing patterns | 5 (base mode), 6 (reference 1) |
 | S3 | no irrelevant changes | 6 (reference 1, 6) |
 | S4 | no AI-generated artifacts | 6 (reference 4, 7) |
-| TQ (fairness, coverage) | per-test fairness, requirement coverage | 2, 4, 6 (tests) |
-| SQ (comprehensiveness, code quality) | | 3, 6 (reference) |
-| FP panel | a pass that misses a stated requirement | 4, 7 (variants, dispositions), 8 |
-| Verify | tests fail without / pass with, stable, offline uid | 5, 7 |
+| Test Quality (verifyFairness, 2026-11) | blocking: a realistic wrong solution passes every test and is wrong by the description, the behaviour before the change or a documented contract; or a correct solution fails a test | 1 (three sources), 2 (triggers, existing behaviour), 4 (decision rows, field lists, absent/several/merged, equivalence by execution, values readers tell apart), 7 (kept wrong versions, mutants), tq-once.md |
+| Solution Quality (2026-11) | blocking: a wrong output on an executed input, or a measured slowdown on the normal path; Design / Clutter / Practice notes repeat until fixed or declined in writing | 3 (mirrors, open input spaces, normal-path cost, removed writes), 6 (reference 1-11), sq-once.md |
+| Verify Tests / Solution / Flakiness | tests fail without and pass with the solution; root baseline then uid 1000 apply with the five sets empty; stable over about 12 runs; offline uid | 5 (per-leaf T1, the platform interface, the two-user order, skip allowlist), 7 (fast check) |
+| False-pass audit, per-run evaluator | a pass that misses a stated requirement; probes replayed on the reference; three columns (sentence, behaviour before the change, origin of the reference rule) | 4, 7 (variants, dispositions), 8 |
 
 ## 10. Never (unfair or wasteful)
 Pin helper names, call counts, internal maps or file counts (never GRADE an internal; a harness wait or setup hook
-on repo-visible state is acceptable, rated "repo-discoverable" on 4 accepted packages); turn a surviving variant into a finding without a
+on repo-visible state is acceptable, rated "repo-discoverable" on 4 accepted packages); turn a variant that still passes into a finding without a
 concrete failing scenario; pin behaviour only the reference's own docs state; force a race winner or error precedence
 the text does not state; grade unstated sizes, budgets or performance; build the full cross product of the axes (one
 case per distinct entry, form and guard, plus the interactions that expose a plausible wrong rule); copy another
 task's harness exclusions or fallbacks verbatim (port the intent, prove it here).
+Also never (vet task 6, owner 2026-11-20): call an unexported function or build an internal state that a real run
+never produces; use a name, field or type that only the reference adds; skip a new test; pin a value that common
+readers of the format do not tell apart; assert a field the description does not name; test a behaviour only because a
+solution review asked for it; split a leaf into parts that pass on base. The hard rules are in tests.md (fair, aligned
+with the prompt both ways, behavioural, no API-based tests, public behaviour only) and solution.md; walk tq-once.md
+before buying Test Quality.

@@ -1,0 +1,46 @@
+FROM public.ecr.aws/d3j8x8q7/olympus-base-go:latest
+
+# go.mod needs Go 1.27.3 and the base image has Go 1.26 (GOTOOLCHAIN=local). Install the
+# Go 1.27.3 release archive in its place, checked against its published SHA-256, so every
+# go command uses 1.27.3 and nothing downloads a toolchain later.
+RUN curl -fsSL -o /tmp/go.tgz https://dl.google.com/go/go1.27.3.linux-amd64.tar.gz \
+    && echo "65efbc80fdc1fa2cd2631cad5b481777a68e8725f34e89f50fc6ac714e379b40  /tmp/go.tgz" | sha256sum -c - \
+    && rm -rf /usr/local/go \
+    && tar -C /usr/local -xzf /tmp/go.tgz \
+    && rm /tmp/go.tgz \
+    && go version
+
+# The repository's CI lints with golangci-lint v2.14.0 (.github/workflows/golangci-lint.yml) and the base
+# image has no linter. Install that release, checked against its published SHA-256, so make check can run.
+RUN curl -fsSL -o /tmp/golangci-lint.tgz https://github.com/golangci/golangci-lint/releases/download/v2.14.0/golangci-lint-2.14.0-linux-amd64.tar.gz \
+    && echo "ab90aeb7b066f92a33415b638a50fe5344bbb75a0d32ad30cc248d88f81032ab  /tmp/golangci-lint.tgz" | sha256sum -c - \
+    && tar -xzf /tmp/golangci-lint.tgz -C /tmp \
+    && install -m 755 /tmp/golangci-lint-2.14.0-linux-amd64/golangci-lint /usr/local/bin/golangci-lint \
+    && rm -rf /tmp/golangci-lint.tgz /tmp/golangci-lint-2.14.0-linux-amd64 \
+    && golangci-lint version
+
+# git-upload-pack and git-receive-pack are symlinks to /usr/bin/git and stop working when git is run through a
+# wrapper script. The repository's git source tests need them, so call git's own binary directly.
+RUN printf '#!/bin/sh\nexec /usr/lib/git-core/git upload-pack "$@"\n' > /usr/local/bin/git-upload-pack \
+    && printf '#!/bin/sh\nexec /usr/lib/git-core/git receive-pack "$@"\n' > /usr/local/bin/git-receive-pack \
+    && chmod 755 /usr/local/bin/git-upload-pack /usr/local/bin/git-receive-pack
+
+WORKDIR /app
+
+COPY . .
+
+ENV GOWORK=off
+ENV GOCACHE=/tmp/gocache
+ENV GOTMPDIR=/tmp
+
+RUN go mod download \
+    && go build ./... \
+    && go list -deps -test ./... > /dev/null
+
+RUN mkdir -p /tmp/gocache \
+    && chmod -R a+rwX /app /tmp/gocache \
+    && chmod -R a+rX /opt/go \
+    && chmod -R a+rwX /opt/go/pkg/mod/cache \
+    && git config --system --add safe.directory /app
+
+CMD ["/bin/bash"]

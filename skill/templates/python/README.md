@@ -3,7 +3,7 @@
 Recipe origin: platform-accepted Faust task 12, `cc-faust-topic-start/wip15`,
 faust-streaming/faust at `ca53750fdea332cdf5ac7088afc525691556c167`.
 `recipe.json` preserves its exact dependency-install block and affected regression
-selectors. Accepted status belongs to the original package; see `BUILD-2-report.md`
+selectors. Accepted status belongs to the original package; see `history/build-logs-202611/BUILD-2-report.md` in the product repo
 for the generated adapter's separate local results.
 
 Use the same commands as the Go README, with `{"recipe":"faust-task12-wip15"}`
@@ -11,8 +11,23 @@ in explicit settings for the exact repository/pin. This recipe asserts Python
 3.12.13, the locally inspected platform-base runtime. The pin's >=3.10 constraint
 is not itself an exact interpreter pin. A different base runtime fails the build.
 
-The template markers are `platform`, `toolchain_version`, `dependency_install`,
-`development_install`, `build_environment`, `profile_b64`. For a different
+The template markers are `toolchain_version`, `dependency_install`,
+`development_install`, `build_environment` (Dockerfile) and `profile_json`
+(test.sh: a readable, indented JSON object; the template no longer reads the
+older `profile_b64` marker). The rendered profile uses the neutral names
+`overlay_paths` and `base_overlay_paths` for the overlaid test files
+(repo_init's profile.json keeps `hidden_paths`/`base_hidden_paths`),
+`restore_paths`/`helpers` for the pinned files, and `keep_tracked` for tracked
+files that a generated-output pattern (*.pyc, build/, __pycache__/, ...) would
+otherwise drop from the copy; `precheck.py pkg` fails on any
+process word in test.sh (grading, hidden paths, pristine, solver) with the line.
+The Dockerfile starts with the bare `FROM public.ecr.aws/d3j8x8q7/olympus-base:latest`
+(the platform's allowed list has no python-specific image any more and rejects
+`--platform=`) and ends with `chmod -R a+rwX /app` (the Harbor oracle applies
+solution.patch in /app as uid 1000). test.sh accepts
+`[--output_path <junit.xml>] [--mode] <base|new>` in any order, mode default
+base, output path optional (a scratch path is printed), exit 2 on a malformed
+argument; it prints pytest's normal text. For a different
 repository, supply its own
 exact dependency/test/development pins and setup commands; the Faust dependency
 recipe is guarded by URL and commit and is never silently reused elsewhere.

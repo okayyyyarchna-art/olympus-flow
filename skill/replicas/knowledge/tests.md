@@ -150,13 +150,13 @@ Do not collapse this eight-row task-level check into per-test fairness. Historic
 - examples: latest concurrency AR found JSON object properties/nested objects but no JSON array elements; T4 Medium and band 2. [digest/kh75aj75cn-concurrency-strategies-act-on-the-whole-cx.md:322-336] Latest suggestions also identify descendant depth and larger table/topology counts as `single_point`. [digest/kh75aj75cn-concurrency-strategies-act-on-the-whole-cx.md:417-418; digest/kh7dvvpbmr-when-a-worker-dies-its-partitions-and-st-cx.md:109-110]
 - count: six latest `single_point` suggestions; one current AR Medium issue.
 
-### TC-09 Partial/no coverage is advisory unless a wrong implementation is proven
-- check / rule / site severity: verifyFairness coverage yes/partial/no; AR may raise to T3/T4
-- trigger (generalized, no task names): A requirement is only partly exercised, is an exclusion rather than executable behavior, or would require pinning an unstated interpretation.
-- how to detect locally: Record `covered` separately from fairness. For `no`, distinguish an executable positive requirement from an exclusion/permission. raise only with a grounded wrong implementation and load-bearing test.
-- what the site accepted instead (the PASS side): Overall fairness PASS can coexist with partial/no coverage and suggestions. If the missing boundary needs a prompt edit, do not add the test first.
-- examples: at-least-once redelivery is `no` and suggested as `untested`; XOR against a lagging worker-local view is `partial`. [digest/kh70yqhmm2-settable-members-go-missing-or-come-back-cx.md:263-321] The current stream suite says replaying the exact raising message “Would need prompt edit,” so the boundary remains unspecified. [digest/kh70afkwq3-streams-that-start-or-stop-while-the-wor-cx.md:145-146]
-- count: 23 partial, three no, 20 suggestions; one suggestion explicitly needs a prompt edit.
+### TC-09 A grounded wrong solution that passes every test is BLOCKING (updated 2026-11-18)
+- check / rule / site severity: verifyFairness blocking, FP lane ("Found N blocking fairness issues"); AR may raise to T3/T4
+- trigger (generalized, no task names): an executed one-line wrong solution of a reference decision passes every hidden test, and the outcome it changes is stated by the description or follows from repository text (comments, messages, helpers, existing tests).
+- how to detect locally: replicas/fairness.md FP lane: decision ledger, executed wrong solutions, the generated one-line variant sweep (eval/sweep). Static reasoning alone is a candidate, not a finding.
+- what the site accepts instead (the PASS side): breadth is not required; one discriminating test per decision is enough. A boundary the text leaves open gets no test ("Would need prompt edit").
+- examples (one task, three rounds, 2026-11-18): a removed integrity hash; direct/dev marks not inherited in a record merge; removed records counted as locked; a CRLF checkout of a kept file; first-copy-wins for two copies of one source (twice); an added sibling file named MODIFIED.
+- history: until 2026-11-17 the site listed coverage gaps as advisory (23 partial, three no, 20 suggestions across the older digests).
 
 ## Auto Review Tests T1-T8 patterns
 

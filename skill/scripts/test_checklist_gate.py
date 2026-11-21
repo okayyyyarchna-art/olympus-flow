@@ -1,7 +1,10 @@
+import contextlib
 import importlib.util
+import io
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 
 
 SCRIPT = Path(__file__).resolve().parents[1] / "tools/checklist_gate.py"
@@ -97,6 +100,31 @@ class Gate(unittest.TestCase):
         self.fill()
         gate.make_sheet(self.task)
         self.assertEqual(self.problems(), [])
+
+    def test_stray_pipe_is_reported_by_cell_count_and_the_sheet_command_heals_it(self):
+        self.fill(note="run ./test.sh base|new first")
+        problems = self.problems()
+        self.assertTrue(any("row 1.1 has 8 cells, expected 7 (a | in a cell?" in p for p in problems), problems)
+        self.assertFalse(any("no row in the sheet" in p for p in problems))
+        with contextlib.redirect_stdout(io.StringIO()):
+            gate.make_sheet(self.task)
+        self.assertIn("base \\| new", gate.sheet_path(self.task).read_text(encoding="utf-8"))
+        self.assertEqual(self.problems(), [])
+        rows = gate.read_sheet(gate.sheet_path(self.task))
+        self.assertEqual(rows[next(iter(rows))]["note"], "run ./test.sh base | new first")  # cells are stripped
+
+    def test_sheet_command_names_the_rules_blanked_by_a_checklist_edit(self):
+        self.fill()
+        text = gate.CHECKLIST.read_text(encoding="utf-8")
+        rule = next(r for r in gate.rules(text) if r["text"] in text)
+        edited = self.task / "build-checklist.md"
+        edited.write_text(text.replace(rule["text"], rule["text"] + " (edited)", 1), encoding="utf-8")
+        out = io.StringIO()
+        with patch.object(gate, "CHECKLIST", edited), contextlib.redirect_stdout(out):
+            gate.make_sheet(self.task)
+        self.assertIn(f"blank rows (rule text changed or rule new since the earlier sheet): {rule['id']}", out.getvalue())
+        self.assertTrue(any(f"rule {rule['id']}: not filled" in p for p in self.problems()) or
+                        any("checklist changed" in p for p in self.problems()))
 
 
 if __name__ == "__main__":

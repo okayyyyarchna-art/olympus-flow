@@ -1,6 +1,10 @@
 # Replica: description quality (site check "descriptionQuality") + task criteria ("taskQuality")
 
 Read `common.md` first. You judge the description text; use test.patch only to see which sentences the tests rely on.
+Two things no local check can see, which the builder reports as NOT VERIFIED: the site's AI detector (it failed a
+builder-written draft that this check had passed; only the owner's own words pass it, so the lock needs the owner's
+text or an explicit "keep the draft") and the site's requirement extraction. A non-ASCII character is a hard stop
+at the lock, not a note: the platform rejects the text at a later stage whatever this check says.
 
 ## Part A: description comments
 Find passages in these categories (the site's categories):
@@ -21,7 +25,7 @@ Count requirement UNITS (method measured on 24 descriptions with known verdicts)
 outcome under one condition; per exception with its own outcome; per keep-as-is sentence; per transport or
 entry-point sentence; per scope-out; per permission; outcomes per strategy or mode separately; a list inside one
 sentence is one unit; not counted: symptom, motive, history, examples restating a unit. <= 14 units passed 8 of 8,
->= 19 failed 5 of 5, 15-18 mixed. Report the unit list and count; `blocking: true` at >= 19, and at 15-18 when the
+>= 19 failed 5 of 5, 15-18 mixed. Report the unit list and count; `blocking: true` above 9 units (the builder's own hard limit, description.md section 0) as well as at >= 19, and at 15-18 when the
 text also reads as separate asks (below). Also list the distinct wanted behaviours as information. The site's blocking decision is NOT a number: it passed one coherent change described with many details
 (24 extracted requirements, 13 by our count) and failed a text of 10 that asked for many separate behaviours. Set
 `blocking: true` when the text reads as a list of separate asks rather than one change: several independent use cases

@@ -5,6 +5,10 @@ usage: proof.py <base-repo> <pkg-dir> --base-ids ids.json --new-ids ids.json
        [--base-skips ids.json] [--stability] [--final] [--rebuild] [--tamper PATH]...
        [--work-root DIR] [--timeout SECONDS] [--build-timeout SECONDS]
        proof.py <base-repo> <pkg-dir> --build-only   (stage 1: needs only pkg/Dockerfile)
+       proof.py <base-repo> <pkg-dir> --base-ids ids.json --base-only   (build or reuse the image, run base/base only; repo_check's hook point)
+       ... [--root-base] [--two-user] [--plain-new]   platform-identity cells (see platform_cell): root base mode;
+           uid 1000 applies the solution after root's base run, new then base, verifySolution set check; test.sh new
+           with no --output_path. Each takes --timeout seconds per test.sh run.
 --tamper PATH (repo-relative, repeatable): overwrite that file with one junk line in the reference tree; base mode
 must then give the same per-ID vector as on the clean reference (the file is pinned by test.sh).
 Expected-ID files are nonempty canonical-ID JSON arrays. Baseline skips must be
@@ -28,6 +32,7 @@ import time
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))  # python -I drops the script folder
 from machine import load
+import junit_sets
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 from certify import id_set, inspect_junit
@@ -186,6 +191,93 @@ def run(image, patches, out, mode, solution, as_user=12345, platform=None,
     return evidence["results"], time.monotonic() - t0
 
 
+def platform_cell(image, patches, out, steps, platform=None, *, timeout=600):
+    """One container the way the platform runs verifySolution (BACKLOG #155, #156, #158, #172, #174): root, the
+    image's own user with its environment and its /app, applies test.patch and runs base mode (step baseline); the
+    `model` user, uid 1000, created with groupadd/useradd as the platform does, applies solution.patch in /app (apply)
+    and runs new mode (new), then base mode (after); `plain` runs `test.sh new` as uid 1000 with no --output_path,
+    the Harbor wrapper's call form. When /app is not writable for uid 1000 it is made so first and the cell log says
+    so (the Dockerfile should do it, #156). Returns {step: (exit code, JUnit XML of baseline/new/after or the log of
+    apply/plain)}; ValueError when the container or a step did not run."""
+    out.mkdir(parents=True, exist_ok=True)
+    platform = platform or MACHINE["docker"]["native_platform"]
+    model = bool(set(steps) & {"new", "after", "plain"})
+    lines = [
+        "set -u", "cd /app || exit 97",
+        "if ! id -u 1000 >/dev/null 2>&1; then groupadd -g 1000 model && useradd -m -u 1000 -g 1000 -s /bin/bash model"
+        " || exit 97; fi",
+        "u=$(id -nu 1000)",
+        'as() { su "$u" -s /bin/bash -c "cd /app && $1"; }',
+        "if [ -n \"$(as 'find /app ! -writable -print -quit 2>/dev/null')\" ]; then "
+        "echo 'NOTE /app is not writable for uid 1000: chmod -R a+rwX /app applied (the Dockerfile should, #156)'; "
+        "chmod -R a+rwX /app; fi",
+        "git apply --whitespace=nowarn /patches/test.patch || exit 97", "chmod +x test.sh",
+    ]
+    if "baseline" in steps:
+        lines.append('./test.sh base --output_path /out/baseline.xml > /out/baseline.log 2>&1; echo "STEP baseline exit $?"')
+    if model:
+        lines.append("as 'git -c safe.directory=/app apply --whitespace=nowarn /patches/solution.patch' "
+                     '> /out/apply.log 2>&1; echo "STEP apply exit $?"')
+    for step, call in (("new", "./test.sh new --output_path /out/new.xml"),
+                       ("after", "./test.sh base --output_path /out/after.xml"), ("plain", "./test.sh new")):
+        if step in steps:
+            lines.append(f"as '{call}' > /out/{step}.log 2>&1; echo \"STEP {step} exit $?\"")
+    lines.append(f'for f in /out/*.xml /out/*.log; do [ -f "$f" ] && {{ printf "\\n{MARK} %s\\n" "${{f##*/}}"; '
+                 'cat "$f"; }; done; exit 0')
+    proc = docker("run", "--rm", "--platform", platform, "--network", "none", "--user", "0:0", "--workdir", "/app",
+                  "--tmpfs", "/out:rw,mode=1777", "-v", f"{patches}:/patches:ro", "--entrypoint", "/bin/bash",
+                  image, "-c", "\n".join(lines), timeout=timeout)
+    head, *parts = re.split(rf"\n{re.escape(MARK)} (\S+)\n", proc.stdout)
+    (out / "cell.log").write_text(head + proc.stderr, encoding="utf-8")
+    files = dict(zip(parts[::2], parts[1::2]))
+    for name, text in files.items():
+        (out / name).write_text(text, encoding="utf-8")
+    exits = {step: int(code) for step, code in re.findall(r"^STEP (\w+) exit (\d+)$", head, re.M)}
+    wanted = set(steps) | ({"apply"} if model else set())
+    if proc.returncode or wanted - set(exits):
+        raise ValueError(f"platform cell exit {proc.returncode}, steps run {sorted(exits)} of {sorted(wanted)}: {out}")
+    return {step: (exits[step], files.get(f"{step}.xml", files.get(f"{step}.log", ""))) for step in exits}
+
+
+def platform_cells(args, image, patches, work, ids, skips, platform):
+    """The platform-identity cells behind --root-base, --two-user and --plain-new, one say() line per check: root's
+    base mode reconciles with the base IDs; uid 1000 applies the solution after root's base run; its new mode
+    reconciles with the new IDs; the verifySolution set check over baseline/new/after is empty (junit_sets.py);
+    `test.sh new` with no --output_path exits 0."""
+    cells = [(label, steps) for label, steps, wanted in (("root-base", ("baseline",), args.root_base),
+                                                        ("two-user", ("baseline", "new", "after"), args.two_user),
+                                                        ("plain-new", ("plain",), args.plain_new)) if wanted]
+    for label, steps in cells:
+        out = work / label
+        try:
+            got = platform_cell(image, patches, out, steps, platform=platform, timeout=args.timeout * len(steps) + 120)
+        except ValueError as exc:
+            say(False, f"{label}: {exc}")
+            continue
+        if "apply" in got:
+            say(got["apply"][0] == 0, f"{label}: uid 1000 applies solution.patch in /app after root's run "
+                                      f"(exit {got['apply'][0]})")
+        for step, mode, who in (("baseline", "base", "root"), ("new", "new", "uid 1000")):
+            if step in got:
+                try:
+                    results = inspect_junit(got[step][1].encode(), ids[mode], "pass", got[step][0],
+                                            skips if mode == "base" else ())["results"]
+                    say(True, f"{label}: {mode} mode as {who}: exit/report/IDs reconcile, {len(results)} IDs, "
+                              f"{sum(s == 'skipped' for s in results.values())} skipped")
+                except ValueError as exc:
+                    say(False, f"{label}: {mode} mode as {who}: {exc}")
+        if "after" in got:
+            sets = junit_sets.check(*(junit_sets.cases(out / f"{step}.xml") for step in ("baseline", "new", "after")))
+            say(not any(sets.values()), f"{label}: verifySolution sets "
+                                        + ", ".join(f"{title} {len(ids_)}" for title, ids_ in sets.items()))
+            for title, ids_ in sets.items():
+                for cid in sorted(ids_)[:10]:
+                    print(f"      {title}: {cid}")
+        if "plain" in got:
+            say(got["plain"][0] == 0, f"{label}: test.sh new with no --output_path exits {got['plain'][0]} as uid 1000 "
+                                      "(the Harbor wrapper's call form)")
+
+
 def main():
     global ok
     ok = True
@@ -196,7 +288,9 @@ def main():
     parser.add_argument("--new-ids", type=Path)
     parser.add_argument("--tamper", action="append", default=[])
     parser.add_argument("--base-skips", type=Path)
-    for option in ("stability", "final", "rebuild", "build-only"):
+    for option in ("stability", "final", "rebuild", "build-only", "base-only"):
+        parser.add_argument("--" + option, action="store_true")
+    for option in ("root-base", "two-user", "plain-new"):  # platform-identity cells, see platform_cell
         parser.add_argument("--" + option, action="store_true")
     parser.add_argument("--work-root", type=Path)
     parser.add_argument("--timeout", type=int, default=600)
@@ -204,14 +298,14 @@ def main():
     args = parser.parse_args()
     if not 0 < args.timeout < 688:
         parser.error("timeout must be positive and below the 688-second platform watchdog")
-    if not args.build_only and not (args.base_ids and args.new_ids):
-        parser.error("--base-ids and --new-ids are required unless --build-only")
+    if not args.build_only and not (args.base_ids and (args.new_ids or args.base_only)):
+        parser.error("--base-ids and --new-ids are required unless --build-only; --base-only needs only --base-ids")
     image = "(unresolved)"
     work = None
     try:
         ids, skips = {}, []
         if not args.build_only:
-            ids = {mode: read_ids(path) for mode, path in (("base", args.base_ids), ("new", args.new_ids))}
+            ids = {mode: read_ids(path) for mode, path in (("base", args.base_ids), ("new", args.new_ids)) if path}
             skips = read_ids(args.base_skips, allow_empty=True) if args.base_skips else []
             if not set(skips) <= set(ids["base"]):
                 raise ValueError("base skip allowlist contains unexpected IDs")
@@ -255,6 +349,8 @@ def main():
             return results, elapsed
 
         cell("base-base", "base", False)
+        if args.base_only:
+            return 0 if ok else 1
         _, elapsed = cell("new-base", "new", False)
         say(elapsed < 300, f"new/base duration {elapsed:.1f}s (<300s)")
         previous = None
@@ -272,6 +368,7 @@ def main():
                 say(False, f"base mode changed with the tampered inputs {args.tamper}: {exc}")
         # All preceding cells already use H4; retain a separately named unknown-uid probe.
         cell("unknown-uid", "new", True)
+        platform_cells(args, image, patches, work, ids, skips, platform)
         if args.stability:
             for label, solution in (("base", False), ("reference", True)):
                 def repeat(i):

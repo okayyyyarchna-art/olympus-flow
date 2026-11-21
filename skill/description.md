@@ -8,13 +8,13 @@ outcomes run through), never in ambiguous words.
 **Evidence rule:** only tasks submitted on or after 2026-10-16 set rules (the platform added the requirement-count and
 AI/plagiarism checks on 2026-10-14). Older tasks are historical mechanisms only. Agents improve with every submission,
 so the newest verified accepted texts set the bar. Audits: vet eval/desc-audit-A.md, desc-audit-B.md,
-desc-history-digest.md, desc-recipe-astra.md; decisions: olympus-product TRIAGE-desc-astra.md.
+desc-history-digest.md, desc-recipe-astra.md; decisions: olympus-product history/build-logs-202611/TRIAGE-desc-astra.md.
 
 ## 0. Policy and states (owner rules)
 | State | What may change | Exit |
 |---|---|---|
 | PRE-LOCK | anything; every check in section 3 runs here | the lock (section 3 step 11) |
-| LOCKED | nothing in the text; findings change tests and the reference inside the stated sentences | the platform rollout result |
+| LOCKED | nothing by the builder; findings change tests and the reference inside the stated sentences. Before v1 a finding on the text goes to the owner, who may change the words (then word reach, the DQ replica, the unit count and a new hash); from v1 on only the OWNER EXCEPTION | the platform rollout result |
 | OWNER EXCEPTION | one change (section 5b), only when the owner asks for it. The builder never proposes, drafts or lists one. Usually not needed: a text that is imperfect but whose effect tests can absorb stays (vet) | locked for good |
 | REDESIGN | outside the band and no allowed lever works: the builder names the one blocker and proposes the smallest new version that clears it (new lock, fresh rollout); the owner approves it. A task is never retired: the flow ends only with an accepted task. A known false pass is never released to reach the band | owner approves the redesign |
 Hard limits: at most **9 requirement units** (target 5-8); about **250 site words is guidance**, not a limit; the
@@ -40,7 +40,7 @@ the trajectories read them as a checklist; vet task 2: words naming the PR base 
 | R9 | Never excuse a reference gap in the text | task 5: SQ read the excuse as a requirement |
 | R10 | Every claim about current behaviour, API names and paths is true at the pin (source-checked) | docker "/export and /commit already hide these writes" was false -> major |
 | R11 | For each boundary decide: outside the feature (no promise), preserve current behaviour (measured on base), or must reject (a requirement). Name a boundary only when the deletion test keeps it; do not catalogue unreachable or unsupported things; silence excludes nothing | task 5's exclusion read in reverse; turso's catalogue cost TPQ count; topic-start's missing tables exclusion |
-| R12 | Depth, not breadth: one coherent objective, one hard invariant through several modules | elio's "every kind elio knows" contract: endless findings |
+| R12 | Depth, not breadth: one coherent objective, one hard invariant through several modules. A sentence over an open input space (symbolic links, "any outputs", "every X the tool knows", "invalid per RFC X", "malformed") states its boundary before the lock, in scope words inside the same sentence (a closed list of what the tests check), or every shape of the input becomes a requirement | elio's "every kind elio knows" contract: endless findings; vet task 6: an unbounded link sentence gave about ten rounds of link findings and two site SQ failures until the owner's one change ("Only relative symbolic links that stay below the scanned directory are in scope"), BACKLOG #195 |
 | R13 | The owner's own words; never fabricate anecdotes, typos or errors to look authored | model drafts were flagged by the AI check; owner texts passed |
 | R14 | The sample's promises are the final contract; narrow or widen only before the lock | topic-start's late narrowing invalidated earlier runs |
 | R15 | No URI schemes; the category follows the semantic change (the precheck's shape check is a warning) | prechecks; standby and turso are feature requests with bug-story openings |
@@ -70,9 +70,15 @@ loose example that changes the rule ("ex: app.log.1").
   package rules, an unrelated failing check, an older report without a check list, a mistyped id.
 - Bad difficulty: a word with two readings (breaks the reference and fairness, separates nobody), an undiscoverable
   timing window, an unrelated subsystem, an unstated performance limit, missing tools.
-- The seam's difficulty is measured by the obvious-design spike at step 3 ([difficulty.md](difficulty.md)) and the
-  stage-3 runs. The text adds no difficulty and removes none: it states the
+- The seam's difficulty is seen in the solver runs after the lock ([difficulty.md](difficulty.md) section 3: 3 + 3
+  local solves, 2 + 2 platform runs). The text adds no difficulty and removes none: it states the
   requirement.
+- Length is not in the text either. The platform needs the passing Orion run to compact once (256K+; we design for
+  300K+); it comes from the depth of the seam (the code a solver must read and trace before its first correct edit,
+  and a repository loop that keeps failing until the design is right), measured by the length spike on the draft
+  before the lock (difficulty.md section 2). A sentence added for length (a clause the solution already meets)
+  bought 3-7K per run on vet 6; a hint bought none. Each universal word in the text opens cells a reviewer can probe
+  (problem-design.md section 7): name its boundary in the same sentence (R12).
 - Trap inventory, qualitative: list each trap a solver must clear and mark it explicit or implied; do not stack two
   unnamed traps on one path; every implied consequence that is required gets a test (R8). Planning rates live only in
   the ledger's difficulty section (profiles.md); they never decide a sentence: the rollout measures.
@@ -91,9 +97,9 @@ loose example that changes the rule ("ex: app.log.1").
    assertion, and the plausible partial implementation it rejects. At most 9 units (R5).
 3. **Feasibility gate**: a disposable reference spike proves the hard path with the real interfaces; sketch one
    materially different valid design; run the base suite against the spike to find base tests that pin internals.
-   If the hard path cannot be built or tested fairly, narrow the problem now. Then the obvious-design spike
-   (difficulty.md section 3): it must fail on at least two different decisions, or the lock waits for
-   difficulty.md section 2 (the runner-up seam first, then one widen).
+   If the hard path cannot be built or tested fairly, narrow the problem now. No difficulty gate (owner 2026-11-16):
+   difficulty is seen in the solver runs after the lock (difficulty.md section 3). The length spike (difficulty.md
+   section 2) runs on this draft and must pass before the lock.
 4. **Variant table** per obligation: every shape a user can hit, marked TESTED, EXCLUDED (named boundary) or OUT
    (unreachable, with the evidence). TESTED only if a careful agent finds it from the text + repo.
    For every exception sentence ("if X, do not Y") list the states next to X that are not X: unknown, missing,
@@ -105,7 +111,10 @@ loose example that changes the rule ("ex: app.log.1").
    its own requirement. When the DQ replica's count equals the number of tested outcomes, stop rewording.
 6. **Word reach**: grep docs, code comments, configuration and diagnostic/error texts for every key word; every state
    the repo names with it is TESTED or the word changes. Scope words (only, any, always, every, all) and exclusions
-   get a second-reading check in both directions.
+   get a second-reading check in both directions. Agents read a scope word by its nearest noun (vet 6: "every
+   lockfile ..., paired with the manifest file" became a table of file names; no run asked which states of the
+   lockfile count): per sentence, write the reading the nearest noun suggests and what it leaves out, and decide
+   whether the left-out states are stated (then the sentence names them plainly) or open.
    Entry-point words ("run", "save", "skip rule", a method name) cover every documented way the repo does that thing:
    list them all (edsl: "running the survey" = survey.run and survey.run_async, docs surveys.mdx:147; "skip rule" =
    add_skip_rule and add_rule(..., before_rule=True) with its own destination, CLI --destination). For each one, run
@@ -116,7 +125,7 @@ loose example that changes the rule ("ex: app.log.1").
    reviewers read the sentence literally on every path, each round adds a test for a pre-existing engine defect, and
    the task drifts away from its seam (edsl-survey-insert: 14 of 50 cases ended up testing run_async, navigator and
    scheduling bugs that exist without any insertion; owner narrowed the tests back after the lock).
-7. **Reading audit, two independent lanes** (Codex GPT Sol 6.1 high + Claude; the draft and the pinned repo only,
+7. **Reading audit, two independent lanes** (Codex GPT Sol 6.1 medium + Claude Opus 5.5 medium; the draft and the pinned repo only,
    never the reference) **and adjudication**: for every second reading record the separating input (one input, two
    different outputs), the strongest repo evidence for or against it, and the disposition: reword (the fewest words
    that leave one reading), a deliberate scope choice, or tests that accept both behaviours. A reword never names a
@@ -147,21 +156,27 @@ lists the meaning each sentence must keep, never named corners or hard points as
     (implied cases listed apart); (c) the difficulty check: per hard point, the words that would give its cause away,
     grepped in the text and absent, and what the text must reveal because it is the requirement; (d) what stays NOT
     VERIFIED until the platform (its own extraction and DQ, the real difficulty). The locked text goes to the
-    build (tests and reference by the construction cards). No local solves: right after the lock the owner runs 2 Orion + 2 Vega on
-    the locked text (difficulty.md section 4), then the checks and the rest of the rollout on v1 (PIPELINE.md stage 7b).
+    build (tests and reference by the construction cards). The lock report also carries the length spike result
+    (difficulty.md section 2: each solve's sequence length and the mean), which must have passed on the draft. Right
+    after the lock, 3 + 3 local solves start and the owner runs 2 Orion + 2 Vega on the locked text, in parallel,
+    while the build goes on at stage 4 (difficulty.md section 3); then the checks and the rest of the rollout on v1
+    (PIPELINE.md stage 7b).
 
 ## 4. Checklist before the lock (all yes, or a named external check marked NOT VERIFIED)
 - [ ] one coherent objective; every boundary decided three-way (R11, R12)
 - [ ] at most 9 requirement units, counted honestly (R5); short (about 250 site words as guidance)
 - [ ] every sentence is an outcome, a scope line or an anchor, plus at most one true context line (R1)
 - [ ] no direction, no solver instruction, no excuse, no trap list, no URI scheme (R2-R4, R9, R15)
-- [ ] every sentence passes the deletion test; no word of a hard point or implied case in the text (section 1, step 8)
-- [ ] the obvious-design spike fails on at least two different decisions (step 3, difficulty.md section 3)
+- [ ] every sentence passes the deletion test; no word of a hard point or implied case in the text (section 3, step 8);
+      purely stated requirements, no hints (owner 2026-11-15)
 - [ ] every normative promise has a planned test; preservation sentences are tested or removed together with their
       assertions; every assertion traces to a sentence or quoted repo behaviour (R7)
 - [ ] every obligation categorized explicit / implied; implied required consequences have planned tests (R8)
 - [ ] every claim about current behaviour, names and paths source-checked (R10)
 - [ ] feasibility gate done: hard path proven by a spike, a valid alternative sketched, base pins found (step 3)
+- [ ] length spike passed on this draft: two Codex xhigh solves with a mean sequence length >= 300K and neither under
+      250K (difficulty.md section 2); the test-grid budget of the seam still holds for these words (problem-design.md
+      section 7)
 - [ ] every key word grepped; the repo's own term; every second reading adjudicated with its separating input (R6,
       steps 6-7)
 - [ ] the difficulty is in a stated path, not a word; no two unnamed traps stacked (section 2)
@@ -198,6 +213,15 @@ only from the owner asking: the builder never proposes, drafts or lists a change
   No second change exists.
 - **Rulebook repair:** name the rule that should have caught it at the first lock and sharpen it (or add one), so
   the next task is written right at once.
+- **A hint for a wall case** (a case every run of every rollout fails) is not a separator and costs no difficulty:
+  when the owner asks for one, name the state plainly in the owner's casual words ("even if the PR leaves the
+  lockfile with no packages in it"); a subtle qualifier ("empty or not") is skimmed, because agents read a sentence
+  by its nearest noun (vet 6: 0 of 4 runs, then 1 of 2 fully with the plain words). Check that the words describe
+  exactly what the tests check, and that the solution needs no change for them (grep the repository's own tests at
+  the site first: a pinned upstream test decides the boundary of a word).
+- **A change for length** (a passing Orion run that stays under 256K) adds the layer the solver must trace (a
+  second entry path, a saved state read back, a caller context), stated as one requirement; a clause the solution
+  already meets adds 3-7K per run, a code-changing requirement about 20K (problem-design.md section 2).
 
 ## 6. Rollout levers, description side (the order of use is rollout.md)
 - First classify the evidence (rollout.md step 1): eligible runs only, per-family denominators; a re-evaluation of one
@@ -206,7 +230,7 @@ only from the owner asking: the builder never proposes, drafts or lists a change
   1/4, elio Orion 4/4 -> 1/4, swift -> Orion 1/4, vet older-report and typo tests); fixing an assertion only when it
   pins unsupported behaviour (never because a case is rare or unnamed); dropping a test only when its case is
   unspecified (R8), with the list of wrong designs the drop would release.
-- Too easy after rollout.md levers 1-5: stay in tests (prompts/calibrate-one-passer.md). A text change happens only if
+- Too easy after rollout.md levers 1-4: stay in tests (prompts/calibrate-one-passer.md). A text change happens only if
   the owner asks (section 5b): remove the wording that gave the path, or deepen or add a requirement (word reach,
   reading audit and DQ replica first). Then a fresh rollout: replaying old patches checks compatibility only, it
   cannot measure a new wording. Text hints overshoot (elio 0/4 -> Orion 4/4, swift 4/4, turso 4/4, vet task 2 Orion
@@ -265,4 +289,63 @@ diagnostic and error texts; cite file:line). Mark a sentence AMBIGUOUS when two 
 results; for each, give the separating input, the strongest repository evidence for and against each reading, and
 your proposed disposition (reword without naming a corner / scope choice / accept both). Do not open any other file
 of the task folder.
+```
+
+Scope-closing draft prompt (2026-11-21, after vet task 6: the open axes and unbounded input spaces of its first text
+cost most of its Test Quality and Solution Quality rounds; give this to the drafting model with the obligation ledger):
+```
+Write the task description for <seam, one line in user words> in <repo> at <commit>.
+Inputs: the obligation ledger (each outcome, its grounding, its planned test), the planned reference's behaviour list,
+and the repository at the pin. Nothing else: no reference code, no hidden tests.
+
+Who will read it, and how: a Test Quality reviewer will read every sentence literally, infer the solution's shape,
+write plausible wrong solutions and block if one passes every test or a correct one fails; a Solution Quality reviewer
+will build an input for EVERY path the words cover (every mode, file form, driver, version, entry point) and run the
+tool. So every word that widens the promise is a path the reference must implement and a cell the tests must cover.
+
+Write at most 9 requirement units in about 150-250 words, plain first-person user voice (the owner rewrites it in
+their own words afterwards). One reading per clause. Then apply these rules, in order, and fix the text until all hold:
+
+1. Universal words. For every "every", "any", "all", "each", "including", "or", "with or without", "added or
+   modified": name the axis it opens and count its members from the repository (file names, formats, versions,
+   drivers, modes, entry points). If the members are more than about 8 and the reference does not treat them through
+   one code path, narrow the word to the members the reference handles, in the same sentence. A universal word with
+   no axis named is a defect.
+2. Open phrases are forbidden: "invalid", "malformed", "corrupt", "wrong", "correctly", "properly", "as expected",
+   "consistent", "all cases", "edge cases", "etc.", "and so on", "like X" (without saying which part of X),
+   "invalid per <standard>". Replace each by the exact observable: the input shape and the result the user sees.
+3. Open input spaces (links, paths, encodings, formats, sizes, versions, concurrency): the same sentence states the
+   boundary ("only relative symbolic links that stay below the scanned directory"; "lockfile versions 1 to 3").
+   Inside the boundary everything is required and tested; outside it, either say "is not covered" or "keeps today's
+   behaviour" and only after you ran the base code on that input. Silence excludes nothing.
+4. Entry points: name the family once ("a pull request scan"), then list every documented way the repository
+   reaches it (commands, flags, saved files read back, a second API form); each is either inside the promise or
+   scoped out in one clause. Run the scenario on the base code for each: where it already behaves differently, decide
+   it in the text now.
+5. Existing behaviour: a sentence that says something stays as it is must be measured on base first (command and
+   result); otherwise delete the sentence. Never excuse a gap ("I don't expect X to be handled").
+6. Exceptions: for every "if X, then not Y", write what happens in the neighbouring states (unknown, missing,
+   failed, partial, older) in the same sentence or a scope line, because reviewers and agents over-apply exceptions.
+7. Numbers and limits: none unless the repository defines them (a documented cap, an OS limit); never a size, speed
+   or count promise the tests cannot hold on the platform.
+8. No mechanism, no place, no cause, no instruction to the solver, no list of corner cases, no named helper or file.
+   A sentence that tells where or how to fix is a hint: delete it.
+9. Nearest-noun check: agents read a scope word by its nearest noun. For each sentence write the reading the nearest
+   noun suggests and what it leaves out; if the left-out state is required, say it plainly ("even if the file is left
+   with no entries"); if it is not required, scope it out.
+10. Deletion test: delete each sentence in turn; if the remaining text plus one quotable repository line still decides
+   the outcome one way, the sentence is a hint and goes. It stays only when deleting it leaves two readings with
+   different observable results.
+
+Output, in this order:
+A. The description.
+B. One table, one row per sentence: kind (outcome / scope / anchor / context); the obligations it carries; each
+   universal word with its axis and member count and the clause that closes it; the planned test; the wrong design
+   that test rejects; the other reading a careful engineer could take (none, or the fix); the base behaviour it
+   keeps, with the command you ran.
+C. The paths a Solution Quality reviewer can build from these words (mode x form x entry point): the reference must
+   implement every one; flag any the planned reference does not cover.
+D. The requirement unit count (one per stated outcome under one condition, per exception with its own outcome, per
+   keep-as-is sentence, per scope-out); over 9, say which sentences to merge or cut.
+E. The words that still carry two readings, with the separating input for each.
 ```

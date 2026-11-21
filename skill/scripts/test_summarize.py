@@ -60,7 +60,7 @@ class Checkpoints(unittest.TestCase):
             (self.folder / name).write_text(json.dumps(value), encoding="utf-8")
 
     def test_complete_clean_checkpoint_passes(self):
-        self.assertEqual(summary.gate(self.folder, self.manifest), ([], []))
+        self.assertEqual(summary.gate(self.folder, self.manifest), ([], [], []))
 
     def test_each_required_report_missing_empty_malformed_or_incomplete_fails(self):
         for name in self.reports:
@@ -113,7 +113,7 @@ class Checkpoints(unittest.TestCase):
             self.reports = clean_reports()
             self.reports["sq-r1a.json"]["issues"] = [issue("lost input", severity)]
             self.write()
-            problems, union = summary.gate(self.folder, self.manifest)
+            problems, union, _ = summary.gate(self.folder, self.manifest)
             self.assertIn(("sq-r1a", "lost input"), union)
             self.assertTrue(any("unresolved" in p for p in problems))
             self.reports["verify-r1.json"]["verdicts"] = [{
@@ -124,13 +124,22 @@ class Checkpoints(unittest.TestCase):
             self.write()
             self.assertFalse(summary.gate(self.folder, self.manifest)[0])
 
-    def test_kept_medium_or_unknown_or_duplicate_dispositions_block(self):
+    def test_kept_medium_blocks_unknown_id_warns_and_duplicate_dispositions_raise(self):
         self.reports["verify-r1.json"]["kept"]["solution_medium"] = 1
         self.write()
         self.assertTrue(summary.gate(self.folder, self.manifest)[0])
+        # Since #70 a verdict on an ID no report raised is a warning, not a failure (the finding stays pending).
         self.reports = clean_reports()
         self.reports["verify-r1.json"]["verdicts"] = [{
             "source": "sq-r1a", "id": "unknown", "severity": "medium", "decision": "DROP", "dropReason": "scope", "evidence": "quote"}]
+        self.write()
+        problems, _, warnings = summary.gate(self.folder, self.manifest)
+        self.assertEqual(problems, [])
+        self.assertTrue(any("matches no finding" in w for w in warnings), warnings)
+        self.reports["sq-r1a.json"]["issues"] = [issue("lost input")]
+        row = {"source": "sq-r1a", "id": "lost input", "severity": "medium", "decision": "DROP",
+               "dropReason": "code", "evidence": "line 20 handles it"}
+        self.reports["verify-r1.json"]["verdicts"] = [row, dict(row)]
         self.write()
         with self.assertRaises(ValueError):
             summary.gate(self.folder, self.manifest)

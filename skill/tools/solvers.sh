@@ -1,8 +1,12 @@
 #!/usr/bin/env bash
-# Too-easy alarm (launched at the S1 lock, graded at S4): 4 blind solves of the locked description, run while I build.
-#   1 Opus via Claude Code on this account, 1 Opus via Claude Code on claude2 (the platform's Vega shape),
-#   2 GPT Sol 6.1 via Codex (Orion's model).
+# Solver runs after the lock (owner 2026-11-16, difficulty.md section 3): 3 + 3 blind solves of the locked description,
+# run while I build: solves 1-3 Opus 5.5 high via Claude Code (2 on this account, solve 2 on claude2, the platform's
+# Vega shape), solves 4-6 GPT Sol 6.1 xhigh via Codex (Orion's model and effort; codex_job.sh sets it for job "solve").
 #   bash solvers.sh <task-dir> [title]      stop: bash stop_solves.sh <task-dir> (kills every solve tree)
+#   bash solvers.sh <task-dir> spike        the length spike before the lock (difficulty.md section 2): solves 7 and 8,
+#                                           both GPT Sol 6.1 xhigh, on the draft text; then
+#                                           python tools/seqlen.py <task-dir>/solves/s7 <task-dir>/solves/s8
+# Each solve's Codex session log (rollout-*.jsonl, copied next to meta.txt when found) carries the token counts.
 # Each solver gets a fresh clone of <task-dir>/base (pinned, clean) OUTSIDE the task folder and only
 # "# <title>\n\n<description>" (pkg/description.md). No Docker slot is held. SOLVE_PATH=<dir> puts a toolchain (a venv's
 # Scripts/bin) first on PATH so solvers can run the repo's tests; SOLVE_TIMEOUT_MIN caps each run (default 90).
@@ -13,7 +17,9 @@ source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/machine.sh" || exit 2
 # the whole body is one function: bash reads it completely before running, so editing this file while a run
 # is in progress cannot break that run (vet 2026-11-06: an edit mid-run garbled the tail of solvers.sh)
 main() {
-T=$(cd "$1" && pwd); title="${2:-$(head -1 "$T/pkg/title.txt" 2>/dev/null | tr -d '\r')}"
+T=$(cd "$1" && pwd); mode=run
+if [ "${2:-}" = spike ]; then mode=spike; set -- "$1"; SOLVERS="${SOLVERS:-7 8}"; fi
+title="${2:-$(head -1 "$T/pkg/title.txt" 2>/dev/null | tr -d '\r')}"
 [ -n "$title" ] || title="$(basename "$T")"
 name="$(basename "$T")"; mkdir -p "$T/solves/patches"
 prompt="$(printf '# %s\n\n%s\n' "$title" "$(tr -d '\r' < "$T/pkg/description.md")")"
@@ -46,6 +52,9 @@ open(sys.argv[2], "w", encoding="utf-8", newline="\n").write("".join(keep))
 PY
   cp "$S/agent.patch" "$T/solves/patches/s$n.patch"
   echo "finished=$(machine_date) patch_lines=$(wc -l < "$S/agent.patch")" >> "$S/meta.txt"
+  # the Codex session log holds the per-request token counts that tools/seqlen.py reads (sequence length, compaction)
+  local log; log="$(ls -t "$OLYMPUS_CODEX_HOME"/sessions/*/*/*/rollout-*.jsonl 2>/dev/null | head -1)"
+  if [ -n "$log" ] && grep -q -F "$R" "$log" 2>/dev/null; then cp "$log" "$S/session.jsonl" && echo "session=$S/session.jsonl" >> "$S/meta.txt"; fi
 }
 
 clone() {  # $1 = n -> prints the clone path
@@ -88,7 +97,7 @@ opus() {  # $1 = n, $2 = main|claude2
 
 gpt() {  # $1 = n
   local n="$1" S="$T/solves/s$1" R; mkdir -p "$S"; R="$(clone "$n")" || { echo "s$n: no clone, solve skipped" >&2; return 1; }
-  echo "solver=gpt-6.1-sol started=$(machine_date) clone=$R" > "$S/meta.txt"
+  echo "solver=gpt-6.1-sol effort=xhigh mode=$mode started=$(machine_date) clone=$R" > "$S/meta.txt"
   cat > "$R/../brief.md" <<EOF
 Your working folder is $R. Read TASK.md there: it is a request from the maintainers of this repository. Implement it
 in the repository in $R the way a strong contributor would (read the code, change it, add or run tests if useful).
@@ -102,15 +111,19 @@ EOF
   finish "$n" "$R"
 }
 
-# SOLVERS="3 4" re-runs only some solves (1, 2 = Opus main/claude2; 3, 4 = GPT)
+# SOLVERS="4 5" re-runs only some solves (1, 3 = Opus main; 2 = Opus claude2; 4, 5, 6 = GPT; 7, 8 = the length spike, GPT)
 # Job control gives each background solve its own process group on POSIX hosts.
 [ "$OLYMPUS_OS" = windows ] || set -m
 for n in ${SOLVERS:-$(seq 1 "$OLYMPUS_SOLVERS")}; do
-  case "$n" in 1) opus 1 main & ;; 2) opus 2 claude2 & ;; *) gpt "$n" & ;; esac
+  case "$n" in 1|3) opus "$n" main & ;; 2) if [ -n "$C2DIR" ]; then opus 2 claude2 & else echo "no second Claude account: solve 2 runs on the main account" >&2; opus 2 main & fi ;; *) gpt "$n" & ;; esac
 done
 wait
 # watcher (user rule 2026-11-06): a solve may use only its clone, the task text and the repo; only CLEAN solves count
 "$PY" "$OLYMPUS_TOOLS/solve_watch.py" "$T"
-echo "solves done: $T/solves (grade only the CLEAN ones, solves/watch.md, with replay_patches.sh; then start the FP audits of every passer at once, PIPELINE.md Confirmation schedule)"
+if [ "$mode" = spike ]; then
+  echo "spike done: measure with  python \"$OLYMPUS_TOOLS/seqlen.py\" $T/solves/s7 $T/solves/s8  (gate: mean >= 300K, none under 250K; difficulty.md section 2); grade the CLEAN ones on the sample tests"
+else
+  echo "solves done: $T/solves (grade only the CLEAN ones, solves/watch.md, with replay_patches.sh; then start the FP audits of every passer at once, PIPELINE.md Confirmation schedule)"
+fi
 }
 main "$@"; exit $?

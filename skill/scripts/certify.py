@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Read-only artifact fingerprints and JUnit integrity checks; not a semantic judge."""
+"""Read-only artifact fingerprints and JUnit integrity checks; not a semantic judge.
+
+Usage: certify.py package <package-dir> | fingerprint <file>... [--metadata <identity.json>] |
+       junit <report.xml> --ids <ids.json> --expect pass|fail --exit-code <n> [--allow-skips <ids.json>]
+"""
 
 import argparse
 import hashlib

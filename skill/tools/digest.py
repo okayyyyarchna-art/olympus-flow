@@ -126,13 +126,13 @@ def main():
             if c.get("guidance"):
                 L.append(f"  - guidance: {c['guidance']}")
         L.append(f"- computedDifficulty: {crit.get('computedDifficulty')}")
-        L += ["", "## Runs", "", "| solver | eval | verdict | status | stale | seq len | fault | env blocker | summary |", "|---|---|---|---|---|---|---|---|---|"]
+        L += ["", "## Runs", "", "| solver | eval | verdict | status | stale | seq len | compacted | fault | env blocker | summary |", "|---|---|---|---|---|---|---|---|---|---|"]
         for r in sorted(runs, key=lambda r: (bool(r.get("stale")), r.get("createdAt") or 0)):
             o = r.get("output") or {}
-            L.append("| {} | {} | {} | {} | {} | {} | {} | {} | {} |".format(
+            L.append("| {} | {} | {} | {} | {} | {} | {} | {} | {} | {} |".format(
                 r.get("taskAgentCodename") or r.get("taskAgentType"), r.get("evalAgentCodename") or r.get("evalAgentType"),
                 r.get("verdict") or o.get("verdict"), r.get("status"), "stale" if r.get("stale") else "",
-                o.get("sequenceLength"), txt(r.get("fault"), 60), txt(o.get("environmentBlocker"), 60),
+                o.get("sequenceLength"), o.get("compacted"), txt(r.get("fault"), 60), txt(o.get("environmentBlocker"), 60),
                 txt(o.get("summary"), 300).replace("|", "/").replace("\n", " ")))
         L += ["", "## Reviews"]
         for rv in d.get("reviews") or []:

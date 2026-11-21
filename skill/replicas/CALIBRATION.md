@@ -2,7 +2,10 @@
 
 MODEL NOTE: the rounds below ran on gpt-5.6-terra (sq, dq) and gpt-5.6-sol (fairness, ar, verify). From 2026-11-05
 22:00 every check runs on GPT Sol 6.1 medium (user rule); the check design is unchanged. Re-check round on Sol 6.1
-medium: section at the end.
+medium: section at the end. Since 2026-11-18/19 the fairness and sq checks execute (wrong solutions through both test
+modes; break attempts on built inputs) and report in the site's current format ("Found N blocking ..."); the
+calibration packages below predate that, so a new calibration run on vet task 6 fx9/fx10/fx16/fx22e/fx25g (every
+platform blocking item is in BACKLOG #177-#199) is the open item.
 
 Method: exact pasted files downloaded with `olympus problems download`; repo at the pinned commit with both patches
 applied; replicas run blind (no platform output in their inputs). Only platform verdicts that are fresh for those
@@ -12,7 +15,7 @@ files (not stale) are compared. The data and scripts of that run are not part of
 Role of each package: a calibration package is a DETECTOR TEST with a known platform answer, not a model to copy.
 Packages the platform failed (SetTable draft, #751 draft, elio gzip, window) test that our replicas catch what the
 platform caught; packages the platform passed (accepted or approved) test that our replicas raise no false alarms.
-What to build is modelled only on ACCEPTED tasks (templates/accepted, problem-design.md status column).
+What to build is modelled only on ACCEPTED tasks (templates/examples/accepted, problem-design.md status column).
 
 Packages: SetTable draft (SQ FAIL, 2 Highs), topic start (all pass, AR approved), standby promotion (all pass),
 goka group-table writes (SQ PASS, fairness), elio gzip (SQ CQ 2/3 Medium, AR revision: 256 MiB passer + PDF

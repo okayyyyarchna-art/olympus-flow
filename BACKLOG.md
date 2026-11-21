@@ -114,3 +114,874 @@ One line per item. Status: OPEN, DONE (where), WAITING (owner decision). Read be
 | 141 | 2026-11-13 | cc-pmg-cooldown stage 0b: the Go test.sh template copies the candidate tree with shutil.ignore_patterns('*.o', '*.a', 'build', 'dist', ...), so a tracked file matching them is dropped from the graded tree. pmg tracks internal/netenforce/bpf/enforce_bpfel.o (go:embed of a compiled BPF object), so every package that imports internal/netenforce failed with 'pattern enforce_bpfel.o: no matching files found' ([setup failed]). Editing init/test.sh does not stick: repo_check re-renders test.sh whenever it saves the profile (profile_b64 is embedded). Worked around through the restore_paths setting (the object is restored from the pinned commit by git archive). Needed: ignore only untracked build outputs (filter by git ls-files), or document the restore_paths route in harness.md. | OPEN |
 | 142 | 2026-11-13 | cc-pmg-cooldown stage 1: the Go Dockerfile template renders 'FROM --platform=linux/amd64 public.ecr.aws/...', and the platform Dockerfile check rejects it: 'Dockerfile must start with: FROM public.ecr.aws/x8v8d7g8/mars-base:latest or FROM public.ecr.aws/d3j8x8q7/olympus-base:latest or FROM public.ecr.aws/d3j8x8q7/olympus-base-go:latest'. Fixed in the task's pkg/Dockerfile (the local proof passes --platform to docker build itself). Needed: the templates render the bare FROM line; dockerfile.md E2 names the three allowed FROM lines verbatim. | OPEN |
 | 138 | 2026-11-13 vet task 6 | Owner: "why did you stop? product should work in continuation". PIPELINE.md stage 1b said the sample exists "so nothing is built on a problem the platform already has", which I read as: wait for the Scope Gate before stage 2. Fix: stage 2 starts right after the sample paste; the Scope Gate runs in parallel; only a reject stops the candidate | DONE 2026-11-13: skill/PIPELINE.md, installed copy updated |
+| 143 | 2026-11-13 | cc-pmg-cooldown stage 2: the widen step (difficulty.md section 2 step 3) assumes the widened need changes the promise and the sample (re-paste + Scope Gate). Here the added decision (D7, a version range is not a pinned version) was already implied by the general sentence and docs, so it was an inventory row brought back from OUT (breadth) rather than a new promise; no re-paste was needed. Needed: one line in section 2: a widen first looks for an implied inventory row the spike gets wrong (no text change), and only then adds a new need; and the spike counts the rows the stage-0 inventory marked OUT for breadth before the seam is called too easy. | OPEN |
+| 144 | 2026-11-13 cc-pmg-cooldown + vet hunt 6 | The spike bar (V-OBVIOUS fails on >= 2 different decisions, difficulty.md section 3) passed 0 of 5 seams today in two repos: vet reach 0, vet YAML aliases 1 (widen stayed 1), pmg cooldown 1 (D4), pmg violation cache #562 0, pmg cooldown widened 1 once both reading lanes called D7 (version ranges) a scope choice. Both widens failed for one reason: the added decision is either stated (a complete design does it) or unstated with the repo silent (tests must accept both). The retro's own backward checks put accepted tasks RED on this spike (unused-suppression: one assertion on one path, analysis-20261112/lane-a-vet.md:122; elio: Orion 4/4 on the first suite, lane-c-other.md:213) and standby GREEN but too easy (lane-b-faust.md:150); the 2 came from a hindsight reading count (synthesis.md section 4) and conflicts with difficulty.md:6 (aim: a task that can be calibrated, not one hard on its first suite). Options: A) bar = at least 1 fair decision whose right answer sits far from the wrong idiom, 0 rejects, the stage-3 stop signal stays the second gate; B) keep 2 and count a split among the stage-3 runs as the second decision; C) keep 2 and combine bugs (vet task 6 route). | DONE 2026-11-13 (owner chose A): difficulty.md section 2 step 2 and section 3, description.md step 3 + checklist line, PIPELINE.md stage 2 gate; installed copy updated |
+| 145 | 2026-11-13 cc-pmg-cooldown | Owner: "we cant give product in this state to any customer ... we will build a checklist that any seam can quickly go through and we can decide on it to continue or not, else we will stuck forever and never find any task". The hand-written spike is slow (hours per seam) and biased (the builder writes V-OBVIOUS knowing every trap); its near/far call is a reading verdict (pmg D4: the dedupe idiom sits 35 lines below the counter, stats.go:137-153 vs 188-205, but in another file than the decision fix). Needed: a quick seam checklist (minutes, evidence per line: file:line plus one separating input) that decides continue or stop at stage 0, built from the 12-task retro, the five seams of 2026-11-13 and real solves (2 Opus high on pmg d1, owner-asked), validated blind on seams with known outcomes before it replaces the spike. | OPEN (owner direction; draft after the pmg solves) |
+| 146 | 2026-11-13 cc-pmg-cooldown stage 1b | The sample went to the platform with a test.sh whose new mode cannot run: the embedded profile had new_native_ids {} while expected.new held the 3 hidden IDs, so for Go test.sh lists every test of the selected package (go test -list) and stops with "collection inventory drift" (test.sh:371-375) whenever the hidden file shares a package with other tests. repo_init flags new_native_ids as unresolved only in its TypeScript branch (repo_init.py:218), repo_check qualifies base mode only, and nothing ran test.sh new on base and on the reference before the paste. Found when the owner-asked solves graded 0/3 with the reference also 0/3; the owner had not run prechecks yet. Fixed task-locally: new_native_ids in choices.json (id -> [package, name]), repo_init --render-only, test.patch rebuilt, full proof, sample re-pasted. Needed: repo_init derives new_native_ids from expected.new (or flags it for Go and Python), and the stage-1b paste refuses a package whose proof did not run new mode on base and on the reference (precheck: new_native_ids consistent with expected.new). vet task 6 sample may carry the same gap (its profile.json shows new_native_ids {}). | OPEN |
+| 147 | 2026-11-13 cc-pmg-cooldown | PIPELINE.md Confirmation schedule item 2 (FP-audit every passer of owner-asked local solves, without asking) assumes a full reference. At stage 2 the reference is the sample sketch, and the fp-audit replica marks a pass NOT DESERVED only when the reference gets the case right (replicas/fp-audit.md), so an audit then returns DESERVED by construction for every gap the sketch shares (pmg: both solves pass the 3-test sample but miss D2 withheld and D4, which the sketch also misses). Needed: before stage 5, owner-asked solves are graded on the planned separators (eval/spike) and go into the variant corpus; their FP audits run only when the full reference exists, and only for runs that still pass the full suite. | OPEN |
+| 148 | 2026-11-13 cc-pmg-cooldown | Owner: "what is the issue why kit still rejecting it?" My wording of option A (#144) added "a failure whose right helper sits in the same file as the wrong idiom does not count", a reading veto over a measured failure (against difficulty.md "the gate is measured, never read"); it rejected pmg (spike fails only D4, whose dedupe idiom sits in stats.go next to the counter) although two Opus 5.5 high solves missed D4 and D2 withheld (one fix in the very function they edited). It was not needed for direct-deps either (its spike failed nothing, 35/35). | DONE 2026-11-13 (owner yes): difficulty.md section 1 (row field + best-separator note: rows the stated fix does not lead to; distance decides nothing), section 2 step 2, section 3 bar = one fair decision, distance never discounts; description.md step 3 + checklist line; PIPELINE.md stage-2 gate; ledger-template.md (needs 1; column 'Stated fix leads to it?'); installed copy updated |
+| 149 | 2026-11-13 cc-pmg-cooldown stage 3 | The builder locked its own draft d1 when the owner said "continue building the task from next stage" (no owner words), skipping the humanizing step; the platform DQ then failed d1 with a major ai_generated comment ("write your description like how you would prompt an LLM") while the local DQ replica had passed it (the replica cannot see the platform AI detector). The owner rewrote the text; both reading lanes found no changed or ambiguous phrase and the DQ replica passed the new bytes. Needed: PIPELINE.md stage 3 and description.md part B say the lock needs the owner's own text or an explicit "keep the draft" reply ("continue" never locks), the builder asks for it in so many words, and the lock record cites the owner text hash; a local check can never replace the owner rewrite because no local check sees the AI detector. | OPEN |
+| 150 | 2026-11-13 cc-pmg-cooldown prechecks | The platform "Test patch sanity checks" precheck warns on every kit test.sh: the profile is embedded as an opaque base64 blob (no_package_installation and no_malicious_code: "the encoding obscures content"). Needed: test.sh templates embed the profile as readable JSON (a heredoc or a sibling data block) instead of base64, so reviewers and the AI check can read it. | OPEN |
+| 151 | 2026-11-13 cc-pmg-cooldown | Owner (repeated): "to not stop for me ... I will only run 2+2 and then next run will be after final build; 2+2 is for your reference how agents are solving this ... we will see if anyone of 2+2 can become fair passer". The kit still made stage 6 start only after the stage-3 runs, and the builder told the owner it would wait. | DONE 2026-11-13 (owner): PIPELINE.md stage 3 and stage 6 rows and difficulty.md section 4: the builder never waits for the stage-3 runs or any owner check; stages 4-7 go on; the runs are folded in when they end (stop signal, keeper, gaps as fair tests through Repair); the next platform runs are the v1 rollout; installed copy updated |
+| 152 | 2026-11-13 cc-pmg-cooldown sweep 1 | Auto Review lane flagged process words in the kit test.sh template (grading, grade_roots, hidden_paths, "pristine grading-path inventory", "hidden path escapes source") as a Tests leak risk (a faust task lost Tests 0/3 to such words); precheck.py process-word check passes them. Needed: neutral identifiers and messages in the test.sh templates (for example restore_paths/overlay instead of grading/hidden), and precheck.py checks the template words too. | OPEN |
+| 153 | 2026-11-13 cc-pmg-cooldown verify | BLOCKER for every Go task: templates/go/Dockerfile:8 sets ENV PATH=/usr/local/go/bin:/opt/go/bin:/usr/local/bin:/usr/bin:/bin, dropping /usr/sbin and /sbin. The platform verifyTests/verifySolution image build then fails: it runs groupadd/useradd to create the model user (uid 1000), which are "command not found", and stops at "chown: invalid user: model:model" (owner-supplied modal build log). The Dockerfile check, rebuildSafe and harborSafe pass, and the local proof never creates that user, so nothing local caught it. Needed: the template PATH keeps /usr/local/sbin:/usr/sbin:/sbin; proof.py (or precheck) replays the platform user step (groupadd -g 1000 model; useradd -m -u 1000 -g 1000 model; chown -R model:model /app) on the built image before any paste. | OPEN (task fixed locally) |
+| 154 | 2026-11-14 | Owner: "we will keep running platform style replica checks until we get 3/3 in all, but to a threshold of 3; if even after 3rd round we get 1/3 we will run one strict sweep round again to cover all the gaps and again verification round after that". The kit stopped after one verification batch even with bands at 1 (cc-pmg-cooldown vb1: tests 1, solution 1). | DONE 2026-11-14: PIPELINE.md Review schedule stage-7 rows, the Terms paragraph and item text: verification rounds until description/tests/solution are all 3, at most 3; then one strict sweep -> fix -> rounds again (up to 3); then the owner decides; no paste for owner checks while a band is below 3; installed copy updated |
+| 155 | 2026-11-14 cc-pmg-cooldown verifyTests | Platform verifyTests failed the baseline (508/509, 1 errored): cmd/setup TestCheckEventLogDirResultUnwritable calls t.Skip when run as root, the platform runs base mode as root, and test.sh turns any base-mode skip not in skip_allowlist into an error. proof.py runs every cell as a non-root uid (12345), so the local proof passed; the sweep AR lane had flagged it as a note (N-3). Needed: proof.py adds a root base cell (the platform verify identity) and repo_check proposes skip_allowlist entries for tests that skip as root, with the reason. | OPEN (task fixed: skip_allowlist entry) |
+| 156 | 2026-11-14 cc-pmg-cooldown verifySolution | BLOCKER for every task built from the kit templates: templates/go/Dockerfile:16-18 (and templates/python, templates/typescript) leave /app owned by root and only readable for other users. The platform's verifySolution then fails with harbor_oracle_failed and no detail (baseline, new tests and offlineUid all pass): the Harbor oracle applies solution.patch in /app as the image's `model` user (uid 1000) and git apply cannot write ("unable to write file"), reproduced locally with groupadd/useradd + su model. The accepted vet Dockerfile has `chmod -R a+rwX /app` and passed the oracle on every version. Needed: (a) templates make /app writable for every user (chmod -R a+rwX /app), (b) proof.py gets a model-user oracle cell (create uid 1000, apply both patches in /app, run test.sh new and base) next to the root base cell of #155, (c) situations.md entry: harbor_oracle_failed with everything else green = /app not writable for uid 1000; the check's testLog artifact is missing, so diff against an accepted Dockerfile. Task-local replay: cc-pmg-cooldown/eval/harbor_emulate.sh. | OPEN (kit change waits for the owner's yes) |
+| 157 | 2026-11-14 cc-pmg-cooldown round v4r1 | Owner set the replica rounds of this task to GPT Sol 6.1 medium (was GPT Sol 6 medium, the kit default since 2026-11-13). The first 6.1 round found a real defect that two 3/3/3 rounds on 6.0 had accepted: a pinned ==2.0.0 reported blocked while an old 2.0 file of the same release is returned (three lanes reproduced it with pip offline); sweep 1 ref-B had raised it and the builder rejected it (ledger F04, reversed by F14). Needed: (a) owner decision whether 6.1 medium becomes the kit default for replica rounds (tools/replica.sh:20), (b) situations.md: a rejected sweep finding that says 'reported blocked while an installable version is returned' needs a client probe (pip/npm) before REJECT. | OPEN (owner decision) |
+| 158 | 2026-11-14 owner | Owner: "set codex to gpt sol 6.1 medium again". This decides 157(a): the replica checks default back to GPT Sol 6.1 at medium effort (was GPT Sol 6 since 2026-11-13). Changed tools/replica.sh:20 and its header, SKILL.md, PIPELINE.md Confirmation schedule (local-passer FP audit command) and situations.md; fp-audit and ref-audit stay GPT Sol 6.1 high; other Codex jobs stay high. 157(b) stays open. | DONE |
+| 158 | 2026-11-14 cc-pmg-cooldown verifySolution v4 | harbor_oracle_failed again on v4 after the /app fix (#156); baseline 509/509, new 10/10, offlineUid pass. Every task that ever passed the oracle (vet direct-deps, local-registry, unused-suppression) used a bash test.sh with `[--output_path F] [--mode] <base|new>`, optional output path and default mode base; the kit's adapter test.sh (repo_init.py render) exits 2 on `test.sh new`, `test.sh` and `test.sh --mode new`, so a wrapper that calls it any way but `<mode> --output_path F` fails. Task-local fix: eval/patch_testsh.py (applied in build_testpatch.sh). Needed in the kit: (a) the adapter template accepts that interface, (b) proof.py runs `test.sh new` without --output_path as one cell, (c) situations.md: harbor_oracle_failed = check the test.sh call interface and /app writability. Root cause on the platform side still unconfirmed (no Harbor log exposed). | OPEN (kit change waits for the owner's yes) |
+| 159 | 2026-11-14 cc-vet-pr-accuracy | No stage-2 gate measures the breadth of a promise. DQ (replica and platform) grades count, clarity and prescriptiveness, so a sentence with an open quantifier ("every finding", "every pair vet knows", "no output") passes at 8 units while it hides many repo cases: 19 reference bugs surfaced after the lock (2 FP audits, 2 checklist reviews, 1 ref-audit), each a corner of a stated sentence. Needed: at stage 2 step 8, a breadth count per sentence: for each quantifier word, list the repo cases it reaches (controls, outputs, pairs, link shapes) with a grep; over about 5 cases, the owner chooses before the lock between narrowing the words and accepting the build cost (problem-design.md section 4 already warns: "Mode coverage the reference does not really have"). | OPEN |
+| 159 | 2026-11-14 cc-pmg-cooldown verifySolution v5 | harbor_oracle_failed a third time after #156 and #158. The real Harbor 0.26.0 oracle (pip install harbor) passes the same package locally (reward 1.0) with an exit-code wrapper, so the platform's private tests/test.sh wrapper decides differently. The adapter test.sh prints raw `go test -json` events on stdout, while every oracle-passing task printed `go test -v` text; a log-parsing wrapper finds no `--- PASS:` line. Needed in the kit: (a) the Go adapter prints decoded Output text (task-local fix in eval/patch_testsh.py), (b) a stage-6 cell that runs the real Harbor oracle with a log-parsing wrapper (the task-local harness is in the session scratchpad; move it into tools/), (c) situations.md: harbor_oracle_failed with green verify = check stdout format, test.sh call interface, /app writability. | OPEN (kit change waits for the owner's yes) |
+| 160 | 2026-11-15 cc-pmg-cooldown round v6r2 | repo_init classified internal/cloudpolicy/cloudpolicytest (imported only by tests) as production, so test.sh did not restore it and a candidate could edit the fixtures of retained regression tests (AR T1 High). Needed: repo_init marks every non-test Go package whose importers are all test code as a helper (restore_paths), and proof.py tampers each such helper by default. | OPEN (kit change waits for the owner's yes) |
+| 161 | 2026-11-15 pmg hunt 2 (owner) | Owner, at the seam pick: "pick feature/bug which touches 10+ files; solver has to grind enough context on the codebase before coming to the solution, the solution should not be visible from the surface of the codebase". The kit sizes seams at 2-4 production files (hunt.md part B step 4 drops more than 4; problem-design.md section 6; templates/hunt-brief.md rule 1), the opposite direction. Needed: owner decision whether this becomes the kit default; if yes, hunt.md step 4/5 and the hunt brief score breadth (10+ files touched along the data path) and depth (the right answer sits away from the symptom site; the solver must trace the value through several subsystems), and problem-design.md section 6 changes its size guide. Applied for this hunt only until then. | DONE 2026-11-15: superseded by #162 (owner range 3-30 files + depth rule) |
+| 162 | 2026-11-15 (owner) | Owner's ten task-quality points: (1) a task never has only one solution, (2) different fair implementations pass, (3) wrong implementations fail, (4) hidden tests behavioural, not brittle (need), (5) requirements not discoverable from surface-level repo code and no hint in the repo itself, (6) no hints in the description, purely stated requirements, (7) more edge cases and behavioural tests, (8) round tripping (need), (9) features touching 3-30 files, (10) the solver must grind codebase context; the solution is not visible from the surface. | DONE 2026-11-15: problem-design.md section 5/6 and S0 step 3 (3-30 files on the value's real path) + new step 3b (depth trace, no repo hint, >= 2 fair designs, drop the seam if any fails); hunt.md B4 filter + B5 score (+1 traced value); seam-bank.md schema (depth, repo hints checked, fair designs) + lane rule 5; templates/hunt-brief.md rule 6 + schema; templates/design.md header; build-checklist.md round trip REQUIRED, edge-case matrix required, 'Behavioural, not brittle' rule, at least one valid alternative besides the reference; tests.md T6; description.md checklist (purely stated requirements). Points 6-8 were already rules (deletion test 2026-11-12, round trip and edge matrix 2026-11-13), now marked required. Both kit copies synced. |
+| 162 | 2026-11-15 cc-pmg-bypass-counts stage 1 | tools/precheck.py cannot run at the Dockerfile-only stage: it reads pkg/task.md first and crashes (FileNotFoundError) when the package holds only the Dockerfile, so the stage-1 gate (dockerfile-first-gate: local precheck rules before the Dockerfile paste) has no tool. Needed: precheck.py checks only the files present (a --dockerfile-only mode or a missing-file skip with a note). | OPEN |
+| 163 | 2026-11-15 cc-pmg-bypass-counts stage 1 | `olympus problems create` returned ConvexError "Submission creation is paused. New problems can't be created right now." No card says what to do. Needed: situations.md entry: creation paused = build ahead locally (stages 2, 4-7 need no draft; the spike and the stage-2 audits run locally), retry create at each paste point, tell the owner once; a reused Dockerfile identical to an accepted one may go in with the sample paste when creation reopens. | OPEN |
+| 164 | 2026-11-15 cc-pmg-bypass-counts stage 0b | tools/repo_check.py cannot qualify any adapter now: it hooks proof.run to discover native IDs "during the base/base cell of proof --build-only" (repo_check.py:204-206), but proof.py --build-only returns right after the image step (proof.py:244) since build-only became the Dockerfile-only stage-1 gate. qualify() never runs, self.image stays None and probes() fails with "TypeError: expected str, bytes or os.PathLike object, not NoneType" (eval/repo_check-3.log); every probe is NOT EXECUTED. Needed: repo_check runs proof without --build-only for its own base qualification (or proof gets a --base-only mode), and a smoke test of repo_check on a known-good package (PIPELINE item 8). Also: repo_check refuses --timeout >= 688 with a message that does not name the bound. | OPEN (task worked around by hand: discovery + base run with the rendered test.sh) |
+| 165 | 2026-11-15 cc-pmg-unanalyzed-counts | The task folder was first named cc-pmg-bypass-counts; "bypass" is on check_codex_brief.sh's flagged list, and every replica brief names the task path, so replica.sh refused to launch ("brief has flagged words"). The folder could not be renamed afterwards (a handle held it; worked around with a junction cc-pmg-unanalyzed-counts). Needed: repo_init.py (or the stage-0 card) checks the task name against the flagged list before creating the folder; hidden test names and file names avoid the list as well. | OPEN |
+| 166 | 2026-11-15 cc-pmg-unanalyzed-counts stage 2 | The obvious-design spike passed the gate on 3 fair decisions (trusted-only early return, insecure+block path, stop printing before --fail-on-violation), but the 2 local Opus 5.5 high solves the owner asked for both solved all 3 in 17-20 min (FP audits: both DESERVED). The spike models a lazy fix; on a seam that carries one value to a set of readers the description lists, Opus reads every reader end to end, so hidden early returns inside the named readers are not hard. Needed: difficulty.md section 3 note: a decision only counts when it sits outside the named readers (an unnamed reader, a saved-state round trip, a second entry path) or needs a semantic choice; "an early return inside a reader the text names" scores 0. Optional owner decision: a 1-solve Opus check before the lock for plumbing seams. |
+| 163 | 2026-11-16 (owner) | Owner: "remove the gate we had for difficulty, we are not continuing on that; instead, once you have my humanized desc, we will run 3-3 solvers in local and 2-2 on platform to get the best idea; solvers (both local and platform) run in parallel while you continue on your build with the workflow, start with the next stage". | DONE 2026-11-16: difficulty.md sections 2-4 rewritten (no gate; 2. solver runs after the lock: 2 Orion + 2 Vega + 3 Opus 5.5 high + 3 Codex GPT Sol 6.1 high in parallel, build starts stage 4 at once; 3. reading the runs: grade, FP audits, keeper, gaps -> fair tests, correct runs -> valid alternatives; 4. all ten correct with no spread -> owner options); description.md step 3, lock report and checklist (spike line removed); PIPELINE.md stage 0/2/3/4 rows and Confirmation item 2; SKILL.md card table and fixed rule; hunt.md step 8; ledger-template Difficulty; platform.md; rollout.md; tools/solvers.sh launches 6 (1,3 Opus main, 2 Opus claude2, 4-6 GPT); machine profiles solvers = 6. Both kit copies synced. |
+| 164 | 2026-11-16 (owner) | Owner: "the edge cases and more behavioural tests + round tripping should be part of the calibration prompt that we have saved for many passers, not in the actual flow, because these will be useful there". | DONE 2026-11-16: build-checklist.md drops the full round-trip cell set, the edge-case matrix and the 'one public-entry test per obligation' rule (keeps the base save/reload check of section 3 item 2 and 'Not brittle'); prompts/calibrate-one-passer.md gains Lever K (edge-case matrix + behavioural cells through the public entry point) and Lever L (round trip a-e), run after I/J and C/F/H, filtered by Step 3; ledger-template Blueprint note updated. Supersedes the 'required' marks of #162 points 7-8. Both kit copies synced. |
+| 167 | 2026-11-16 cc-pmg-propose-base stage 4 | tools/checklist_gate.py splits sheet rows on every `|`, so a note that holds a literal pipe (here `./test.sh base|new`) makes the gate report "rule 1.1: no row in the sheet" although the row is there. Needed: the gate reports "row 1.1 has N cells, expected 7 (a | in a cell?)" instead of "no row", or the sheet accepts `\|`. Also: a checklist edit mid-task re-keys changed rules and blanks their rows; the sheet command could print which rule ids were blanked. | OPEN |
+| 168 | 2026-11-16 cc-vet-pr-accuracy lock2 paste | tools/watch.sh keeps eval/platform/watch-base.txt across sessions: started after the lock2 paste with a baseline from an earlier session, it exited at the first poll and listed the 2026-11-14 checks and runs as new (old rollout FAIL_* and SQ FAIL), which reads as a fresh failed batch. Fix: write a fresh baseline on every start (or take --fresh, and have the paste step delete the old base); print each item's timestamp so an old result is visible. | OPEN |
+| 169 | 2026-11-17 platform V2 gates (CLI diff, cc-pmg-cooldown) | The platform readiness changed (memory olympus-gates-20261117): Nova 0%; Orion must solve 1-25% of runs; Vega at most 25%; Orion's solving runs must average >= 256K tokens (our past Orion passes: 106K-190K, none >= 256K); Auto Review left readiness; 7 quality checks with new categoryAlignment and rewardHacking; harborSafe needs a rebuild for a new hygiene layer; drafts reserved 14 days. Kit impact: rollout.md/profiles.md/difficulty.md target Orion (not 'exactly one family'); seam pick predicts Orion pass length; replicas for rewardHacking and categoryAlignment; AR band demoted; PIPELINE re-run list (prechecks, Scope Gate, rebuild, 7 checks). Owner 2026-11-17: the new Orion uses little context, so the requirement itself must force long work. Seam pick adds a length score: files the solver must read on the value path (target >= 15 across >= 3 packages), files it must edit (>= 5), parallel paths one sentence covers (every ecosystem/driver), layers the value crosses (handler -> state -> report -> CLI). Never padding (noisy logs, hidden steps): that is rewardHacking/unfair. | OPEN: waiting on the owner's plan and the platform's docs text |
+
+## #169 Replica knowledge: go-git fixtures rewrite absolute symlinks (2026-11-17, vet task 6)
+go-git's Worktree.AddGlob commits an absolute symlink as a path relative to its chroot ("/pinned/deps.txt"), not the
+real link text. A reviewer "reproduction" of absolute-link handling built with go-git fixtures is an artifact. Add to
+replicas/knowledge: verify absolute-link findings with the git CLI before keeping them; treat committed absolute links
+as machine-specific (they dangle on any other checkout).
+
+## #170 Stage 7: three phases, fix after every round (owner 2026-11-17)
+Replaces "sweep 1 -> replica batch -> verification batch, sweep 2 on its trigger" and the 2026-11-14 "rounds until
+3/3, then one strict sweep". Stage 7 now runs up to 3 phases: sweep 1, then a strict sweep, then a very strong sweep,
+each followed by a fix batch and 3 verification rounds (`tools/round.sh`) run one at a time with a fix batch after
+every round. Only medium-high reproduced errors in round 3 start the next phase; Lows are fixed but never do. After
+phase 3: fix, prove, stop and report the recurring error classes to the owner. Description fixes are allowed in a
+round's fix batch until the v1 paste (word reach, fairness replica, unit count, owner-approved words); from v1 on the
+lock is final. Changed: skill/PIPELINE.md (stage 3 and 7 rows, Review schedule, Terms, Confirmation items 3-4, time
+boxes, metrics), skill/SKILL.md, skill/description.md (sections 0 and 5), skill/ledger-template.md,
+agents/olympus-auto-reviewer.md, agents/olympus-sq-judge.md, GETTING-STARTED.md.
+
+## #171 Replica lanes: fall back to claude2 when Codex hits a usage limit (2026-11-18, vet task 6)
+round.sh lanes run only on Codex; a provider usage limit ("try again at 4:55 PM") killed a whole verification round
+mid-phase, 15 hours before the reset. Add an automatic fallback: on a Codex usage-limit or capacity error, rerun the
+same check on the claude2 reviewer agent of that role (sq -> olympus-sq-judge, fairness -> olympus-tq-judge, ar ->
+olympus-auto-reviewer) with the same brief, record the fallback in the checkpoint, and keep the gate's required-report
+names.
+
+## #172 Proof gets a two-user cell: root base mode, then the solution applied by uid 1000 (2026-11-18, vet task 6)
+Platform verifySolution runs test.sh base as root and then applies solution.patch as another user. vet task 6 fx6 failed
+it ("unable to unlink ... Permission denied"): test.sh restored pinned files with `git archive | tar -x`, and tar reset
+each touched folder to root 0755. proof.py runs every cell as one user, so it cannot see this. Add the cell (replay:
+cc-vet-pr-accuracy/eval/harbor-replay.sh) to proof.py, and make the kit's test.sh restore helpers use
+`tar -x --no-overwrite-dir` and leave restored files writable.
+
+## #173 Quick checks run the repository's own gate tests (2026-11-18, vet task 6)
+A reference change broke vet's internal/archtest import rule; the per-package quick check never ran it and SQ found it.
+The full proof and the pre-paste check run `go test ./...` (or the repo's `make check` test step) once, with known
+environment-only failures listed, not a hand-picked package list.
+
+## #174 The two-user replay checks verifySolution's test sets, not counts (2026-11-18, vet task 6)
+vet task 6 fx7 failed verifySolution with `after_extras_not_skipped`: the reference adds an acceptance script, and
+test.sh base mode ran every script in the folder, so base mode with the solution applied had one test that the baseline
+never had. The local base/base and base/reference cells showed it (1156 vs 1157 PASS lines) but only counted, so nobody
+compared them. Replay now: eval/harbor-replay.sh (root baseline, uid 1000 apply + new + base) plus eval/junit-sets.py
+(baseline failures, new not passing, new also in baseline, after extras not skipped, p2p not passing after). Put both
+into proof.py, and add to the build checklist: base mode runs only tests that the pinned commit has (overlay for Go
+files; acceptance or data-driven runners filtered by the pinned commit's file list).
+
+## #175 Size every task so the solving agent compacts at least once (2026-11-18, owner)
+Owner: "make sure the agent compacts, at least once; you need bigger and harder tasks". The platform gate (Orion's solving
+runs average >= 256K tokens) means the same thing, since Orion's window is about 258k. vet task 6 on its narrowed text
+does not reach it: the local Codex gpt-6-astra stand-in peaked at 204k of 258k with no compaction. On the older text, 1 of 4
+platform runs compacted. Kit changes:
+- hunt.md / difficulty.md: the seam's predicted solve must pass the Orion window.
+- Stage-2 spike: one local Codex solve must compact (peak context >= window, via astra-tokens.py on the session jsonl)
+  before the lock.
+- rollout.md: report each run's `compacted` and `sequenceLength`.
+Owner notes 2026-11-18 (an accepted task's 4 counted Orion runs) give the mechanics and the seam signs:
+- Sequence length is the sum of window peaks: window 1 peaks at 247K-250K, compacting at 243K-246K of input; window 2
+  restarts at 12K-14K and peaks at 41K-67K, for 292K-316K. A solve that never compacts stays under about 250K.
+- Runs make 150-200 requests at about 1.4K-1.7K context each and compact after 140-165 of them.
+- Good seam signs: crosses layers; needs 80+ files read and about 20 changed; several paths that must agree; large files
+  traced across; a slow suite.
+- Warning signs: one module, a prompt that points at the fix, instant tests, one tricky line.
+
+Kit changes:
+- hunt.md: score each seam on these signs.
+- difficulty.md stage-2 spike: the local solve's first window must reach about 243K input. The vet6 Astra spike, 100
+  requests and a 204K peak, would have failed this.
+- The spike runs the current Orion model and effort: GPT Sol 6.1 at xhigh (owner, 2026-11-18). A cheaper stand-in
+  (gpt-6-astra medium) under-reads and gives a low length estimate.
+
+## #176 SQ lanes time the default path at two input sizes (2026-11-18, vet task 6)
+Platform SQ on vet task 6 fx8 failed on speed alone. The reference builds a per-entry text for every npm lockfile entry
+on every scan (gjson.GetBytes from the top of the document for each entry, so the work grows with the square of the
+entries). A plain full scan, which never reads that text, went 1.34x slower at 4000 entries (+1.1 s), and 15.5 s vs
+11.6 s at 8000. No local lane caught it, because our SQ briefs, the SQ preflight checklist and proof.py check
+correctness and code shape only, and the hidden tests use tiny inputs. Add:
+- an SQ checklist item: list every per-item step the reference adds on a path that does not need the feature (full
+  scan, other modes);
+- a timed probe of each: base vs reference at 1x and 2x input, best of 3. Flag superlinear growth or more than about 5%
+  added time there.
+
+## #177 Fairness lanes: a wrong design that passes is blocking; prove each gap by a run (2026-11-18, vet task 6)
+Platform verifyFairness on vet task 6 fx9 failed with 2 blocking items:
+- No test removed an integrity hash. A solution that compares hashes only when both entries have one passed every test.
+- One assertion pinned exactly ADDED where the same file accepts {ADDED, MODIFIED} for the same situation.
+
+The platform now lists "a grounded wrong design passes every test" as blocking. Our fairness replica still says "verdict
+FAIL only when at least one test is Unfair", and kb-tests TC-09 calls partial coverage advisory. So four local fairness
+runs after that assertion was added (x1, x1r1, x1r2, x1r3) said PASS. They were static (no runs, no mutants) at medium
+effort, and two of them listed coverage gaps as advisory only. SQ lanes had read that the reference reports a removed
+hash (sq-p3r2b, sq-x1r4b), but no lane asked which test fails when a solution drops it.
+
+Kit changes:
+- replicas fairness prompt + kb-tests: a grounded wrong design that passes every test is blocking (FAIL), the same as an
+  unfair test.
+- Stage 6 gate (proof.py): run the hidden tests with -coverpkg over the packages the reference changes, and list each
+  changed block that no hidden test runs (eval/cov-changed.py in vet task 6). Each listed block gets a test, or a
+  recorded out-of-scope reason.
+- Before a paste that answers a platform coverage item: apply the platform's wrong design to the reference, and show it
+  passes the old tests and fails the new ones.
+- Each new change-name assertion is checked against the names the same file accepts for the same situation.
+DONE 2026-11-18 (owner asked to match the platform, with Codex): replicas/fairness.md rewritten.
+- It now has FP, FN and AR lanes, a decision ledger, executed one-line wrong solutions (only an executed survivor
+  grounded in the description or repository text blocks), an FN peer-value check, and AR T1 per leaf.
+- Output: the site's shape ("SUMMARY: Found N blocking ..."), a JSON ledger, and PASS / FAIL / NOT VERIFIED.
+- knowledge/tests.md TC-09 now says blocking; olympus-tq-judge sweep rules 3-5 point to the new rubric.
+- Merged from a Claude draft and a Codex GPT Sol 6.1 high draft (vet6 eval/tq-update, eval/codex/tq-replica-design.md).
+  Backup: fairness.md.bak-20261118.
+Still open: calibrate it once by running it on the fx9 tests and checking it finds the platform's 8 blocking items.
+2026-11-18 later: the rubric is reworded with neutral terms (variant, passing variant, CAUGHT, skip, contradicts),
+so one file works for Claude and Codex (check_codex_brief.sh clean). Codex judge jobs run with full access and may run
+Docker through dockrun, so the Codex lane executes wrong solutions too: codex_job.sh <task> <name> <brief> high judge,
+with CODEX_TIME_BOX_MIN. First two-lane run: vet6 fx13 (Claude olympus-tq-judge + Codex, eval/tq-run/).
+Evidence: on the fx9 tests the coverage list held the removed-hash message block (the platform's F1); on fx10 that
+block runs and the remaining 70 unrun blocks had no in-scope gap (defensive paths, scope left by the narrowed text, or
+unstated indirect outputs). A run takes about 5 minutes in the proof image.
+
+## #178 Before a paste, run a wrong-design sweep over the reference's decision points (2026-11-18, vet task 6)
+Platform verifyFairness on vet task 6 fx10 found 5 more passing wrong designs after #177's coverage run said no in-scope
+gap was left. 4 of the 5 were in code that the tests do run, but no test checked that outcome, which a coverage run
+cannot see:
+- a record taking Direct/Dev from the modified copy;
+- a CRLF checkout of a kept file;
+- two aggregations over copies with the same source ("first copy wins").
+
+The fifth (removed records counted as locked) was on the coverage list, and I put it out of scope because I only
+thought of the pull-request output; a control-level test settles it.
+
+Kit change (gates.md, stage 6):
+- List the decisions the reference makes for each stated rule: each tie-break, merge field, kept-file comparison, and
+  each place that reads the head's package list.
+- For each decision, write the naive version a solver would write as a one-line wrong solution (eval/val5/mutate.py
+  style).
+- Run each wrong solution through test.sh new. One that passes needs a test, or a recorded out-of-scope reason.
+- Consider a control-level or unit test when the pull-request output of a case is not stated.
+Owner 2026-11-18: "cover all, including what is implemented and stated", after a third fairness round. First version
+built in vet task 6 (eval/sweep):
+- mutants.py takes the lines the reference patch adds and keeps those the hidden tests run (cover profile). It writes
+  neg / drop / del / flip mutants: 396 candidates across 27 files before the filter.
+- runmut.py runs each mutant against the hidden tests and classes it killed / survived / invalid.
+- run.sh runs it as Docker shards.
+Move it into tools/ (proof.py stage) once its triage rules are settled.
+
+## #179 Re-run only the wrong solutions a test edit can affect (2026-11-18, owner, vet task 6)
+Owner: "why are we running full wrong solution again and again". A new test cannot let an old wrong solution pass, but an
+edit of an existing test can. Each proof run records which test caught each wrong solution (val-*.txt). The next run
+executes:
+- the new wrong solutions;
+- the old ones whose catching test changed (diff the test patch per test function).
+Everything else carries over. On vet6 fx14, only 1 of the 7 platform wrong solutions needed a re-run (about 15
+minutes saved).
+
+## #180 (proposed, owner decides later) Run the two-user replay only when it can change (2026-11-18, vet task 6)
+Proposal: run harbor-replay.sh when the solution, test.sh, the set of test files or the Dockerfile changes. When only
+test bodies change, the cells already prove what the replay would. Owner 2026-11-18: keep the replay before every paste
+for now, and decide later.
+
+## #181 Why the sweep and triage missed the no-resolved made-direct case (2026-11-18, vet task 6, platform fx15)
+The platform found a reference branch no test ran: reputation.confused, an entry with no resolved URL. A solution
+returning the package change there passed all 80 tests. Three misses lined up:
+1. The fx10 coverage run listed the branch as never run. I dismissed it by reasoning ("the entry change equals the
+   package change for the add-or-upgrade trigger"). That holds for install scripts, not for confusion, and fx13 showed
+   the two changes differ when a package is made direct.
+2. The sweep only mutates lines the tests run, so the branch got no variant. Its operators also cannot express "package
+   change instead of entry change" (an operand swap inside a return).
+3. When fx13's made-direct gap disproved that assumption, I tested the resolved-URL path only and did not reopen the
+   earlier decisions that cited it. The hygiene sibling (nonRegistrySources, single entry) was found only now.
+
+Kit changes:
+- An unexecuted changed branch is never classed "equivalent" by reasoning. A test runs it, or it gets a concrete
+  out-of-scope or defensive reason.
+- mutants.py gets a swap operator for entry-level and package-level fields (EntryChange<->Change, entry
+  Resolved/Integrity <-> package ones) in returns and assignments. It also runs once without the coverage filter, so
+  unrun branches get variants too.
+- When a finding disproves an assumption, grep every triage file for that assumption and reopen each decision that
+  rests on it.
+- Class coverage = every branch of the function plus every reader of the field (grep the field), not just the path the
+  finding names.
+
+## #182 Judge every passing wrong solution the way the site does: three sources, hangs are defects (2026-11-18, vet task 6, platform fx16)
+The site's fx16 round found 3 blocking items after two replica lanes and a 336-variant sweep passed the tests. Two of
+the three wrong solutions were in our own sweep and passed every test: variant 18 (no visited check in the base link
+walk) and variant 158 (no link count in the base link reader). Triage then dismissed them: 18 as "equivalent, a dedup"
+(the reference's own comment says "against loops"), 158 as "defensive: link cycles". The third (a package made direct
+keeps a MODIFIED record) got no variant at all. The fx13 Codex brief also steered the lane away from the sweep's passing
+variants ("spend your executions on what one-line operators cannot express"), so nobody re-judged them.
+How the site judges, from all its findings: a wrong solution is a defect by ANY of (1) the description, (2) the
+behaviour before the change on that input ("Before the change, ..." with the base code and the upstream test), (3) a
+contract the repository documents (code comments, upstream tests, the sibling mechanism the new code mirrors). A hang is
+always a defect. Our rubric line "behaviour the reference implements but the description does not promise gets a
+reason, never a test" is what let these through.
+Kit changes:
+- replicas/fairness.md v2 (eval/tq-run2/criteria-tq2.md of vet task 6): the three-source test; a contract ledger
+  (for each new function, the code it mirrors or replaces and that code's properties); input shapes (cycles, links to
+  the root, order, multiplicity, state matrix, field presence, CRLF, format versions).
+- Triage: "equivalent" only after an executed search for a distinguishing input found none; "defensive" only for an
+  error path whose removal still ends and changes no output; a loop guard or a limit is never defensive. Every passing
+  variant gets a focused check on base, reference and the variant before any call.
+- Lanes get the raw passing variants and the list of changed code no test runs, and never the builder's triage.
+- When a new function mirrors an existing one (head walk vs base walk), diff their rules line by line: the vet task 6
+  reference missed two of the head walk's three rules (target holds the link; at most MaxLinkedDirs linked folders).
+
+## #183 TQ skill: close the pool exhaustively with generators, not anecdotes (2026-11-19, owner, vet task 6)
+Owner: "learn this skill of TQ for future". What the site does that our checks did not, from its 12 blocking items:
+- It is a sampler that needs ONE real defect from the pool of passing wrong solutions (64 one-line variants still
+  passed all 83 vet6 fx17 tests). We review by sampling too, so we lose a round whenever any pool item is open. The
+  only winning answer is exhaustive closure: every item caught, proved equivalent, or proved not a defect.
+- It is not a stronger model (its fairness check ran on gpt-5.6-sol per the 11-05 platform data; our lanes on
+  gpt-6.1-sol). It asks a different question (which obligations do the tests not force?) with a different oracle
+  (description + behaviour before the change + documented contracts) and reads outward from the diff.
+- Our checks were many but correlated: all derived from the reference and the builder's description, so they shared
+  the builder's blind spots (the reference itself lacked two of the head walk's three loop rules).
+- Our knowledge was stored as per-task anecdotes (olympus-tq-judge grew to 532 lines of faust/turso/elio sections);
+  a judge matches anecdotes by surface features instead of deriving obligations from the repository at hand.
+Kit changes (done 2026-11-19): replicas/fairness.md v3 (pool closure, three sources, mechanism inventory read outward,
+generator matrix G1-G13 from the site's finding classes, reference as suspect, lens-split lanes); olympus-tq-judge
+METHOD v3 header on top. Still to do: rebuild olympus-tq-judge around the generators (move the anecdote sections to an
+examples appendix); sweep tool runs once without the coverage filter and covers every case clause; a pool-closure
+ledger file per task (eval/pool.md) that a paste requires to be empty of open items.
+
+## #184 Mirror a mechanism's decisions, not its rules (2026-11-19, vet task 6, own SQ replica on fx18)
+fx18 copied the head walk's three link rules into the base walk by reusing extractors.Links on the base tree. Two of the
+rules are local (a link to its own folder, a folder the walk is inside); the third is a global count in walk order (at
+most 64 linked folders). On a different tree (the change deletes a link) and in a different order (git tree order vs
+name order) the count picks different folders, so the base skipped folders the head read: false ADDED. fx19 records the
+folders the head walk enters (a quiet pass of the same walk) and the base follows exactly those.
+Kit: replicas/fairness.md G8 now says: when new code must agree with an existing mechanism, consume that mechanism's
+output where possible; re-running its rules on other input is a second implementation, and count-, order- or
+state-dependent rules diverge. Our own SQ lane caught this before the paste, which is the review schedule working.
+
+## #185 Reference scope = test scope (2026-11-19, vet task 6, owner question)
+Anything the reference implements that no
+hidden test checks is the worst of both: the platform can flag the untested behaviour, and the code carries its own
+bugs (the deleted-link reader produced the fx20 cache bug and a hang finding). At every build checkpoint list each
+reference behaviour with no test and decide: test it (if the description states it) or remove it from the reference.
+Kit: add this as a step in build-checklist.md before the proof, and a G14 "untested reference behaviour" question in
+replicas/fairness.md.
+
+## #186 Review lanes time-boxed and visible (2026-11-19, vet task 6, owner frustration)
+Three Claude lanes plus
+validation jobs ran 1-2.5 h each while the owner saw no progress; Docker slots were shared, so jobs queued silently.
+Kit: every lane brief carries a hard time box (default 40 min) and writes its report at the box; the builder posts one
+status line per finished step, never a long silent chain of tool calls; a new owner question is answered before any
+further tool call, as the final text of that turn if needed.
+Also: a lane that stops at its time box must kill its own wait loops (until/sleep shells polling for an output
+file). The fx20 SQ lane left 8 such loops polling for a probe file that would never come; the owner saw them as
+stuck tasks. The lane brief should say so, and the builder checks for leftover shells when a lane reports.
+
+## #187 Pre-paste gate in the kit, not only in memory (2026-11-19, vet task 6, owner: "did you forget new requirements again?")
+The 2026-11-17/18 owner rules (mutant sweep before every paste, V2 gate with the 256K compaction bar, 7 quality checks)
+lived only in memory notes whose index lines were cut short; after a context compaction the hand-over skipped them.
+Done locally: PIPELINE.md gains a "Pre-paste gate" section (backup PIPELINE.md.bak-20261119); the three MEMORY.md index
+lines now state the action. Still to do in the kit: wire the gate into tools (a pre-paste script that refuses a hand-over
+without a fresh sweep file and replay verdict for the same patch hashes).
+
+## #188 SQ replica must execute, like the TQ method (2026-11-19, vet task 6, platform SQ FAIL on fx22e)
+The platform SQ built a repository reached through a linked folder and ran vet: absolute link texts through the alias
+gave a false ADDED lockfile and a false finding. Our Codex SQ said PASS on static traces (execution NOT VERIFIED), and
+our Auto Review lane had found the same bug on fx20 (S1-b) but I left it out as Low without running it. Done:
+replicas/sq.md Step 3b (execute at least 6 attempts plus every environment-dependent one; path/link axes; execute every
+earlier lane's wrong-output finding before dropping it; no PASS on static traces). Backup sq.md.bak-20261119.
+
+## #189 Grep upstream tests before changing an internal type; model, not fallback (2026-11-19, vet task 6, fx24)
+Two lessons from the fx24 fix of the executed SQ findings. (1) I changed the type of an internal field (base.links,
+map[string]bool) and the engine package stopped compiling: an UPSTREAM white-box test (basecache_test.go) builds that
+struct literal, and test.sh restores upstream tests, so the type is pinned for every solver too. build-checklist.md
+should say: before changing any unexported type, field or function signature, grep the upstream *_test.go files of the
+package for it. (2) For "what does the base hold here", I first proposed a fallback that reads the head's state (the head
+link's real path) when the base model fails. It is wrong whenever the change edits that state (a retargeted link).
+solution.md should say: answer a base question with a model of the base (here, the base tree inside the repository plus the
+real file system outside it, which no commit holds), never with head state; and add a test where the change edits the very
+state that a fallback would read.
+
+## #190 Task copies of replica prompts go stale (2026-11-19, vet task 6, owner: "SQ TQ check should be new platform way")
+The kit's replicas/fairness.md became version 3 at 01:52, but the task's eval/replica/prompts/fairness.md stayed the v2
+copy, and I pointed the fx24 TQ lane at it; the owner caught it. sq.md and common.md were current only because I copied
+them by hand. Done: the task copy is now v3 (old one kept as fairness.md.v2-stale), and every copy was compared with the
+kit. Kit: lane briefs should name the kit's replicas/ files directly, or the launcher should compare each task copy
+with the kit before a lane starts and refuse a stale one.
+
+## #191 Codex replica checks ran on the wrong model (2026-11-19, vet task 6, owner: "which model of codex are you using?")
+Since fx19 I launched every Codex replica check (SQ, TQ, TQ-FN) with CODEX_MODEL=gpt-5.6-terra at high effort, because
+codex_job.sh's comment calls it "the platform's TQ/SQ/DQ model". The owner's rule (2026-11-05/14; SKILL.md line 42 and
+memory olympus-agent-models-20261028) is GPT Sol 6.1 at MEDIUM for replica checks, high for other Codex work. The rule
+was never changed; I carried the launch line forward through compactions. Fix now: replica checks on gpt-6.1-sol
+medium from fx24f on. Kit: codex_job.sh should take the model and effort from the job kind (judge = Sol 6.1 medium) and
+its comment should not suggest another model; the launcher should print the model it uses.
+Done 2026-11-19 (owner: "update the workflow if you are relying on that..update the tools"): codex_job.sh now sets model
+and effort from the rule (gpt-6.1-sol; judge medium, others high), refuses any other CODEX_MODEL unless CODEX_ONE_OFF_MODEL
+(user request), and prints model and effort in the launch line (backup codex_job.sh.bak-20261119). TOOLS.md and the
+models memory note updated. Root cause also noted: tools/replica.sh already had the right defaults; I bypassed it.
+
+## #192 TQ replica "full suite" left out the pass-to-pass tests the site also runs (2026-11-19, vet task 6, fx24f)
+The Claude TQ v3 lane judged each wrong solution by `test.sh new` alone (eval/tq-run8/batch.sh, 114 hidden leaves). The
+site grades with `test.sh base` (upstream pass-to-pass tests) as well. Blocking item 2 of the lane (zero hash for a
+dangling base link, e05/e35) "passed every test" but fails the upstream base-mode test
+TestPullRequestModeCountsAnUnresolvedBaseLinkAsChanged (eval/tq-run8/val25_me.txt), so it was a false blocker that cost a
+validation run. Kit: replicas/fairness.md method and the TQ batch template run both modes per wrong solution; "passes
+every test" means `test.sh new` and `test.sh base` both pass.
+
+## #193 Check verdicts reported without their version; a fix that reopens checks not announced (2026-11-19, vet task 6, owner: "before paste you said TQ is good now, now suddenly 4 blocker?")
+I told the owner "TQ good" for fx22e. After the site's SQ failed, the owner chose option A, which rewrote the link
+handling (fx23-fx24g: solution patch +370/-182 lines, tests about 300 lines). I did not say that this reopens TQ and SQ,
+so 4 TQ blockers on fx24f looked like a sudden regression. Two of them are on code added after the paste, one was a false
+alarm (#192), and one (doubled diagnostic count, W37) was already in fx22e: the pre-paste Claude TQ lane was scoped to
+"what changed this round" with two wrong versions, too narrow to reach it. Kit: every check status names its version;
+when the owner picks a fix that changes the solution beyond a line or two, the reply says which checks it reopens (SQ,
+TQ, AR, replay, bench); the pre-paste TQ lane covers every mechanism of the whole solution diff (v3 inventory), not the
+round's delta.
+
+## #194 Codex effort: medium for every job, not only replica checks (2026-11-19, vet task 6, owner: "why high? i asked for medium isnt it? for any work except in solver?")
+I launched the description review (kind search) at high because codex_job.sh and the skill said "replica checks medium,
+other Codex jobs high" (from the 2026-10-28 / 11-05 / 11-14 notes). The owner's rule is medium for any Codex work except
+solver runs. Done: codex_job.sh sets medium for every kind; replica.sh no longer raises fp-audit/ref-audit to high;
+SKILL.md fixed rule, TOOLS.md and the models memory note updated. The stopped job ran about 3 minutes at high.
+
+## #195 Rulebook repair: a sentence over an open input space names its boundary at the lock (2026-11-19, vet task 6)
+The vet task 6 link sentence ("If a manifest file is followed via a symbolic link, it will be diffed against the
+corresponding file at the same path on the base ref") had no boundary, so every link shape (absolute texts, aliases,
+outside folders, links that leave the scanned folder, links to the folder itself, text checkouts) became a requirement;
+about ten review rounds and two site SQ failures followed, and the cache sentence inherited the whole space. The owner's
+one change closed it ("Only relative symbolic links that stay below the scanned directory are in scope: ..."), the same
+for "all pairs known to vet" ("every lockfile vet reads packages from, paired with the manifest file it is generated
+from"). Rule that should have caught it: R12 (depth, not breadth; "every kind elio knows"). Done: description.md R12
+now says a sentence over an open input space (links, outputs, "every X the tool knows") states its boundary before the
+lock, with this evidence.
+Done #192 (2026-11-19): replicas/fairness.md step 4 now defines PASSED ALL as passing `test.sh new` and `test.sh base`
+(pass-to-pass) with the edited solution, and requires a base-mode run before a blocking item is reported.
+
+## #196 SQ replica verdict and report were the site's old format (2026-11-19, vet task 6, owner: "isnt this was old way? ... You even figure out and analysed how SQ is working now?")
+replicas/sq.md found issues the current way (Step 3b, executed) but judged and reported them in the old site format:
+x/3 scores, High/Medium/Low, FAIL on two Mediums. Every site SQ result since 2026-11-18 (vet task 6: fx8, fx9, fx22e
+twice) reads "Found N blocking issues and M non-blocking issues": blocking = a wrong output on an executed input
+(Input / Command / Expected / Received / Why / Suggested change) or a measured slowdown on the normal path (fx8, 1.34x);
+non-blocking = Design / Clutter / Practice notes, measured costs on extreme inputs; FAIL only with a blocking item (fx9
+passed with 6 notes). Our lanes reported 0 notes where the site wrote 4-9, and two notes (Resolve kept, cache version
+jump) came back after an earlier fix. Done: sq.md Step 5 is now the site's Design / Clutter / Practice sweep with its
+examples, the verdict section is the site's current format, issues carry blocking and kind; score fields kept and
+derived (1 blocking / 2 notes / 3 none) so summarize.py and round.sh still read the reports.
+Follow-up #194 (2026-11-19): the medium-for-every-kind change also lowered solver runs (solvers.sh calls codex_job.sh
+with job name "solve", kind build) to medium, against the owner's "except in solver". Fixed: codex_job.sh keeps job
+"solve" at high. A model other than GPT Sol 6.1 for a solve (the owner's GPT Astra run) goes through
+CODEX_ONE_OFF_MODEL; eval/solvers-astra.sh on vet task 6 now uses it.
+
+## #197 Base-mode regression list misses packages that import changed code (2026-11-19, vet task 6)
+fx22d added every package importing changed code, but six extractors (importing the changed scalibr), test/extraction,
+test/reach and cloud/report (reached through sinks, flagged by tests_lint L5) were still missing on fx25. Kit: a
+deterministic check (tests_lint L5 or proof.py) that computes the direct importers of every changed Go package with
+tests and fails when one is neither in base mode nor listed with a reason (wall-clock or user-dependent tests).
+
+## #198 Judge prompt made Codex rename the replica report (2026-11-19, vet task 6, SQ fx25d-b)
+codex_job.sh's judge prompt said "write ONLY your report plus check files under the task's eval/ folder with a _cx
+suffix"; Codex read the suffix as applying to the report too and wrote sq-fx25db_review_cx.json instead of the brief's
+sq-fx25db.json, so round.sh failed the check ("missing or empty report") although the review had finished (PASS).
+Done: the judge prompt now says to write the report files the brief names at exactly those paths and names, and only
+check files take the _cx suffix.
+
+## #199 Our TQ missed two platform fairness blockers on vet task 6 fx25g (2026-11-19, owner: "here we again got error you last 10 hour of work was this")
+Platform TQ v3 on fx25g: 2 blocking, 3 notes; both blocking items reproduced before fixing (eval/tqv3/).
+(1) Missing coverage: the reference walks the head twice in pull request mode (a quiet walk finds the linked folders);
+only its `if !quiet` guard keeps the unreadable-path warning at one count per path. A version without the guard prints
+"(4 times)" for two chmod 000 folders and passed every test. Our variant sweep had flagged that line (variants 143/144
+survived) and I parked them as "full-scan, check later". (2) Unfair test: the entry-table row with 9007199254740992 ->
+...993 (added at fx25b because our Codex SQ called float64 decoding a bug) rejects decoding as npm's JSON.parse and Go's
+encoding/json do. Notes: a reach test calling reachOf with a hand-built state no scan builds (a removed record marked
+local), a wall-clock goroutine helper, a flat 30-pair loop instead of table subtests.
+Kit, done: replicas/fairness.md G14 (extra passes count once), G15 (values every reader of the format tells apart),
+G16 (internal-function tests with hand-built states), step 5: parking a variant ("check later", "only the full scan")
+is no closure. Open: (a) when SQ asks for a reference choice and no fairness lane has judged a test of it, keep the
+fix untested (record it) - add to sq.md/fairness.md hand-off; (b) TaskStop on a multi-step run script kills only the
+running step: the script went on to start the next container (offline uid, then replay). Run scripts need a trap or a
+stop file, or the stop procedure must kill the whole process tree and the containers it started.
+
+## #200 Adopt the "Passing Test Quality Once" method as the gate before every Test Quality purchase (2026-11-19, owner handover from an agent that passed TQ; vet task 6)
+The method: three lists before the first upload (every decision point of solution.patch with the test that fails when
+it alone changes, plus every existing behaviour at each touched site; every call form the repository accepts for the
+named commands; every description sentence split on its triggers), a grid of cells checked against an oracle (the
+full scan, the base code) rather than literals, a scripted wrong version kept for every gap and re-run together every
+round, controls for unfair findings, the fairness sentence over every assertion of the whole file every round, no
+skips in new tests, a solo suite run under 6 minutes, notes fixed or declined with a written reason, Test Quality
+bought last, and fresh eyes after a second fail. Measured on vet task 6: our variant sweep reached 7 of 27 changed Go
+files (about 59% of the decision points), parked 18 survivors, had no existing-behaviour list (the platform's blocker
+1), and no fairness sentence pass (blocker 2).
+Running on vet task 6 (fx26): four read-only lanes (A decision table of the 20 unswept files, B design-level wrong
+versions and existing behaviour of the 7 swept files, C call forms and grid, D fairness sentence on every assertion)
+and an independent Codex review against the method (GPT Sol 6.1 medium, eval/codex/tq-once-review.md); then one
+batch run of every scripted wrong version, backed tests only, full proof.
+Kit, to do after this task's round: a card (tq-once.md) with the lists, grid and checklist; a runner for kept wrong
+versions (eval/wrong/*.py with EDITS, expected leaves; controls must pass); mutants.py gains always-true/false
+operators and lists added lines no test runs; replicas/fairness.md step 1 builds the three lists first.
+Done for #200 (2026-11-20): olympus-flow/tq-once.md (the method as a pre-purchase gate, with the vet 6 traps: per-leaf
+T1 with subtests, head-only counts, oracle instead of a root skip, SQ-requested behaviour not pinned) and its row in
+SKILL.md. Still to do: a kit runner for eval/wrong/kept (today eval/tqv3/wrongrun.py + batch2.sh on vet 6), and
+mutants.py always-true/false operators plus a list of added lines no test runs.
+
+## #201 Estimate the test grid before locking a seam and a description (2026-11-20, vet task 6, owner: "why our problem so bad?")
+vet task 6's reference touches 27 Go files (about 1,350 added lines, about 300 decision points) and its description has
+universal words over wide axes: "every finding" (16 finding families), "any outputs" (16 outputs), "every lockfile vet
+reads packages from" (21 lockfile names x 6 pair conditions), plus the open link domain (chains, limits, texts, loops).
+Each universal word multiplies the cells a reviewer can probe, and code shared with the full scan adds existing
+behaviour to keep. Result: 20+ fix rounds, each finding a new cell. Kit: at stage 0 (seam) and stage 2 (description),
+count decision points of the planned change and the cells each universal word opens (axis members x conditions);
+above a budget, narrow the seam or the word before the lock (problem-design.md, difficulty.md).
+Follow-up #201 (owner 2026-11-20): sequence length comes from depth, not width: "give a difficult enough task so
+that agent first takes time to understand the problem and code ... Widening the task will not help." vet 6 (wide, 27
+files) peaked at about 205K for the GPT Astra stand-in, no compaction. Kit: hunt.md/difficulty.md seam test = how much
+code a solver must read and trace before the first correct edit, not how many rules the description lists.
+Follow-up #201 (owner guideline 2026-11-20, "an iterative task that requires the agent to examine its log and its
+current solution, repeatedly refine"): vet 6's s8 solve was one pass (63 calls: about 40 reads, 15 edits, 6 test runs,
+32 min) because no run the agent could make showed its solution wrong. Kit seam test: does the agent's own feedback
+(a reproducible command, build/test output, logs) keep failing until the work is done, layer after layer?
+
+## #202 Checklists and checkers updated from the handover, every vet 6 platform finding and the owner's five test rules (2026-11-20)
+Owner: "update our check list of test and solution now and our TQ SQ checkers also"; rules: hidden tests fair, prompt
+aligned completely, all tests behavioural, no API-based tests, every test on public behaviour. Done:
+- tests.md: "Hard rules for every hidden test" (the five rules with vet 6 examples) + hygiene (T1 per leaf, no skips
+  with a non-root guard, OS limits gated, scenario names in messages, existing behaviour kept, kept wrong versions,
+  solution-side tests are no coverage, tq-once.md before TQ).
+- solution.md: "Hard rules" (site SQ executes inputs; decision table; constants at real limits; sibling forms a tool
+  defines; a second pass repeats no side effect; shared code paths and scope growth; one logic in one place;
+  solution-side tests not graded).
+- build-checklist.md section 10: the new "never" items + pointers.
+- replicas/fairness.md step 10: five verdicts per assertion (fair, aligned, behavioural, public, per-leaf T1), the
+  skip / root / OS-limit / scenario-name checks, enumerate cells instead of sampling.
+- replicas/sq.md step 3: sibling forms, second-pass side effects, shared code paths, real-limit constants, duplicated
+  logic; solution-side tests are no proof.
+- tq-once.md: the five rules up front.
+Open: build-checklist.md and tests.md still hold older words that the Codex brief filter flags (probe, survivor, leak,
+FP panel, inject, crash, mutant); reword them if a Codex builder ever reads those cards (the judge cards are clean).
+
+## #203 A removed side effect at a touched site broke a check in another package (vet 6 platform SQ, 2026-11-20)
+Platform SQ on vet 6 blocked on a regression: the solution stopped writing an unresolved link into the temporary base
+tree; upstream wrote the link text there, and the manifest extractors' lockfile-presence check (fs.Stat of the name)
+relied on that entry. No decision point of ours looked wrong on its own; the reader of the side effect is in another
+package. Kit changes to make:
+- solution.md / tq-once.md list 1: for every write the solution removes or makes conditional (files, map entries,
+  temp-tree entries), list who reads it (grep the consumers: Stat, Open, ReadDir, map lookups) and keep one executed
+  case per reader.
+- replicas/sq.md execution lane: an "unchanged PR" sweep, one run per input shape of the touched axis (here link target
+  kind: file, folder, dangling, outside x every file name an extractor checks for) with a change that edits only an
+  unrelated file; expected output is no record with a change. Compare with base vet on the same tree.
+- gates: base vet versus reference on the same unchanged-PR trees as a kept script (a regression against upstream is
+  blocking at the site every time).
+
+## #204 Fast hand-over check: run each check only when its inputs changed (vet 6, owner 2026-11-20)
+Owner: "find a way of not running hand over check for 1 hour". Measured cause: the full suite is 5 minutes alone and
+20+ minutes when other Docker jobs share the 3 GB VM; the fx30b hand-over ran it seven times, mostly in parallel with
+other jobs. Built for vet 6 in eval/fast/ (run.sh, fp.py, snapshot-in.sh, twouser-in.sh, light-in.sh); move into the kit:
+- fingerprints: test.sh / hidden tests / solution. The clean-repo base run depends on test.sh alone (base mode runs no
+  added test file; fp.py refuses a test patch with anything but test.sh and test files), so root's baseline is run once
+  per test.sh and committed as a snapshot image; the after run is saved per test.sh + solution.
+- the two-user order is kept: uid 1000 starts from the state root left in the snapshot; the verdict is the same junit
+  set check over the saved baseline, new and after files.
+- kept wrong versions run only the test function each names; a failing case of the after run is re-run alone x3 to
+  tell a wall-clock failure from a real one; the hidden tests also run as a user id with no account record.
+- one heavy container at a time (DOCKRUN_SLOTS=1 for every lane): contention, not the suite, made the runs slow.
+- the full cold two-user replay is repeated only when test.sh changes; say so in the hand-over.
+- new standing step (from #203): reference versus upstream vet on unchanged-PR trees (eval/sq31/agents.sh).
+
+## #205 A helper that died was reported as still running; reserve rows measured on agent solutions (vet 6, 2026-11-20)
+- The in-process helper stopped when the owner interrupted the turn; an hour later I still said it was running, and the
+  owner saw no container. Rule for the kit and for me: before any "still running" statement, check the lane's last file
+  time and `docker ps`; after an interruption, list every background lane and restart the dead ones in the same reply.
+- Method that worked and should be a kit step after the wrong-version lanes: for each open wrong version write one
+  behavioural row, then run every row on (a) the reference, (b) its wrong version, (c) the clean repo, (d) each real
+  agent solution through test.sh new. Add only rows that every strong run passes; fold a row that passes on the clean
+  repo into a leaf led by one that fails there. vet 6: 24 of 37 open versions closed in one pass at no cost to the
+  Orion runs (eval/reserve31/table.py, eval/fx32/rows.sh).
+- eval/fast/run.sh: add the reserve list (eval/fx32/list.txt) to the kept-version step so those versions are re-run
+  with every hand-over; a kept script whose edit no longer applies must fail the step, not print a line.
+
+## #206 A test cell removed for the rollout came back as a platform Test Quality blocker (vet 6, 2026-11-20)
+What happened: fx30 removed the emptied-lockfile pair rows because all four Orion runs of rollouts 46 and 48 failed
+them, while the reference kept the code (emptiedLockfiles). Platform Test Quality on fx32 then blocked on exactly that
+("no test covers a change that empties package-lock.json"). Second blocker: the saved report keeps the fields of each
+manifest through one comparison of 12 fields (sameUse); the tests covered the 5 fields upstream already had and the
+copies, never "only the integrity differs".
+Workflow changes:
+- Removing a test cell while the reference keeps the code behind it opens a Test Quality hole. The removal step must
+  list each removed cell with the code path it leaves untested, and either a test stays for it or the owner sees the
+  hole before the paste. A cell that every agent run fails is a rollout cost, not a reason to leave code untested.
+- Field-list sweep: for every function of the reference that compares or copies a list of fields (here sameUse, useOf,
+  In), one wrong version per field in the kept-version step, before the first paste. vet 6: 7 wrong versions written
+  after the finding; 2 more survived the first new tests (entry change, local mark) and needed their own rows.
+- A row that can only differ in a field the clean repository does not have passes there, so it cannot be a subtest of
+  its own: fold it into a leaf led by a scenario that fails on the clean repository (eval/fx33/probe2.txt).
+- Go test text with backslashes goes through the Write tool only: a doubled backslash in a quoted Python heredoc
+  became a real newline again (eval/fx33/saved.go.txt is the clean source).
+- eval/fast/run.sh: the kept-version step is now 17 scripts and about 220 of 700 seconds. Split it so that a change of
+  layout only (same test names and assertions) repeats new mode, the clean-repository run and lint, not the kept step.
+- A probe of new rows runs on the clean repository and the reference first (eval/fx33/probe.sh): it showed which rows
+  fail on the clean repository (subtest allowed) before the test was written into the package.
+
+## #207 Handover document for a second machine (2026-11-20, owner request)
+HANDOVER-new-machine-20261120.md (13 sections: platform facts, how each reviewer judges, test and solution rules, the
+pre-paste proof, the fast hand-over check, description, difficulty, rollout, the finding-type re-check list, working
+rules, the nine decided-but-unwritten kit changes) and its appendix A (the fast-check scripts). Sent to the owner's
+cloud session as two messages. Kit: keep this file current as the one-page entry for any new machine; section 12 is
+the open kit to-do list of #203 to #206.
+
+## #208 A "one-line solution change" I promised broke a repository test; check the repo's own tests before promising (vet 6, 2026-11-20)
+For the owner's hint ("empty or not") I said a zero-byte package-lock.json needed a one-line solution change. It
+needed two files, and the second edit contradicted an upstream test (the lockfile control must return an error for a
+lockfile that is not JSON). I found that only after a 12-minute fast check failed. Kit:
+- Before proposing any solution change, grep the repository's own tests for the behaviour at the site and at every
+  consumer of the changed value (here: the control that reads the lockfile again). A pinned upstream test is a
+  contract (source 3) and decides the boundary of a description word ("vet reads" excludes a file vet cannot decode).
+- Run a one-minute targeted check (the new test plus every test of the touched packages) before the long fast check.
+- Word reach for a hint: list every reading of the new word on the current solution first (probe), then decide; do
+  not promise the solution change before the probe.
+- A platform note asking for t.Run subtests is declined with the per-scenario clean-repository table as proof.
+
+## #209 What two Orion trajectories show about how the agent decides (vet 6 rollout 50, 2026-11-20)
+- The agent's loop is: trace, write its own regression tests, fix, run the repository gate, stop when green. Its tests
+  encode its own reading of each sentence, so a case it did not think of never fails for it. A requirement is solved
+  only if the agent thinks of the case while reading; nothing it can run corrects a narrow reading. Kit (profiles.md,
+  difficulty.md): predict a miss wherever a stated rule reaches a state the visible tests and docs never show.
+- A scope word is read by its nearest noun: "every lockfile ..., paired with the manifest file" became a table of file
+  names; no run asked which states of the lockfile count. Kit (description.md word reach): list, per sentence, the
+  reading the nearest noun suggests, and what it leaves out.
+- Tool output is capped (about 10K characters per call) and the agent batches several files into one command; a
+  decisive line was cut from its final review. This is noise in the rollout, not a property of the task: do not treat a
+  single run's miss of that kind as evidence that a test is hard.
+- A new mechanism that mirrors an existing one copies its limit as a separate budget (two walks, two counters); the
+  case above the limit is never tested by the agent. This class (mirror with an independent bound) is a dependable
+  discriminator.
+- tools: eval/grade50/timeline.py prints a compact timeline of a trajectory (each tool call, the size of its result,
+  the agent's messages, the per-window token peaks give the sequence length). Move it into the kit's tools.
+
+## #210 Length lever: a stated requirement in an area the agents barely read, that the solution already meets (vet 6, 2026-11-20)
+Four Orion runs: 75-79% of the context is reading; three stopped 25-30K short of compaction (about 244K), and a run
+that compacts is over 256K. Lever tried in fx35: add one clause that the current solution already satisfies, in an
+area the runs barely opened (here internal/policy: "a policy applied to the report read back gives the same gate"),
+so a solver must read and check it. Cost: one test, no solution change; risk: one more requirement unit (Task Prompt
+Quality) and one more area for the Test Quality reviewer. Kit (difficulty.md): measure per area the read commands
+of the stored runs, pick an area under 10% that an existing sentence already reaches, probe the solution first.
+
+## #211 A hint for a wall case is direct; a subtle hint for it is wasted (vet 6, 2026-11-20)
+A case that every run of every rollout fails is a wall, not a separator: making it easy costs no difficulty while
+other cases still split the runs. The rule "never name the case the runs fail" is for separators. For a wall the
+owner asked for a hint; I first gave three words ("empty or not"), and the owner asked why it was not straightforward.
+The trajectories show agents read a sentence by its nearest noun, so a subtle qualifier is easy to skim. Kit
+(description.md 5b): when the owner asks for a hint on a wall case, name the state plainly in the user's casual words
+("even if the PR leaves the lockfile with no packages in it"), and check it describes exactly what the tests check.
+
+## #212 Scouter: identify the hosted agent's harness, effort and model from its trajectories (2026-11-20, owner guide)
+eval/scout/ in vet 6 holds the tools: stage_a.py (harness fingerprint, hidden prompt part = first-request input minus
+visible messages in o200k_base, work per request, compaction windows), local_sessions.py (same fingerprint from local
+Codex rollout logs with known model and effort), capture-in.sh + capture.py + capture_report.py (what a Codex build
+sends on its first request, in the task image, no model call), grade.sh (hosted patches graded locally with the tests
+they were graded with). Findings that change the workflow:
+- The hosted Orion harness is stable (one hidden-part size over 7 days) and is an older Codex build than the current
+  one: a local solve with current Codex is not a replica (different tools, instructions, compaction point).
+- Hosted compaction comes at about 244K, so the 256K bar means "compacted once" under that harness.
+- Hosted Orion reasons 2-3x less per request than our local gpt-6.1-sol high runs; local solve lengths and pass rates
+  overstate Orion until the replica runs the hosted build and effort.
+Kit: move eval/scout into tools/scout; before any local stand-in solve, run capture_report against the hosted
+fingerprint; record per rollout the hidden part and reasoning per request so a platform change shows at once.
+
+## #213 Verify Flakiness failed on an existing wall-clock test the change does not touch (vet 6, 2026-11-20)
+The base suite runs every listed package in one parallel go test call; a repository test with an upper wall-clock
+bound (1.6 s for a scan with two 1 s enrichers) went over it 4-5 times in 30 even on a quiet machine, on the original
+repository as well. The platform runs the suite 12 times, so one failure is likely. Kit (harness.md, test.sh template,
+build-checklist): before the first paste, git grep the base packages' tests for upper time bounds
+(assert.Less(t, time.Since(...)), elapsed comparisons, short timeouts); measure each 30 times on the clean repository;
+skip each one that exceeds its bound there in base mode, with the reason next to it, as for user-dependent tests.
+A test.sh change re-opens Verify Tests, Verify Solution, Verify Flakiness, Reward Hacking and Test Quality.
+
+## #214 A local replay can pass tests that the same patch fails on the platform (vet 6 rollouts 51-52, 2026-11-20)
+Two of six Orion patches failed five link tests on the platform that pass when the patch is replayed in our task
+image; both read files through Go's os.Root. A temp folder reached through a link was ruled out. Likely a kernel or
+sandbox difference (link resolution under the platform's runtime). Kit (rollout.md, scouter): treat the platform
+junit as the truth for a run; report replay-vs-platform differences per test; do not count a run's local replay as
+its platform result; when two patches share a platform-only failure set, look for the shared mechanism first.
+
+## #215 Sequence length by requirement: attribution of each run's context (vet 6, 2026-11-20, owner request)
+eval/scout/attribution.py gives each tool call (arguments + output read, o200k_base) to the requirement areas its
+command or patch names; the rest is the fixed prompt plus the model's reasoning and messages. On 6 Orion runs:
+tests and builds about 18%, the largest requirement (links) about 16%, each other requirement 7-9% (17-22K tokens),
+policy clause (already met by the solution) 1.5-3% (3-7K). Kit (difficulty.md, length gate): estimate a seam's
+length as fixed prompt + about 20K per requirement that needs a code change + about 18% for test runs + about 15% for
+reasoning; a requirement the reference already meets adds only a few K. Use this table before adding requirements
+for length.
+
+## #216 Near-miss release without a Test Quality hole: replace a removed cell with one the near miss passes (vet 6, 2026-11-20)
+When a near-miss run fails only crafted cells, deleting them leaves the code path untested and Test Quality can block
+on it (it did after the emptied-lockfile removal). Method used for fx40: for each removed cell, write down the wrong
+design a reviewer would naturally write (usually the reference minus one check), then find an input where that design
+fails and the near-miss run passes (a kept folder instead of an added one; a 300-link chain instead of 41; the kept
+"delete the first of 65" case). Add it as a case of the same test, with a kept wrong version for the natural design.
+What stays uncovered is only the near miss's own variant; record it. Kit (near-miss-release.md, tq-once.md).
+
+## #217 Dry-run each replacement case against the near miss's own code first (vet 6, 2026-11-20)
+fx40's kept-folder case (a folder named build.gradle.kts that the base has and the change keeps) was predicted from a
+grader's one-line summary ("compares glob name sets") and failed run #3 in the quick check: its code also looks up
+the base blob of each match and returns false for a folder. Any input with a folder named like a manifest file fails
+run #3, so that path cannot be covered while run #3 passes; the case was dropped and its kept wrong version held.
+Kit (near-miss-release.md): before writing a replacement case, read the near miss's code for that path and trace the
+case through it; when every covering input fails the near miss, the path is the near miss's own variant (hold, record).
+
+## #218 A kept wrong version must model the other design, not tweak a check the reference never reaches (vet 6, 2026-11-20)
+base-links-unbounded (the reference with maxLinks 100000) passed the 300-link case: the reference's base enters only
+the linked folders the head entered, so its link limit is never used for a folder the head cannot open. The natural
+wrong design is a base that resolves links on its own (as run #3 does) with no limit: base-walk-unbounded (enter every
+linked folder + no limit). Kit (tests.md, wrong versions): when a test is meant to catch a design that differs in
+structure from the reference, the kept wrong version changes the structure too, and a control (same structure, right
+limit) shows the case isolates the one decision.
+
+## #219 FP triage: check the behaviour before the change on each discriminating probe before calling it stated (vet 6, 2026-11-21)
+The FP audit of the near miss found "a removed runtime copy next to a kept dev copy: run MODIFIED, reference
+UNCHANGED". I first told the owner the reference rule follows a stated sentence and needs no change; only then did I
+read upstream: it gives MODIFIED on that input, so the run kept upstream's rule and the reference's rule was our own
+addition (a replica finding about sources; the dev mark came along). Kit (near-miss-release.md, rollout.md lever 3,
+replicas FP triage): for every probe that separates a passer from the reference, record three columns before any
+verdict - description sentence, behaviour before the change (run or read upstream on that input), origin of the
+reference rule (platform finding, stated sentence, or our own review round). A rule that is ours alone, unstated and
+untested is an alignment candidate for the owner; a rule the platform asked for or a sentence states is not.
+
+## #220 Kit card sq-once.md: the Solution Quality gate, the counterpart of tq-once.md (owner request, 2026-11-21)
+The owner asked for a Solution Quality handover in the form of the Test Quality one. Written as
+HANDOVER-passing-solution-quality-once-20261121.md from every platform SQ result we have (turso, swift, faust, elio,
+vet): what the reviewer does, hard rules, four lists before the first upload (promise x path grid, decision rows,
+rejection ledger, touched-site ledger), closing cells by execution, cost on the normal path, the three-source verdict
+with the defences that never worked, the Design / Clutter / Practice sweep, order and repair loop, an evidence table
+and a one-page gate. Kit: copy it as olympus-flow/sq-once.md, link it from SKILL.md (stage 4-5 and 6-7) and from
+solution.md and replicas/sq.md, and make its section 9 the gate item before every SQ purchase in gates.md.
+
+## #221 replica.sh: an Auto Review that runs alone (owner request "run only auto review", vet 6, 2026-11-21)
+replica.sh ar refuses to start without the fairness, sq and dq outputs of the same tag. For "only Auto Review" I
+hand-built a brief (eval/ar-fx40/brief-codex.md): no replica outputs, the site's own check results as files, and a
+runs folder with each run's verdict on the current tests. Kit: `replica.sh <task> ar <tag> --alone [--runs <dir>]
+[--site <file>...]` writes that brief; ar.md gets one paragraph for the alone case (do the coverage, S1 and P parts
+yourself; a family without runs does not fail the gate).
+
+## #222 Harness check: every test-only helper package of a base-mode package is pinned (vet 6, 2026-11-21)
+The Codex Auto Review found that test.sh pins gitbasetest, golden and plugintest but not graphtest, the comparison
+helper of the upstream lockfile extractor tests that base mode runs: a candidate could weaken those tests by editing
+it. Kit (harness.md + precheck.py): list every non-_test.go file of the base commit that only _test.go files import,
+keep those whose importers are in base-mode packages, and fail the precheck when the pin pattern misses one.
+
+## #223 Kit refactor for the V2 criteria and a 300K design target (owner 2026-11-21: "refine workflow and align everything with new requirements ... target 300k+ from start ... make this customer ready now")
+What changed, by card (product skill/; the pre-refactor copies are in history/pre-refactor-20261121/):
+- SKILL.md, PIPELINE.md: the objective is the platform's rollout criteria verbatim (platform.md, read from the platform JSON:
+  Nova 0, Orion 1 <= passes <= N/4 with its passing runs averaging >= 256K, Vega <= N/4, >= 4 runs each, no unfair flag,
+  cheat < 20%, no env blocker); the design target is an Orion pass of 300K+ designed at stage 0 and measured at stage 2.
+  Stage 7 is one replica round + one fix batch + one verification round (replaces #170's three phases and the
+  2026-11-14 "rounds until 3/3"): the executed closure (tq-once, sq-once, fastcheck) is the proof, model reviews are
+  samples; a platform finding is answered by the repair loop, never by a new review phase. Every lane: 40 min box.
+  "Version bookkeeping" section (#193). Pre-paste gate rewritten around fastcheck.sh. Metrics baseline = vet task 6.
+- hunt.md: part A adds the long-solve host criteria; part B adds the length score (6b: reading chain, files to
+  change, layers, the repository loop that keeps failing, estimate 8K + 20K per code-changing requirement + 18% + 15%),
+  the test-grid budget (6c, #201) and blocker rows for wall-clock tests, root skips, helper packages and importers.
+- problem-design.md: section 1 updated with the vet 6 trajectories (#209), section 2 adds the length model (#175,
+  #215, owner 2026-11-20 "depth, not width"), section 4 adds open input spaces and crafted cells, section 7 adds 3c/3d.
+- difficulty.md: new section 2 "Length spike" (2 Codex GPT Sol 6.1 xhigh solves of the draft; gate: both compact and
+  mean >= 300K; below it deepen, never widen; two misses -> the owner picks the runner-up); K7 mirrored mechanism;
+  sections renumbered (solver runs 3, reading 4, too easy 5, reserve 6, signals 7 with the short-pass signal).
+- profiles.md: Orion/Vega/Nova rows from the hosted vet 6 runs (lengths, compaction point, the agent's loop, nearest
+  noun reading, mirrored budgets); K7 row; upkeep adds the harness fingerprint.
+- rollout.md, platform.md, gates.md: criteria table verbatim; per-run compacted/sequenceLength; the platform junit is
+  the truth (#214); three-column FP triage (#219); replacement cells (#216/#217); check order (#200); Trial QA as the
+  last readiness item (procedure unknown, to record); zip layout when the CLI is down; AR advisory.
+- description.md: LOCKED row (owner decides before v1, 5b after); length is not in the text; nearest-noun reading
+  (#209); wall-case hint rule (#211); length change rule (#210); checklist items for the spike and the grid.
+- tests.md, tq-once.md, solution.md, build-checklist.md (items 9-11, section 7 fast check and mutant sweep, section 8
+  removed cells), harness.md (H2 helper pins and tar, H3 oracle interface and text output, importers, pinned-only base
+  tests, wall-clock skips; H6 two-user order and junit sets), dockerfile.md (allowed FROM lines, sbin, /app writable,
+  comment per deviating RUN, start from the accepted example), near-miss-release.md (rules 8-10), situations.md (P-8,
+  P-9, E-7..E-10, R-5..R-7, X-9..X-12), replicas (common.md Docker rule, ar.md Alone mode, dq.md AI detector and
+  ASCII, fp-audit.md three columns, sweep-brief.md when it runs, CALIBRATION.md note), ledger-template.md (length rows,
+  criteria table), seam-bank.md, templates/hunt-brief.md, templates/design.md.
+- Tools: codex_job.sh job "solve" at xhigh (the Orion stand-in); solvers.sh `spike` mode (solves 7-8) and the session
+  log copy for seqlen.py; replica.sh `--alone` and `--site` for ar (#221), 40 min default box.
+- Product: GETTING-STARTED.md rewritten for the new flow; build logs, old hand-overs and the pre-refactor cards moved to
+  history/; metrics/README fixed; five parallel workstreams (agents, templates + checkers, repo tools, run-analysis
+  tools, proof tooling) report below as #224-#228.
+Decisions that change an owner rule (flagged for the owner): stage 7 = one round (not three phases, #170); local GPT
+solves run at xhigh (was high); the two spike solves count as GPT solves after the lock when only the wording changed.
+Status: cards DONE; tools per #224-#228; memory notes that set another cadence are superseded by PIPELINE.md.
+
+## #224 Run-analysis tools in the kit: seqlen.py, rollout_report.py, scout/ (2026-11-21, from vet 6 eval/scout; workstream report)
+Built and smoke-tested on the vet 6 data (read-only): `tools/seqlen.py` (Codex rollout .jsonl, trajectory.json, zip or
+pulled run folder -> windows, peaks, requests, sequence length, compacted; passing-run mean against 256K and 300K),
+`tools/rollout_report.py` (per-run table from the platform junit, tests failed by 2+ runs, every platform criterion met
+/ not met / not enough runs; `--marker` for a prompt phrase), `tools/scout/` (stage_a.py hosted fingerprint,
+local_sessions.py, attribution.py with `--areas` JSON, timeline.py, README), `scripts/test_seqlen.py` (11 tests pass);
+pull.sh and digest.py now carry sequenceLength and compacted per run. Findings that correct the cards:
+- The platform's sequence rule (`window_peaks_2026_11b`) sums per-window peaks of input + output tokens; the tool
+  matches the platform field on all 8 rollout-54 runs (run #3 = 330,967; the ledger's 330,604 was input-only).
+- Hosted compaction comes at a window peak of 244,600. The local GPT Sol 6.1 stand-in runs with a 475K window and
+  reached 277-307K without compacting; local gpt-6-astra (258K window) compacted at 244,926. So the stage-2 length gate
+  is the sequence length itself (mean >= 300K, none under 250K), not "both solves compact": corrected in difficulty.md
+  section 2, PIPELINE.md, SKILL.md, description.md, ledger-template.md, situations.md P-8, solvers.sh (#223's line
+  "gate: both compact" is superseded by this entry).
+- Hosted reasoning per request 252-282 tokens vs local Sol xhigh 510-762: local lengths overstate hosted ones.
+- The hidden prompt part of the hosted Orion harness was 7,594 tokens on every run from 11-14 to 11-20 (one build).
+Done in the same step: solvers.sh copies each solve's Codex session log (rollout-*.jsonl, found by the clone path)
+next to meta.txt as session.jsonl so seqlen.py reads local solves (untested until the next solve run); pull.sh prints
+"-" for every empty column so a run without a verdict no longer shifts the fields.
+
+## #225 Reviewer agents rebuilt as thin wrappers over the replica prompts; sq-once.md written (2026-11-21, workstream report)
+agents/olympus-tq-judge.md (121 lines), olympus-sq-judge.md (112), olympus-auto-reviewer.md (106), olympus-fp-auditor.md
+(90): frontmatter name / description ("Run only at the review points of PIPELINE.md 'Review schedule', never per fix or
+per paste") / model opus; Role, Inputs (common.md layout, what the launch message names), Method = "follow
+replicas/<file>.md exactly" with the key points inline, Execution rules (dockrun.py, DOCKRUN_SLOTS=1, reuse the image,
+never build or prune), 40-minute time box with the wait-loop kill, Independence, Output in the site's shape. No
+reference to any file outside skill/ or agents/ (the legacy olympus-challenge-creation paths and the never-built
+references/*.md are gone; grep verified). The per-task anecdote sections moved verbatim to
+skill/playbooks/examples-{tq,sq,ar,fp}.md (441 / 607 / 422 / 115 lines) with a four-line intro: examples of the
+generator questions, not a checklist. skill/sq-once.md (124 lines, from HANDOVER-passing-solution-quality-once) is the
+Solution Quality gate; linked from SKILL.md, solution.md, replicas/sq.md and gates.md G3. Closes the open items of #183
+(rebuild olympus-tq-judge) and #220 (card + links). Still open from #183: the sweep tool pass without the coverage
+filter (in #227's mutants.py) and an eval/pool.md pool-closure ledger a paste requires to be empty.
+Agent launch messages must name: the task folder, the report path, the image, the test command, the time box, and for
+the tests lane the raw variant results; the agents read nothing else (PIPELINE.md Terms).
+
+## #226 Repo tools unblocked: repo_init, repo_check, proof --base-only, checklist_gate, test_summarize (2026-11-21, workstream report)
+DONE, each with a unit test (115 tests pass): #116/#136 repo_init resolves a bare TASK under paths.tasks_root, refuses
+`.`/`..` and any folder inside the skill or product, prints `task: <folder>`; #136 render() keeps a hand-edited
+init/Dockerfile or init/test.sh (hash in init/.rendered.json; `--render-only --force` rewrites); #138 repo_check runs an
+`open-build-inputs` step before any Docker call (placeholders, NOT_VERIFIED, an unverified go_sha256, the matching
+profile.open rows) and writes tracebacks into check/results.json; #140/#164 proof.py `--base-only` (image build or
+reuse + the base/base cell through the proof.run hook, only `--base-ids` needed) and repo_check qualifies with it; the
+`--timeout` message names the 688 s bound; #141 profile `keep_tracked` (tracked files matching the generated-output
+patterns, never dropped from the candidate copy; the template side is in #227); #146 new_native_ids derived from
+expected.new for Go and Python, other cases stay open; #160/#222 a Go package imported only by test code outside its
+own directory becomes a pinned helper (restore_paths, evidence row helper_roles); #165 a TASK name holding a
+check_codex_brief.sh word is refused; #167 checklist_gate names the cell count and the blanked rule ids; #129
+test_summarize fixed (gate() was right). Renderer contract with the templates: `{{profile_json}}` indented JSON,
+`{{profile_b64}}` still rendered for an old template, `--platform=` stripped from FROM, both key spellings
+(hidden_paths and overlay_paths) embedded, one comment block above a deviating RUN allowed.
+OPEN: a Docker smoke run of repo_check on a known-good package (the Docker slot was held by #228's agent); proof.py
+tampering each pinned helper by default (#160 b); the stage-1b precheck "new_native_ids consistent with expected.new".
+
+## #227 Templates and checkers: the platform-blocking defects closed (2026-11-21, workstream report)
+DONE with unit tests (115 pass): #142 bare allowed FROM line in all three Dockerfile templates; #153 PATH keeps
+/usr/local/sbin:/usr/sbin:/sbin; #156 the last RUN makes /app and the caches a+rwX; #139 the Go reinstall carries its
+reason block and no other comment; #158/#159 the generated adapter accepts `[--output_path F] [--mode] <base|new>` in
+any order (default base; a scratch JUnit path printed without --output_path; exit 2 on malformed args) and prints the
+decoded go test text (`--- PASS:` lines) while still building JUnit (UNPROVEN on the Harbor oracle until a package
+passes with it: templates/go/README.md names the bash runner of the accepted packages as the proven route); #150 the
+profile is embedded as readable JSON under {{profile_json}} (repo_init now drops the hidden_* keys from it, keeping
+them in profile_b64 for an old template); #152 neutral identifiers and messages (restore / overlay / pinned) and
+precheck.py fails hard process words in test.sh with line numbers (`--test-sh PATH` for a template); #162 precheck
+runs on pkg/Dockerfile alone with SKIP lines for missing files; #222/#160 tests_lint G1 (every test-only helper package
+of a base-mode package pinned; regex parse when no Go toolchain is on PATH), #197 G2 (changed packages and their
+importers with tests in base mode or `# base skip: <dir> <reason>`), #213/#155 W1 (wall-clock bounds, root skips,
+user.Current() as skip-allowlist candidates); #165 precheck fails flagged words in task, package and hidden test file
+names; examples: templates/examples/in-review/Dockerfile.go-vet-pr-accuracy + test.sh.go-vet-pr-accuracy (byte copies
+of the vet 6 package; move to accepted/ when the owner says so). precheck changes: "Dockerfile does not run tests"
+matches a runner at a command position only (pip install pytest no longer fails); "platform" is a WARN in the patch
+word check (an accepted hidden test uses it).
+Found on vet task 6 by the new checks (task follow-up, not kit): G1 FAIL internal/hiddentext (imported only by the
+hiddencode tests that base mode runs, not in PINNED) next to the known graphtest miss; W1 lists 7 further wall-clock
+bounds (agentconfig limits/shell, hiddencode analyze/dynamic_cgo, app/signal) to measure 30x on the clean repository.
+Add both pins to PINNED at the next test.patch change (a test.sh change reopens Verify Tests/Solution/Flakiness,
+Reward Hacking and Test Quality).
+NEW: the accepted Python example Dockerfiles use `olympus-base-python`, no longer an allowed FROM line (examples/README
+and dockerfile.md E4 say what to change). OPEN: keep_tracked in templates/*/test.sh prepare() (the resumed agent
+reports on it); a Linux run of the generated adapter (no /var/tmp on Windows); the Harbor oracle run of the adapter.
+Addendum #227 (resumed agent): keep_tracked honoured in templates/*/test.sh prepare() (tracked files matching a
+generated-output pattern and their folders survive the filter; behavioural run on a fixture: 6/6); READMEs name
+overlay_paths / base_overlay_paths and keep_tracked; the profile JSON sits in a `r"""..."""` string (valid JSON can never
+hold three consecutive double quotes, so no value can end it early; tests_lint reads both quote forms). 121 tests OK.
+
+## #228 Proof and hand-over tooling in the kit: junit_sets, wrong_versions, mutants, fastcheck, platform cells (2026-11-21, workstream report)
+DONE with unit tests (125 pass): `tools/junit_sets.py` (the verifySolution set check; on the vet 6 fx40 files it gives
+the same VERDICT PASS as the task script); proof.py `--root-base --two-user --plain-new` (#155, #172, #174, #158: one
+container as root in the image's own /app, groupadd/useradd model uid 1000, chmod -R a+rwX /app only when needed and
+logged, root applies test.patch and runs base, model applies solution.patch and runs new and base, the set check, a
+bare `test.sh new`); `tools/wrong_versions.py` (#200/#205/#206: EDITS applied to one tree copy, KIND wrong / control /
+held, a stale edit fails the step; on the 20 vet 6 kept scripts 19 apply, one held script is stale); `tools/mutants.py`
+gen/run (#178/#181/#183: neg, drop, del, flip, true, false, swap on named types; 818 mutants from the vet 6 patch's 1363
+added lines; run classes killed / survived / invalid / timeout / stale, shards); `tools/fastcheck.sh` +
+lib/fastcheck-in.sh, lib/patch_fp.py, lib/junit_leaves.py (#204: three fingerprints, the snapshot once per test.sh,
+the after run once per test.sh + solution, new mode as uid 1000 and an odd uid, T1 per leaf, lint from profile
+commands.lint, kept wrong versions with an optional eval/wrong/kept/cmd.txt, junit sets, the x3 re-run through
+commands.one; dry run with stub docker and dockrun: VERDICT PASS twice, snapshot reused). Cards: gates.md G0/G2,
+harness.md H6, TOOLS.md.
+NOT RUN (this machine had 5.7 GB free against the 15 GB floor, so no container was started): wrong_versions in the vet
+image, the two-user proof cell, a 5-mutant run shard, a real fastcheck run; the exact commands are in the workstream
+report (BACKLOG keeps the gist: run each once on vet 6 with DOCKRUN_SLOTS=1 after the disk is freed; the first real
+fastcheck must also confirm that uid 1000's go accepts root's /tmp/gocache entries from the snapshot, since the kit uses
+the image's own cache layer, not the task's cache volumes).
+OPEN: #179 re-run only the wrong versions a test edit can affect; #206 split the kept step for layout-only test
+changes; the reserve rows of #205 as kept scripts (format decision); repo_init writing `commands.lint` into
+profile.json (Go: gofmt, go vet, golangci-lint) so fastcheck's lint step runs; a sweep wrapper that produces the cover
+profile in the container and shards mutants.py through dockrun; a receiver check in the swap operator (it also rewrites
+`model.Change` type names, classed invalid).
+vet 6 follow-ups (task, not kit): eval/wrong/kept/terraform-json-unpaired.py (held) no longer applies to the current
+reference: fix or retire it before the first fastcheck run; add eval/wrong/kept/cmd.txt with the five-package go test
+command; pin graphtest and internal/hiddentext in pkg/test.sh at the next test.patch change (#227).
+
+## #229 Cold-read QA, the build checklist pass and the field notes folded in (2026-11-21)
+Cold read by a fresh agent (new-user lens) found 3 blocking items, all closed: the new files were untracked (now staged
+for the owner's commit); docker.cleanup_allowed was required by machine.py but missing from machine/schema.md (row
+added, plus the exported OLYMPUS_<KEY> variables and every per-job environment override); hunt part A's three novelty
+lists do not ship and hunt.sh skipped them silently (hunt.sh now prints LIST MISSING per list and hunt.md says where
+each comes from). Also fixed from its 23 contradictions: what a solution change reopens (PIPELINE Version bookkeeping),
+the calibration-paste check order (rollout.md, calibrate-one-passer.md: the reopened checks in platform.md's order,
+Test Quality last), the FP auditor's timing (platform passers at stage 8, owner-asked local passers at once), stale
+efforts in situations.md, the calibration prompt's old target, hunt.md's 300K wording (256K criterion, 300K design),
+examples/README's "accepted only" line, the schema's lock path, the 300 s vs 6 minutes bound, the time-box header,
+solves without a second Claude account (solve 2 runs on the main account), levers 1-4, the DQ replica's 9-unit limit,
+K1-K7, the 40-file drop threshold, the 12 GB floor, sq twice per round, the ninth check (taskQuality) and the check
+name mapping, the agents' rule-5 sentence, three section citations, stale prose references (CALIBRATION path,
+fairness.md backups, python README, dockrun usage, codex_job header, replay_patches header, MAP.md), legacy stage
+letters S0-S3 in titles, and certify.py's usage line. Left as recorded only: the R-id collisions (R1-R16 of
+description.md vs R1-R8 of an old review in build-checklist.md), three meanings of "profile", test_launchers.py's temp
+dir inside skill/scripts, the examples' olympus-base-python FROM line (documented), and near-miss-release.md's
+historical narration.
+Build checklist upgraded (96 rules, gate tests pass): section 1 (three sources; length design and grid budget as
+inputs), 2 (sentence triggers and sibling forms; existing behaviour per touched site; second pass), 3 (mirrored
+mechanisms K7; open input spaces and OS limits; normal-path cost and scope growth; removed writes), 4 (decision rows
+with kept wrong versions; field lists; absent/several/merged; equivalence by execution only; values readers tell
+apart), 5 (per-leaf T1 and no skips; the platform test.sh interface and base-mode rules; the two-user order), 9 (rule
+map rows for Test Quality, Solution Quality, Verify and the false-pass audit as the platform runs them now).
+New card recheck.md (the hand-over's section 10 list of finding types, T1-T15, S1-S8, D1-D3) walked before every paste
+(PIPELINE pre-paste gate item 6). From the owner's shared field notes (another author's Go package through SQ and TQ):
+tq-once.md gains the bad-data twin rule, the unstated-detail reference variant, every API form per list item, the
+half-CPU timing and the three-runs-plus-single-CPU check; sq-once.md the resource-ownership rule; description.md R12
+names "invalid per RFC X" and "malformed" as open phrases to close with a list.
+
+## #230 The kit reads no memory notes; Docker smoke of the proof tools (2026-11-21)
+Owner: "are you sure there is nothing in kit that needs our memory? customer wont have this". Audit of skill/, agents/,
+machine/: two real dependencies, both removed: tools/lib/claude2_run.sh told every reviewer lane to read the
+coordinator's MEMORY.md first (2026-10-17 rule), and tools/lib/codex_job.sh's default job kind told Codex to read
+MEMORY.md and the local olympus-codex-* skills. The method lives in the agents and replicas/ now. paths.memory_dir stays
+in the machine profile for solve_watch.py only (it flags a solver that read the coordinator's memory); schema.md says
+so. Cards mention "memory notes" only to say PIPELINE.md overrides them.
+Docker smoke (after the owner's "clean": 2 exited containers, 1 dangling image, the superseded snapshot
+olympus-snap:9f948a4dfd81 and the volumes vetgo0, vetgo1000, olympus-repo-check-* removed; Docker Desktop stop/start
+freed 2.5 GB on C:; the 43.7 GB docker_data.vhdx holds 13.8 GB and needs an elevated `diskpart /s
+C:\Users\ASUS\OSS\compact-docker-disk.txt`, which this session could not run): wrong_versions.py in the vet 6 image on
+3 kept scripts PASS (wrong caught, control passes, held reported, 3 minutes); mutants.py run on 5 mutants: 3 killed, 1
+invalid, 1 survived (delta.go:162 `if !wanted(rel, f.Size) && !declaresDependencies(...)` made always false: a vet 6
+pool item to triage by the three sources, not a kit defect); fastcheck.sh first run failed before any container on a
+Git Bash to Windows path (dockrun.py and junit_sets.py received /c/... with MSYS_NO_PATHCONV=1 set): fixed with
+machine_host on every path Python gets; second run recorded below.

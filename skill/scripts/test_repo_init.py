@@ -1,8 +1,10 @@
+import base64
 import contextlib
 import io
 import json
 import os
 from pathlib import Path
+import re
 import subprocess
 import sys
 import tempfile
@@ -15,6 +17,17 @@ TOOLS = Path(__file__).resolve().parents[1] / "tools"
 sys.path.insert(0, str(TOOLS))
 import repo_init
 import repo_check
+
+MACHINE = next(d for d in (TOOLS.parents[1] / "machine", TOOLS.parent / "machine") if d.is_dir()) / "windows.example.json"
+
+
+def machine_profile(folder, tasks_root):
+    """A copy of the example profile whose tasks_root is a temp folder: tests never touch machine/local.json."""
+    data = json.loads(MACHINE.read_text(encoding="utf-8"))
+    data["paths"]["tasks_root"] = Path(tasks_root).as_posix()
+    path = Path(folder) / "machine.json"
+    path.write_text(json.dumps(data), encoding="utf-8")
+    return path
 
 
 class Discovery(unittest.TestCase):
@@ -110,6 +123,9 @@ class Discovery(unittest.TestCase):
         self.assertNotIn("{{", dockerfile)
         self.assertIn("NOT_VERIFIED", dockerfile)
         self.assertIn("go1.24.3.linux-amd64.tar.gz", dockerfile)
+        # The platform precheck wants the bare FROM line; the proof passes --platform to docker build.
+        self.assertTrue(dockerfile.startswith("FROM ") and not dockerfile.startswith("FROM --platform"), dockerfile.splitlines()[0])
+        self.assertIn("task: ", proc.stdout)
         repo_check.patch_runner(task)
         patch_file = task / "init/test.patch"
         checked = subprocess.run(["git", "-C", str(task / "base"), "apply", "--check", str(patch_file)], capture_output=True, text=True)
@@ -209,7 +225,8 @@ class Discovery(unittest.TestCase):
                                   "restore_paths": ["tests/test_p.py", "tests/helper.py", "internal/testutil/helper.go"],
                                   "tests": ["tests/test_p.py", "tests/helper.py"],
                                   "helpers": ["internal/testutil/helper.go"],
-                                  "hidden_paths": ["tests/feature.py"]})
+                                  # the runtime names the overlays overlay_paths (older copies: hidden_paths)
+                                  "hidden_paths": ["tests/feature.py"], "overlay_paths": ["tests/feature.py"]})
             effective = ns["prepare"](self.repo, Path(folder), dict(os.environ), "new")
             self.assertEqual((effective / "p.py").read_text(), "value = 99\n")
             self.assertEqual((effective / "tests/test_p.py").read_text(), "assert True\n")
@@ -222,13 +239,158 @@ class Discovery(unittest.TestCase):
                 base_tree = ns["prepare"](self.repo, Path(baseline), dict(os.environ), "base")
                 self.assertFalse((base_tree / "tests/feature.py").exists())
             ns["PROFILE"]["identity"]["commit"] = "f" * 40
-            with self.assertRaisesRegex(RuntimeError, "pristine base commit unavailable"):
+            with self.assertRaisesRegex(RuntimeError, "base commit unavailable"):
                 ns["prepare"](self.repo, Path(folder), dict(os.environ))
+
+    def test_task_argument_resolves_under_tasks_root_and_rejects_skill_folder_and_flagged_names(self):
+        machine = {"paths": {"tasks_root": (self.repo / "tasks").as_posix()}}
+        self.assertEqual(repo_init.task_dir("cc-demo", machine), (self.repo / "tasks/cc-demo").resolve())
+        given = self.repo / "elsewhere/cc-demo"
+        self.assertEqual(repo_init.task_dir(str(given), machine), given.resolve())
+        cwd = os.getcwd()
+        os.chdir(self.repo)  # a relative path is taken as given against the caller's folder, not the skill folder
+        try:
+            self.assertEqual(repo_init.task_dir("./cc-demo", machine), (self.repo / "cc-demo").resolve())
+        finally:
+            os.chdir(cwd)
+        for name in (".", "..", "a b", str(TOOLS.parent / "cc-demo"), str(TOOLS.parents[1] / "cc-demo")):
+            with self.subTest(name=name), self.assertRaises(ValueError):
+                repo_init.task_dir(name, machine)
+        self.assertEqual(repo_init.flagged_word("cc-pmg-bypass-counts"), "bypass")
+        self.assertIsNone(repo_init.flagged_word("cc-pmg-cooldown"))
+
+    def test_cli_bare_task_name_lands_under_tasks_root_and_a_flagged_name_is_refused_before_creation(self):
+        self.files({"go.mod": "module example.org/x\n\ngo 1.24.3\n", "x.go": "package x\n",
+                    "x_test.go": "package x\nfunc TestX(t *testing.T) {}\n"})
+        commit = repo_init.git(self.repo, "rev-parse", "HEAD")
+        tasks = self.repo / "tasks"
+        env = dict(os.environ, OLYMPUS_MACHINE=str(machine_profile(self.repo, tasks)))
+        proc = subprocess.run([sys.executable, "-B", str(TOOLS / "repo_init.py"), str(self.repo), commit, "cc-pmg-bypass-counts"],
+                              env=env, capture_output=True, text=True)
+        self.assertEqual(proc.returncode, 1, proc.stdout + proc.stderr)
+        self.assertIn("'bypass'", proc.stderr)
+        self.assertFalse(tasks.exists())
+        proc = subprocess.run([sys.executable, "-B", str(TOOLS / "repo_init.py"), str(self.repo), commit, "cc-demo"],
+                              env=env, capture_output=True, text=True)
+        self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
+        self.assertIn(f"task: {(tasks / 'cc-demo').resolve()}", proc.stdout)
+        self.assertTrue((tasks / "cc-demo/profile.json").is_file())
+        self.assertTrue((tasks / "cc-demo/init/.rendered.json").is_file())
+
+    def python_profile(self):
+        profile = repo_init.discover(self.repo)
+        profile.update(identity={"commit": repo_init.git(self.repo, "rev-parse", "HEAD")},
+                       environment={"platform": "linux/amd64"}, dependency_install="true", development_install="true")
+        profile["toolchain"]["version"] = "3.12.13"
+        return profile
+
+    def test_render_keeps_a_hand_edited_dockerfile_or_runner_until_forced(self):
+        self.files({"p.py": "value = 1\n", "tests/test_p.py": "def test_ok(): pass\n"})
+        task = self.repo / "task"
+        task.mkdir()
+        profile = self.python_profile()
+        repo_init.save(task, profile)
+        dockerfile, runner = task / "init/Dockerfile", task / "init/test.sh"
+        accepted = "FROM public.ecr.aws/d3j8x8q7/olympus-base-python:latest\nRUN true\n"
+        dockerfile.write_text(accepted, encoding="utf-8", newline="\n")
+        rendered_runner = runner.read_bytes()
+        profile["timeout"] = 500
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            repo_init.save(task, profile)
+        self.assertEqual(dockerfile.read_text(encoding="utf-8"), accepted)
+        self.assertIn("kept hand-edited init/Dockerfile", out.getvalue())
+        self.assertNotEqual(runner.read_bytes(), rendered_runner)  # the untouched runner follows the profile
+        self.assertEqual(set(json.loads((task / "init/.rendered.json").read_text())), {"Dockerfile", "test.sh"})
+        with contextlib.redirect_stdout(io.StringIO()):
+            repo_init.save(task, profile, force=True)
+        self.assertNotEqual(dockerfile.read_text(encoding="utf-8"), accepted)
+        self.assertIn("3.12.13", dockerfile.read_text(encoding="utf-8"))
+
+    def test_keep_tracked_lists_tracked_files_the_generated_output_patterns_would_drop(self):
+        self.files({"go.mod": "module example.org/m\n\ngo 1.24.3\n", "x.go": "package x\n",
+                    "internal/bpf/enforce_bpfel.o": "ELF", "build/ci.sh": "echo\n", "lib/a.go": "package lib\n"})
+        p = repo_init.discover(self.repo)
+        self.assertEqual(p["keep_tracked"], ["build/ci.sh", "internal/bpf/enforce_bpfel.o"])
+        p.update(identity={"commit": "a" * 40}, restore_paths=[], keep_tracked=["../escape.o"])
+        with self.assertRaisesRegex(ValueError, "escapes repository"):
+            repo_init.validate(p)
+
+    def test_new_native_ids_derive_from_expected_new_for_go_and_python_and_stay_open_elsewhere(self):
+        go = {"language": "go", "expected": {"new": ["example.org/m/internal/p::TestA", "example.org/m/internal/p::TestB"]},
+              "tests": [], "hidden_paths": ["internal/p/a_test.go"], "open": []}
+        repo_init.derive_new_native_ids(go)
+        self.assertEqual(go["new_native_ids"], {"example.org/m/internal/p::TestA": ["example.org/m/internal/p", "TestA"],
+                                                "example.org/m/internal/p::TestB": ["example.org/m/internal/p", "TestB"]})
+        self.assertEqual(go["open"], [])
+        py = {"language": "python", "expected": {"new": ["tests.test_new::test_x", "tests.test_new.TestK::test_y[1]"]},
+              "tests": ["tests/test_old.py"], "hidden_paths": ["tests/test_new.py"], "open": []}
+        repo_init.derive_new_native_ids(py)
+        self.assertEqual(py["new_native_ids"], {"tests.test_new::test_x": "tests/test_new.py::test_x",
+                                                "tests.test_new.TestK::test_y[1]": "tests/test_new.py::TestK::test_y[1]"})
+        py["expected"]["new"].append("tests.test_missing::test_z")
+        repo_init.derive_new_native_ids(py)
+        self.assertNotIn("new_native_ids", py)
+        self.assertTrue(any(r["field"] == "new_native_ids" and "tests.test_missing::test_z" in r["reason"] for r in py["open"]))
+        ts = {"language": "typescript", "expected": {"new": ["src/a.test.ts::adds"]}, "tests": [], "hidden_paths": [], "open": []}
+        repo_init.derive_new_native_ids(ts)
+        self.assertNotIn("new_native_ids", ts)
+        self.assertTrue(any(r["field"] == "new_native_ids" for r in ts["open"]))
+        go.update(author_overrides=["new_native_ids"], new_native_ids={"custom": ["x", "y"]})
+        repo_init.derive_new_native_ids(go)
+        self.assertEqual(go["new_native_ids"], {"custom": ["x", "y"]})
+
+    def test_go_package_imported_only_by_test_code_is_a_pinned_helper(self):
+        self.files({"go.mod": "module example.org/m\n\ngo 1.24.3\n",
+                    "internal/policy/policy.go": 'package policy\n\nimport "example.org/m/internal/util"\n\nvar _ = util.X\n',
+                    "internal/policy/policy_test.go": 'package policy\n\nimport (\n\t"testing"\n\n\t"example.org/m/internal/policy/policytest"\n'
+                                                      '\tutil "example.org/m/internal/util"\n)\n\nfunc TestP(t *testing.T) { _ = policytest.Fixture; _ = util.X }\n',
+                    "internal/policy/policytest/fixture.go": "package policytest\n\nvar Fixture = 1\n",
+                    "internal/util/util.go": "package util\n\nvar X = 1\n",
+                    "internal/report/report.go": "package report\n\nvar X = 1\n",
+                    "internal/report/report_test.go": 'package report_test\n\nimport (\n\t"testing"\n\n\t"example.org/m/internal/report"\n)\n\n'
+                                                      'func TestR(t *testing.T) { _ = report.X }\n'})
+        p = repo_init.discover(self.repo)
+        self.assertIn("internal/policy/policytest/fixture.go", p["helpers"])
+        self.assertNotIn("internal/policy/policytest/fixture.go", p["production"])
+        for kept in ("internal/policy/policy.go", "internal/util/util.go", "internal/report/report.go"):
+            self.assertIn(kept, p["production"])  # imported by production, or only by its own tests
+        self.assertTrue(any("policytest is imported only by test code" in e["text"] for e in p["evidence"]["helper_roles"]))
+        task = self.repo / "task"
+        task.mkdir()
+        p.update(identity={"commit": repo_init.git(self.repo, "rev-parse", "HEAD")}, environment={"platform": "linux/amd64"}, go_sha256="0" * 64)
+        with contextlib.redirect_stdout(io.StringIO()):
+            repo_init.save(task, p)
+        self.assertIn("internal/policy/policytest/fixture.go", p["restore_paths"])
+
+    def test_profile_json_placeholder_renders_indented_json_and_the_from_line_loses_platform(self):
+        self.files({"go.mod": "module example.org/x\n\ngo 1.24.3\n", "x.go": "package x\n",
+                    "x_test.go": "package x\nfunc TestX(t *testing.T) {}\n"})
+        templates = self.repo / "templates"
+        (templates / "go").mkdir(parents=True)
+        (templates / "go/Dockerfile").write_text("FROM --platform={{platform}} example/base:latest\nRUN {{build_commands}}\n")
+        (templates / "go/test.sh").write_text("#!/bin/sh\nPROFILE = json.loads('''{{profile_json}}''')\nOLD = '{{profile_b64}}'\n")
+        task = self.repo / "task"
+        task.mkdir()
+        p = repo_init.discover(self.repo)
+        p.update(identity={"commit": repo_init.git(self.repo, "rev-parse", "HEAD")}, environment={"platform": "linux/amd64"}, go_sha256="0" * 64)
+        with patch.object(repo_init, "TEMPLATES", templates), contextlib.redirect_stdout(io.StringIO()):
+            repo_init.save(task, p)
+        self.assertEqual((task / "init/Dockerfile").read_text().splitlines()[0], "FROM example/base:latest")
+        runner = (task / "init/test.sh").read_text()
+        self.assertIn('\n  "language": "go",\n', runner)
+        self.assertIn('"keep_tracked": []', runner)
+        self.assertNotIn("{{", runner)
+        self.assertEqual(json.loads(base64.b64decode(re.search(r"OLD = '([^']+)'", runner)[1]))["language"], "go")
 
 
 def runtime():
     body = (repo_init.TEMPLATES / "python/test.sh").read_text().split("<<'ADAPTER_PY'\n", 1)[1].rsplit("\nADAPTER_PY", 1)[0]
-    body = body.replace("PROFILE = json.loads(base64.b64decode('{{profile_b64}}'))", "PROFILE = {'skip_allowlist': {}}")
+    # The template reads its profile from {{profile_json}} (or the older {{profile_b64}}); stub that one statement,
+    # which may span lines: PROFILE = json.loads(r'''\n{{profile_json}}\n''').
+    body, count = re.subn(r"^PROFILE = .*?\{\{profile_(?:json|b64)\}\}.*?\)[ \t]*$", "PROFILE = {'skip_allowlist': {}}",
+                          body, count=1, flags=re.M | re.S)
+    assert count == 1, "template has no PROFILE = ... {{profile_json}} statement"
     body = body.rsplit("sys.exit(main())", 1)[0]
     namespace = {}
     exec(compile(body, "adapter-runtime", "exec"), namespace)

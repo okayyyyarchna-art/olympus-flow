@@ -24,7 +24,7 @@
   "parallel": {
     "battery_workers": 6,
     "review_lanes": 6,
-    "solvers": 4,
+    "solvers": 6,
     "stability_parallel": true
   }
 }

@@ -1,17 +1,32 @@
 #!/usr/bin/env bash
-# Any Codex job (normal mode; sandbox only for solvers - user 2026-10-18) from a brief (FP second opinion, repo-hunt lane, gap analysis) - the G1/G2/G3 gates stay in
-# codex_review.sh.
-#   bash tools/lib/codex_job.sh <task-dir> <job-name> <brief.md> [effort]
+# Any Codex job (normal mode; sandbox only for solvers - user 2026-10-18) from a brief (replica checks through replica.sh, repo-hunt lanes, solves through solvers.sh).
+#   bash tools/lib/codex_job.sh <task-dir> <job-name> <brief.md> [effort, ignored: the rule decides] [kind]
+# Replica checks go through tools/replica.sh, which calls this script with kind judge.
 # Report: <task-dir>/eval/codex/<job-name>.md (console log .log). Codex runs in its normal (config) mode with network;
-# the prompt limits its writes to the report and _cx probes. Solvers (eval/solve.sh, gpt_solve_in_image.sh) stay sandboxed.
+# the prompt limits its writes to the report and _cx probes. Solver clones are made by solvers.sh.
 set -uo pipefail
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../machine.sh" || exit 2
-T=$(cd "$1" && pwd); name="$2"; brief="$3"; effort="${4:-high}"; kind="${5:-review}"  # review | build | search | judge
-# CODEX_MODEL: optional model for this job (e.g. gpt-5.6-terra, the platform's TQ/SQ/DQ model); default = config model
-model_args=(); [ -n "${CODEX_MODEL:-}" ] && model_args=(-m "$CODEX_MODEL")
-# CODEX_ONE_OFF_EFFORT: only when the user asks for another effort for one job (the rule stays HIGH)
-if [ -n "${CODEX_ONE_OFF_EFFORT:-}" ]; then effort="$CODEX_ONE_OFF_EFFORT"; echo "one-off effort: $effort (user request)" >&2
-elif [ "$effort" != high ]; then echo "effort $effort -> high (user rule 2026-10-28: Codex GPT Sol 6.1 HIGH only)" >&2; effort=high; fi
+T=$(cd "$1" && pwd); name="$2"; brief="$3"; effort="${4:-}"; kind="${5:-review}"  # review | build | search | judge
+# Model and effort come from the owner rules, not from the caller (BACKLOG #191: replica checks ran on another model for
+# 10 hours because a caller passed one). Every Codex job runs on GPT Sol 6.1 (2026-10-28) at medium effort, whatever the
+# kind (owner 2026-11-19: "medium ... for any work except in solver"). Solver runs and length spikes, which solvers.sh
+# starts with the job name "solve", run at xhigh: the platform's Orion is Codex CLI on GPT Sol 6.1 at xhigh (owner
+# 2026-11-18), and the local solve is its stand-in (difficulty.md section 2).
+rule_model=gpt-6.1-sol
+if [ "$name" = solve ]; then rule_effort=xhigh; else rule_effort=medium; fi
+# CODEX_ONE_OFF_MODEL: only when the user asks for another model for one job. CODEX_MODEL may only repeat the rule model.
+model="$rule_model"
+if [ -n "${CODEX_ONE_OFF_MODEL:-}" ]; then model="$CODEX_ONE_OFF_MODEL"; echo "one-off model: $model (user request)" >&2
+elif [ -n "${CODEX_MODEL:-}" ] && [ "$CODEX_MODEL" != "$rule_model" ]; then
+  echo "CODEX_MODEL=$CODEX_MODEL refused: Codex jobs run on $rule_model; set CODEX_ONE_OFF_MODEL only when the user asks" >&2; exit 2
+fi
+model_args=(-m "$model")
+# CODEX_ONE_OFF_EFFORT: another effort for one job, when the user asks or replica.sh sets a check's effort.
+if [ -n "${CODEX_ONE_OFF_EFFORT:-}" ]; then effort="$CODEX_ONE_OFF_EFFORT"; echo "one-off effort: $effort" >&2
+else
+  [ -z "$effort" ] || [ "$effort" = "$rule_effort" ] || echo "effort $effort -> $rule_effort (owner rule for a $kind job)" >&2
+  effort="$rule_effort"
+fi
 [ -f "$brief" ] || { echo "brief not found: $brief" >&2; exit 2; }
 command -v "$OLYMPUS_CODEX_BIN" >/dev/null || { echo "codex CLI not found" >&2; exit 2; }
 out_dir="$T/eval/codex"; mkdir -p "$out_dir"; out="$out_dir/$name.md"
@@ -34,7 +49,8 @@ Everything you need is in that brief and the files it names. Do not open, read o
 (nothing under $OLYMPUS_CODEX_HOME/skills) and no memory files. Verify every claim by file:line or a check run, and
 mark the rest NOT VERIFIED. You may read anything in the task folder; run check builds in Docker one container at a
 time through \"$PY\" \"$(machine_host "$OLYMPUS_LIB/dockrun.py")\" run ...; write ONLY
-your report plus check files under the task's eval/ folder with a _cx suffix; never edit package folders (wip*/),
+the report files the brief names, at exactly those paths and names (no suffix added), plus check files under the
+task's eval/ folder with a _cx suffix; never edit package folders (wip*/),
 repo/, base-clean/ or solveN/; never docker rm/rmi/prune or stop containers you did not start.
 Return only your report (Markdown), starting with a one-line Verdict."
 elif [ "$kind" = build ]; then
@@ -46,12 +62,9 @@ $T/base-clean/, $T/solveN/ (only those exact paths; a working folder the brief n
 container at a time via the dockrun.py lock; never docker rm/rmi/prune. When done, return a short report (Markdown)
 starting with a one-line Verdict that lists every file you created or changed."
 else
-lessons=""
-[ ! -f "$OLYMPUS_MEMORY_DIR/MEMORY.md" ] || lessons="Before the brief, read the shared lessons: $OLYMPUS_MEMORY_DIR/MEMORY.md (and the memory files it points to that match your job) and your matching skill under $OLYMPUS_CODEX_HOME/skills (olympus-codex-sq-judge, olympus-codex-tq-judge, olympus-codex-auto-reviewer, olympus-codex-reviewer).
-"
 prompt="You are an independent reviewer (Codex) next to two Claude reviewers; nobody else's verdicts bind you.
 Task folder: $T. Your instructions are in this brief; read it first and follow it: $brief
-${lessons}Verify every claim (probe or file:line) and mark the rest NOT VERIFIED. Rules: you may read anything, run probes and Docker, and write ONLY your report plus probe files under the task's eval/ folder with a _cx suffix; never edit package folders (wip*/ submit*/ sample*/), repo/, base-clean/ or solveN/; Docker one container at a time via \"$PY\" \"$(machine_host "$OLYMPUS_LIB/dockrun.py")\" run ...; never docker rm/rmi/prune or stop containers you did not start.
+Verify every claim (probe or file:line) and mark the rest NOT VERIFIED. Rules: you may read anything, run probes and Docker, and write ONLY your report plus probe files under the task's eval/ folder with a _cx suffix; never edit package folders (wip*/ submit*/ sample*/), repo/, base-clean/ or solveN/; Docker one container at a time via \"$PY\" \"$(machine_host "$OLYMPUS_LIB/dockrun.py")\" run ...; never docker rm/rmi/prune or stop containers you did not start.
 Return only your report (Markdown), starting with a one-line Verdict."
 fi
 # Time box (2026-11-07: a product build ran 3h20m and filled the disk with cold images). CODEX_TIME_BOX_MIN
@@ -59,7 +72,7 @@ fi
 box="${CODEX_TIME_BOX_MIN:-120}"
 prompt="$prompt
 Time box: finish and write your report within $box minutes; report what is NOT VERIFIED instead of running past it. Docker budget: build at most one new image, reuse existing images, and check free disk space (at least the machine floor, 12 GB by default) before any build."
-echo "Codex job $name -> $out (time box $box min)"
+echo "Codex job $name -> $out (model $model, effort $effort, time box $box min)"
 # The final answer goes to $out.final; it replaces $out only when Codex did not write a longer report there itself
 # (2026-11-05: a brief named $out as the deliverable and the short final answer overwrote the full report).
 timeout -k 60 "${box}m" "$OLYMPUS_CODEX_BIN" exec --sandbox danger-full-access --skip-git-repo-check -C "$T" ${model_args[@]+"${model_args[@]}"} -c model_reasoning_effort="\"$effort\"" -o "$out.final" "$prompt" \

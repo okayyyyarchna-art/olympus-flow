@@ -6,6 +6,8 @@ looked complete; a package that "traces cleanly" on its main path is the usual c
 the design is not the task; trying to break each promise is.
 
 ## Procedure (do every step, in order; the output needs the tables)
+The builder's four lists (sq-once.md section 1: promise x path grid, decision rows, rejection ledger, touched-site
+ledger) are the cells to enumerate; derive your own from the package, never from the builder's copy.
 
 ### Step 1: promise list
 Split the description into promises (one observable outcome each, scope sentences included).
@@ -58,8 +60,38 @@ Build counter-scenarios from these axes and trace each through the real code wit
   chains that carry an error the user already handled;
 - one-way flags: every flag the patch clears is re-armed on the normal path; process-global flags reset per run;
 - a hold or deferral installed before user code shows how it reads needs a release for every excluded shape;
-- user data that looks like internals: special keys (`__proto__`), in-band markers or sentinels, null vs missing.
+- user data that looks like internals: special keys (`__proto__`), in-band markers or sentinels, null vs missing;
+- sibling forms that the tool or format defines inside a universal word (vet task 6: Terraform builds its lock from
+  *.tf and *.tf.json, the reference paired *.tf only; npm lockfile versions 1, 2 and 3; a build tool that uses one of
+  two files): each form is a promise cell;
+- a second pass over the same input (a pre-walk): every side effect of the first pass (diagnostics, counts, recorded
+  fields) still happens once;
+- shared code paths: run the same input outside the described mode; a changed output is scope growth unless a
+  sentence asks for it;
+- constants at a real limit (link counts, path lengths): compare with the platform the grader runs (Linux 40, 4096);
+- the same logic written twice (a site Design note on vet task 6).
 Each attempt: `{promise, scenario (inputs + steps), trace (file:line chain), result: holds | breaks, why}`.
+Unit tests that solution.patch adds are not graded; never count them as proof that a promise holds.
+
+### Step 3b: execute (mandatory; 2026-11-19, vet task 6 platform SQ FAIL on an alias path)
+The site's SQ runs real inputs: it builds a repository, runs the CLI and reports the wrong output. A static trace is a
+hypothesis, not a result.
+- Execute at least 6 break attempts in the task image with a real CLI or engine run on a built input, and every attempt
+  whose result depends on the filesystem, paths, links, users, line ends or the OS. Record the command and the output.
+- For code that handles paths or links, always include: a target reached through a linked ancestor folder (as /tmp
+  names /private/tmp on macOS); absolute link texts written through that alias and through the real path; a link
+  checked out as a text file; a CRLF checkout; a non-root user.
+- Every wrong-output finding an earlier lane reported (Auto Review, TQ, SQ) is executed before it is dropped,
+  whatever its severity label.
+- An unchanged-input run per input shape of the touched axis (vet task 6: link target kind file, folder, dangling,
+  outside, times every file name an extractor checks for) with a change that edits only an unrelated file: the
+  expected output is no record with a change; compare with the base tool on the same tree (a regression against
+  upstream is blocking at the site every time).
+- For every write the reference removes or makes conditional, one executed input per reader of that write in other
+  packages (grep Stat, Open, ReadDir, lookups): the site blocked on an extractor that relied on a link text the
+  reference stopped writing.
+- A PASS needs every executed attempt to hold. An attempt that could not run (no Docker slot, build error) is NOT
+  VERIFIED, and so is the verdict: never PASS on static traces alone.
 
 ### Step 4: decide
 A broken attempt on a realistic input on a real path is a finding. Write its strongest disproof and check it in code
@@ -70,18 +102,32 @@ A broken attempt on a realistic input on a real path is a finding. Write its str
 - the input is outside the setup or scope the description states.
 If your disproof holds, the finding is gone; do not override a disproof you verified.
 
-### Step 5: code quality
-Repository patterns and layering; configured linters/type checker would pass (Optionals narrowed); bounded work where
-the repository is bounded; every new doc/comment claim true through the real caller; no misleading leftover comments
-in touched methods; no comment addressed to a grader; every hunk needed.
+### Step 5: the site's non-blocking notes (Design / Clutter / Practice)
+The site writes several of these on every package (vet task 6: 9 on fx8, 6 on fx9, 3 and 4 on fx22e), and it repeats
+them until they are fixed. Sweep the whole patch for each label:
+- Design: a list or rule kept in two places that the repository's AGENTS.md wants in one (a pair table next to the
+  extractors' own lists); a component redoing work another layer already does (a control re-diffing entries the
+  engine diffed); the base ref opened several times.
+- Clutter: code that only tests call; two doc paragraphs for one function; a stored-format version that jumps by more
+  than one; narrating or leftover comments; a forwarder that adds nothing; an unreachable fallback.
+- Practice: a loop over repeated user data that is quadratic (measure it on a large input and quote the times); a
+  value re-parsed on every call; an error dropped without a log; a caller's slice sorted in place.
+Also check: configured linters pass; every new doc or comment claim is true through the real caller; no comment
+addressed to a grader; every hunk needed.
 
-## Scoring (calibrated on the site's outputs)
-- Each criterion: 3 `Fully Met` (no issue), 2 `Partially Met` (one Medium, or one Low in code quality), 1 `Not Met`
-  (any High, or two or more Mediums). Seen on the platform for both machines' tasks.
-- severity `high` = a stated promise fails on a realistic input on a real path; `medium` = the promise holds but with
-  a material weakness (performance against repo norms, a rare but valid input class, a heuristic edge); `low` =
-  style.
-- verdict `FAIL` if any criterion scores 1; otherwise `PASS`. At most 6 issues, most severe first.
+## Verdict (the site's current format, seen since 2026-11-18)
+- Output: "SUMMARY: Found N blocking issues and M non-blocking issues." The site prints no scores.
+- Blocking, two kinds seen so far:
+  - wrong output: an executed, realistic input breaks a description sentence, vet's behaviour before the change that
+    the description keeps, or a documented contract. Report it as Input (the repository you built), Command, Expected
+    output, Received, Why (quote the description and name the code path), Suggested change (file:line);
+  - cost on the normal path: a measured slowdown on an ordinary input (vet task 6 fx8: a full scan of a 4000-entry
+    lockfile 1.34x slower was blocking).
+- Non-blocking: the Design / Clutter / Practice notes of Step 5, and a measured cost only on an extreme input (the
+  site: "ordinary lockfiles do not feel it").
+- verdict `FAIL` if any issue is blocking; any number of notes still passes. Fix the cheap notes anyway.
+- The score fields stay for the tooling: a criterion scores 1 with a blocking issue in it, 2 with notes only, 3 with
+  none. Severity: blocking = `high`; a note = `low`, or `medium` for a measured cost. At most 8 issues, blocking first.
 
 ## Output schema (JSON)
 ```
@@ -93,8 +139,10 @@ in touched methods; no comment addressed to a grader; every hunk needed.
  "solution_comprehensiveness": {"score": 1-3, "max_score": 3, "level": str, "reasoning": str},
  "code_quality": {"score": 1-3, "max_score": 3, "level": str, "reasoning": str},
  "issues": [{"criterion": "comprehensiveness|quality", "severity": "high|medium|low", "title": str,
-             "detail": str, "evidence": str, "failingCase": str, "disproofTried": str}],
+             "blocking": bool, "kind": "wrong-output|normal-path-cost|design|clutter|practice",
+             "detail": str, "evidence": str, "failingCase": str, "disproofTried": str, "suggestedChange": str}],
  "verdict": "PASS|FAIL", "summary": str, "overall_feedback": str}
 ```
 `evidence` quotes the description sentence the issue breaks (comprehensiveness) or the repository convention with
-path:line (quality).
+path:line (quality). For a wrong output, `failingCase` holds Input, Command, Expected output and Received. `summary`
+starts with "Found N blocking issues and M non-blocking issues."

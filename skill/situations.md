@@ -1,6 +1,6 @@
 # Situations: trigger -> action -> why
 
-One action per row. Evidence keys: MAP.md (workflow-build-20261105) sections and the platform data pulled 2026-11-05.
+One action per row. Evidence: the task records named in each row (task folders, BACKLOG.md) and the platform data pulled since 2026-11-05.
 If two rows apply, do both. If none applies, decide by PIPELINE.md and the cards, and add a row here afterwards.
 Stage names: S0-S1 = stages 0-3, S2 = stage 5, S3 = stage 4, S4 = stage 6, S8 = stages 8-10 (PIPELINE.md). Where a
 row and a card disagree, the card wins.
@@ -15,6 +15,8 @@ row and a card disagree, the card wins.
 | P-5 | All boundaries hit the same blind spot | Replace two with boundaries on other subsystem pairs | group-table task 0/23, failed the gate |
 | P-6 | A boundary needs injected timing or a hook to observe | Cut it from core | 0/33 and 22/22 blocked on T12 |
 | P-7 | Upstream default branch moved since you started | Re-base base/ and repo/ onto the tip before the Dockerfile | Harbor rebuild FAIL x3 on T11 |
+| P-8 | The fix sits in one module, the reading chain is short (under about 40 files), or nothing the solver can run shows its solution wrong; or the stage-2 length spike stays under a mean of 300K | Deepen the seam (a second entry path, a saved state read back, a caller context, a mechanism that must agree); never add a rule; after two short spikes take the runner-up seam (difficulty.md section 2) | vet 6: 8 rules, 27 files, 5 of 6 Orion runs 215-238K with no compaction; the one compacting run was the pass |
+| P-9 | A universal word in the planned text spans more than about 8 axis members with no single code path, or the planned change has more than about 120 decision points | Narrow the word or the seam before the lock; one kept wrong version per decision must stay feasible | vet 6: about 300 decision points, 16 x 16 x 21 cells, 20+ repair rounds |
 
 ## Description (S1, and D-LATE)
 | ID | Trigger | Action | Why |
@@ -53,7 +55,7 @@ row and a card disagree, the card wins.
 | T-6 | Wall-clock wait decides an ordering | Replace with an event/handshake | goka AR T2/T3, task 8 T2 |
 | T-7 | Agents converge on one valid design a test rejects | Loosen that test to the stated outcome | elio PDF private path (3 runs) |
 | T-8 | Coverage suggestion "Would need prompt edit" | Ignore it (never test open behaviour) | it names behaviour the text leaves open |
-| T-9 | Clean `test.sh new` > 300 s | Shorten waits/sizes; keep the hard timeout < platform kill | Verify Tests killed at 688 s (T11) |
+| T-9 | Clean `test.sh new` over 6 minutes (target under 300 s) | Shorten waits/sizes; keep the hard timeout < platform kill | Verify Tests killed at 688 s (T11) |
 | T-10 | T6: test.sh relies on the image ENV / tools found only on PATH of root | Export the toolchain env inside test.sh | turso T6 Blocker (2176 failures as uid 4242) |
 | T-11 | Tests read generated output (dist, bundles) | Rebuild it in test.sh; re-eval agent patches carry no dist | orange-orm sole passer became TEST_BROKEN at re-eval |
 
@@ -66,6 +68,10 @@ row and a card disagree, the card wins.
 | E-4 | "Image failed to rebuild from your committed source" | Find the cause: upstream moved past the base -> re-base onto the tip (do not touch the Dockerfile); the Dockerfile fetches from the network at build (GitHub, nodejs.org), builds native code, or leaves a toolchain unpinned -> fix the Dockerfile (the platform rebuilds as uid 1000 without those hosts) | T11 re-base; turso pinned toolchain, orange-orm removed the native build and fetch (other machine) |
 | E-5 | Flaky result between repeats | Find the scheduling dependence; never retry-until-green | verifyFlakiness runs 6+6 |
 | E-6 | Downloaded platform files differ from the wip (mixed or stale paste) | Re-paste the differing field; re-check what it staled | a wip75 file next to wip78 files (other machine) |
+| E-7 | verifySolution `harbor_oracle_failed` with baseline, new tests and offline uid all green | Check in this order: /app writable for uid 1000 (`chmod -R a+rwX /app`), test.sh accepts `[--output_path F] [--mode] <base|new>` with the output path optional, test.sh prints the runner's text output (`--- PASS:` lines), PATH keeps sbin for the platform's useradd; diff against the newest accepted Dockerfile and test.sh in templates/examples/ | pmg: three failures with no platform log (BACKLOG #156, #158, #159); vet 6 passed with the bash runner |
+| E-8 | `problems create` answers "Submission creation is paused" | Build ahead locally (stages 2, 4-7 need no draft; the spike and the audits run locally); retry at each paste point; tell the owner once | pmg bypass-counts stage 1 (BACKLOG #163) |
+| E-9 | Verify Flakiness fails on a repository test the change never touched | Measure it 30 times on the clean repository; a wall-clock bound that fails there goes on the skip allowlist in base mode with the reason, next to the user-dependent skips; a test.sh change reopens Verify Tests/Solution/Flakiness, Reward Hacking and Test Quality | vet 6: a 1.6 s bound failed 4-5 of 30 on the untouched repository (BACKLOG #213) |
+| E-10 | The platform's verify image build stops at `chown: invalid user` or `groupadd: command not found` | The Dockerfile's ENV PATH dropped /usr/sbin and /sbin; restore them | pmg (BACKLOG #153) |
 
 ## Rollout and FP (S8)
 | ID | Trigger | Action | Why |
@@ -74,6 +80,9 @@ row and a card disagree, the card wins.
 | R-2 | 0 passes in every family, near-misses on fair boundaries | If the blocking test is of UNSTATED behaviour, it may go at re-eval. If a sentence names it, never remove its test (the closest run becomes a false pass): new runs. If only the general rule covers it (implied), near-miss-release.md is an owner decision per task | orange-orm KA 32/32 (other machine); T12 wip12 passers were FP by definition |
 | R-3 | Two families pass | Add one discriminator from a passer's own mechanism on a stated sentence (FP-1 style) | T9, T10 reached the gate this way |
 | R-4 | One family > 25% | Same as R-3 for that family | gate text |
+| R-5 | A platform run fails tests that its patch passes in the local replay | The platform junit is the truth for that run; report the per-test difference; when two patches share a platform-only failure set look for the shared mechanism (link resolution, sandbox); keep the tests | vet 6 rollouts 51-52: five link tests on two Orion patches (BACKLOG #214) |
+| R-6 | The only passing Orion run is under 256K tokens | No test change can fix it; tell the owner: a description change that adds the layer the solver must trace (fresh rollout), or more Orion runs (the passing runs' average must clear the bar); record which stage-0 estimate was wrong (difficulty.md section 7) | criteria `passSequenceLength` (platform.md) |
+| R-7 | A near miss fails only crafted cells, and removing them would leave a code path untested | near-miss-release.md rules 8-9: replace each cell with one the near miss passes and the natural wrong design fails; dry-run against the near miss's code; show the owner what stays uncovered | vet 6 fx30 -> platform Test Quality blocker on the removed path; fx40 replaced cells (BACKLOG #206, #216, #217) |
 | FP-1 | A passer misses a stated sentence (reproduced) | Add one grounded test for it; never weaken the reference | snapshot, sqlite, T10 fixed this way |
 | FP-2 | Passer differs only on unstated behaviour | Keep it; at re-eval an unstated late-added corner test may be dropped | task 7 F6 -> genuine pass, accepted |
 | FP-3 | Temptation to drop/loosen a stated test to keep a passer | Never for a case a sentence names; an implied case only through near-miss-release.md with the owner's decision | T12 wip12 passers were FP by definition |
@@ -89,6 +98,12 @@ row and a card disagree, the card wins.
 | X-6 | The checklist looks skipped, or a short plan stands in for the ledger | Run prompts/apply-build-checklist.md and show the gate output | vet task 2 v1: condensed plan, platform SQ FAIL, full fix batch |
 | X-7 | A Codex job ends with no report, or is about to touch a sensitive area | Read the tail of the job log for the safety-filter message before relaunching. Keep file and folder names neutral too. Search scripts print only owner/name, language, stars, licence and dates. On network servers frame Codex work as a feature or measurement study | task 11 hunt, swift 6 attempts |
 | X-8 | A command was rejected or interrupted | Check git status and the touched folders before continuing: side effects already done stay. Never chain commit, package build and launch in one command | task 7: solves launched on a half-built package |
+| X-9 | `olympus` answers `NoAuthProvider` (login expired) | Tell the owner once; until they log in again, the owner pastes and downloads (run zips: run.txt, junit-new.xml, eval-result.json, solution-patch.patch, trajectory.json per run; `tools/rollout_report.py` reads them); never guess platform state | vet 6, 2026-11-20/21 |
+| X-10 | A review lane runs past its time box, or a lane reports while shells it started still poll for a file | Every lane brief carries a 40-minute box and writes its report at the box; a lane kills its own wait loops before it stops; before saying "still running", check the lane's last file time and `docker ps`; after an interruption list every lane and restart the dead ones in the same reply | vet 6: three lanes 1-2.5 h with no visible progress, 8 orphan poll loops (BACKLOG #186, #205) |
+| X-11 | A check status is reported without its version, or a fix is chosen without saying which checks it reopens | Every status names the hash it graded; before the owner picks a fix, say which platform checks it reopens (PIPELINE.md, Version bookkeeping) | vet 6: "TQ good" on fx22e, then 4 blockers on fx24f after a rewrite (BACKLOG #193) |
+| X-13 | Editing on Windows with Git Bash | Write any file that holds backslashes with the editor's write tool, never a shell heredoc (a doubled backslash became a real newline twice); scripted edits keep LF (`newline=''`), check with `file`; strip `\r` from values Python prints; use `MSYS_NO_PATHCONV=1` plus host-form paths (`machine_host`) for every Docker mount and every path a Windows Python receives | vet 6 (BACKLOG #206, #230) |
+| X-14 | A test fixture or a solver clone loses files with no error | Antivirus removes malware-like fixtures from clones and patches; keep deletions out of agent patches (solvers.sh lists them in meta.txt), re-check the fixture list after a copy, and exclude the task folders from the scanner where the owner allows | vet 2026-11-06 |
+| X-12 | Codex hits a usage limit or capacity error mid-round | Re-run the same check on the Claude reviewer agent of that role with the same brief; record the fallback in the checkpoint; keep the gate's report names | vet 6: a whole verification round died 15 h before the reset (BACKLOG #171) |
 
 ## When stuck: prompts that already found the right path
 
@@ -109,9 +124,9 @@ where it worked, how to run it.
 | Situation | Prompt | Worked on | How I run it |
 |---|---|---|---|
 | A passer exists | "you missed strict fp auditors on passer last time right?" | vet v4/v5 (s1 NOT_DESERVED found) | `replica.sh <task> fp-audit` on EVERY passer, a second when it says NOT_DESERVED or is unclear; reproduce each finding |
-| A local solve the owner asked for passes | "run FP audit on passer as soon as it finishes" | cc-vet-continue-usage s3 (2026-11-09, audit started only after the owner asked) | Same step as grading, no asking: 1 GPT Sol 6.1 medium + 1 claude2 Opus 5.5 high on each passer; report solver results and verdicts together |
+| A local solve the owner asked for passes | "run FP audit on passer as soon as it finishes" | cc-vet-continue-usage s3 (2026-11-09, audit started only after the owner asked) | Same step as grading, no asking: 1 Codex GPT Sol 6.1 medium + 1 Claude Opus 5.5 medium on each passer; report solver results and verdicts together |
 | A reproduced false pass | "we should add test case for this .. make sure reference works fine on this right? ... make sure added test is not unfair and should hold T1-T8 and S1-S4" | vet v5 s1 | smallest test on a stated sentence; battery: reference passes, passer fails as a variant, fair passers pass; the next sweep checks fairness + T1-T8/S1-S4 |
-| Reference gaps the FP audit cannot see | "run strict fp auditors on our reference too .. 2 gpt strict auditors" | vet sweep lanes (ref-audit) | `replica.sh <task> ref-audit` x2 HIGH; every named wrong implementation becomes a test or a variant |
+| Reference gaps the FP audit cannot see | "run strict fp auditors on our reference too .. 2 gpt strict auditors" | vet sweep lanes (ref-audit) | `replica.sh <task> ref-audit pre1` (medium, once before v1); every named wrong implementation becomes a test or a variant |
 | Platform keeps finding one more gap | "We learn why it's very significant to cover all wrong design always in our test cases .. if we got stuck" | faust task 11 (wip49 3/3 + genuine FP) | per promise list every wrong design, reproduce each as a variant first, a test fails each, passer kept |
 | Platform finds what local reviewers miss | "you have to understand how platform is figuring out different ways and finding issues, you have to do it the same way ... upgrade your TQ and SQ and auto reviewer with learning" | elio wip23-24, faust task 11 | literal promise + one reference heuristic + smallest breaking input; multiplicity sweep |
 | A solver fails only 1-2 tests | near-miss study prompt (prompts/near-miss-study.md) | faust tasks 11, 12 | complete the run in its own design, then probe + FP-audit it |

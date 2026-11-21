@@ -1,25 +1,37 @@
 # Tools
 
-| Tool | State | Purpose |
-|---|---|---|
-| tools/machine.py, machine.sh | built (task 1) | machine profile loader; every tool reads limits and paths from it |
-| tools/precheck.py | built | platform precheck replica (description, patches, Dockerfile rules) |
-| tools/tests_lint.py | built | test.patch structural checks |
-| tools/checklist_gate.py | built | one sheet row per checklist rule; fails on blank rows, vague locations and unclosed Blueprint cells (prompts/apply-build-checklist.md) |
-| tools/proof.py | built | four cells, uid/env -i, stability; image built once per identity; `--build-only` needs only the Dockerfile; `--tamper PATH` overwrites a pinned input in the reference tree and base mode must not change |
-| tools/replica.sh, round.sh, sweep.sh | built | model review lanes (one tracked call per lane is the target) |
-| tools/watch.sh, pull.sh | built | read-only platform watcher and pull; pull keys run folders by run id and saves verdict.txt (label, batch), output.json (agentBlameUnfair), evalResult.json and testlog.txt, puts Go/testscript failure lines first, flags FP panel notes that only the web UI shows |
-| tools/lib/replay_plan.py | built | delta replay plan after a test change: SKIP / LINE? / REPLAY per run, stages only REPLAY patches |
-| tools/lib/dockrun.py | built | one machine-wide slot lock (~/.olympus/docker.lock, shared with the task tools); refuses build/pull under the profile's docker.min_free_gb |
-| tools/lib/codex_job.sh | built | Codex jobs with a time box (CODEX_TIME_BOX_MIN, default 120) and a Docker budget in the prompt |
-| scripts/certify.py | built | package structure, fingerprints, strict JUnit reconciliation |
-| tools/repo_init.py + templates/<language> | built (task 2) | pin/clone clean base; manifest/CI file:line discovery, adapter profile/open decisions, parameterized Go/Python/TypeScript templates; unsupported adapters remain OPEN |
-| tools/repo_check.py | built (task 2) | proof.py --build-only with cleanup disabled; one-slot Docker lock, native IDs, offline base, one ID, tamper/production failure and H6 report probes; Go qualified, Python final replay blocked by image loss, TypeScript UNPROVEN; evidence: BUILD-2-report.md in the product repo |
-| corpus runner | next | apply each variant / platform patch, per-id vectors, execution states |
-| evidence manifest + FP barrier | next | hash-keyed results; block hand-over on a missing replay or audit |
-| per-lane launch + shared probe queue | next | each lane notifies on its own; one queue for container experiments |
-| tools/lib/repo_traits.sh | built | Go repository host score (packages, LOC, unimplemented interfaces); hunt.md part A |
-| tools/hunt.sh | built | stage 0 part B: facts, clone, shared brief, Codex + claude2 lanes |
+Every tool reads machine-specific values from the machine profile (machine/*.json through tools/machine.py); task
+paths are arguments. Scripted edits keep LF (`open(p, 'w', encoding='utf-8', newline='')`, then `file <path>`). Never put
+a brief at `eval/codex/<job>.md`: that is the job's report path.
 
-Scripted edits on Windows keep LF: `open(p, 'w', encoding='utf-8', newline='')`, then check with `file <path>`.
-Never put a brief at `eval/codex/<job>.md`: that is the job's report path.
+| Tool | Purpose |
+|---|---|
+| tools/machine.py, machine.sh | machine profile loader; every tool reads limits and paths from it |
+| tools/hunt.sh | stage 0 part B: eligibility facts, clone at the tip, the shared brief from templates/hunt-brief.md, the Codex (medium, search) and second-account lane commands |
+| tools/lib/repo_traits.sh | Go repository host score (packages, LOC, unimplemented interfaces); hunt.md part A |
+| tools/repo_init.py + templates/<language> | pin/clone the clean base; manifest/CI file:line discovery; adapter profile and open decisions; rendered Dockerfile (bare FROM line, one reason block above a deviating RUN) and test.sh (readable JSON profile); TASK under the profile's tasks_root with flagged names refused; keep_tracked; test-only Go helper packages pinned; new_native_ids from expected.new; hand-edited init files kept (init/.rendered.json) |
+| tools/repo_check.py | adapter qualification: the open-build-inputs preflight before any Docker call, then `proof.py --base-only` (image build or reuse + base/base cell), native IDs, offline base, tamper and H6 report probes; tracebacks in check/results.json |
+| tools/precheck.py | platform precheck replica on the package: description, patches, the Dockerfile rules (allowed FROM line, no test runner at a command position, one reason block above a deviating RUN, PATH keeps sbin, /app writable) on pkg/Dockerfile alone at stage 1, process words in test.sh with their lines (`--test-sh PATH`), flagged words in task, package and hidden test file names |
+| tools/tests_lint.py | `tests_lint.py <pkg> <base checkout>`: test.patch structural checks; G1 every test-only helper package of a base-mode package is pinned; G2 changed packages and their importers with tests are in base mode or carry `# base skip: <dir> <reason>`; W1 wall-clock-bounded, root-skipping and user.Current() tests listed as skip-allowlist candidates |
+| tools/checklist_gate.py | one sheet row per build-checklist rule; fails on blank rows, vague locations and unclosed Blueprint cells (prompts/apply-build-checklist.md) |
+| tools/solvers.sh, stop_solves.sh, solve_watch.py | local blind solves of the locked text (1-3 Opus 5.5 high, 4-6 GPT Sol 6.1 xhigh) and the stage-2 length spike (`solvers.sh <task> spike`: solves 7-8, GPT xhigh); each solve keeps its Codex session log for seqlen.py; the watcher marks CLEAN solves |
+| tools/seqlen.py | sequence length as the platform counts it (sum of per-window peaks of input + output tokens; matches the platform's field): a Codex rollout .jsonl, a trajectory.json, a zip or pulled run folder; per-input line plus the passing-run mean against the 256K bar and the 300K design target; exits 0, errors per input |
+| tools/rollout_report.py | one table per run batch (family, platform junit or testlog misses, verdict, sequence length, compacted, requests, `--marker` phrase seen in the prompt), tests failed by two or more runs, and every platform criterion met / not met / not enough runs; never counts a local replay as a platform result |
+| tools/scout/ (stage_a.py, local_sessions.py, attribution.py, timeline.py) | hosted harness fingerprint (hidden prompt part, requests, windows, reasoning per request, tool set), the same for local Codex sessions (`--marker <clone name>`), context share per requirement area (`--areas` JSON) before adding a requirement for length, and a per-call timeline of one run |
+| tools/proof.py | the four cells (base/base, new/base, base/reference, new/reference), uid/env -i, stability; image built once per identity; `--build-only` needs only the Dockerfile; `--base-only` for repo_check; `--tamper PATH`; the platform-identity cells `--root-base --two-user --plain-new` (root base mode in the image's own /app; uid 1000 `model` applies the solution after root's run and runs new then base with the verifySolution set check; `test.sh new` with no --output_path) |
+| tools/fastcheck.sh (+ lib/fastcheck-in.sh, lib/patch_fp.py, lib/junit_leaves.py) | the hand-over check before every paste, keyed by three fingerprints (test.sh, hidden tests, solution): root baseline snapshot once per test.sh (olympus-snap:<hash>), the after run once per test.sh + solution, every time new mode as uid 1000 and as a uid with no passwd entry, T1 on the clean repository, lint (profile commands.lint), every kept wrong version (optional eval/wrong/kept/cmd.txt names a faster test command), the JUnit set verdict; a failing after-run case is re-run alone 3 times (profile commands.one); one container at a time, each under 20 minutes |
+| tools/junit_sets.py | the verifySolution set check over the baseline (root base), new and after (uid 1000 base) JUnit files: baseline failures, new not passing, new also in baseline, after extras not skipped, baseline passes not passing after; VERDICT PASS/FAIL |
+| tools/wrong_versions.py | runs eval/wrong/kept/*.py (EDITS, KIND wrong / control / held, EXPECT leaves) on one copy of a tree through a caller command (`{junit}`, `{tests}` placeholders; default `./test.sh new --output_path {junit}`): wrong = exactly its leaves fail, control = all pass, held = reported, a stale edit fails the step; summary table, exit 1 on any mismatch |
+| tools/mutants.py | Go only. `gen`: neg / drop / del / flip / true / false / swap mutants of a patch's added lines (module from go.mod; swap = a sibling field of the same named type), `covered` flag from a cover profile; `run`: one mutant at a time in a tree copy, `go test -run REGEX` over the test patch's packages, killed / survived / invalid / timeout / stale, `--shard K/N`, JSONL plus a survivors list |
+| tools/replica.sh | one platform-replica check on Codex GPT Sol 6.1 medium (fairness, sq, dq, ar, verify, fp-audit, ref-audit); 40-minute box; `ar <tag> --alone [--site <file>]` runs the Auto Review without the other replica outputs |
+| tools/round.sh | one replica round (fairness, sq, dq, ar, then verify and the gate), reusing reports whose input bytes did not change |
+| tools/sweep.sh | the wide gap sweep (ar and sq reviewer lanes at medium, two ref-audits); only at the owner's request for a platform finding the repair loop cannot place |
+| tools/lib/codex_job.sh | Codex jobs with a time box (CODEX_TIME_BOX_MIN) and a Docker budget in the prompt; GPT Sol 6.1 at medium for every kind, xhigh for the job name "solve" (solves and spikes); another model only through CODEX_ONE_OFF_MODEL; the launch line prints model and effort |
+| tools/lib/claude2_run.sh | one job on the second Claude account: reviewer roles (tq, sq, ar, fp) at medium, other jobs at high |
+| tools/lib/check_codex_brief.sh | neutral-word check of every Codex brief |
+| tools/lib/dockrun.py | one machine-wide Docker slot lock (~/.olympus/docker.lock; DOCKRUN_SLOTS=1 for every heavy lane); refuses build/pull under the profile's docker.min_free_gb |
+| tools/lib/replay_patches.sh, replay_plan.py | replay stored agent patches on the current tests; the delta plan after a test change (SKIP / LINE? / REPLAY per run) |
+| tools/watch.sh, pull.sh, digest.py | read-only platform watcher and pull; pull keys run folders by run id and saves verdict.txt (family, verdict, label, batch, sequenceLength, compacted), output.json, evalResult.json and testlog.txt with the failure lines first, and flags FP panel notes that only the web UI shows; digest prints the checks, criteria and runs tables |
+| tools/summarize.py | round gate: reads the replica reports of a tag and prints the bands and open findings |
+| scripts/certify.py | package structure, byte fingerprints, strict JUnit reconciliation |
+| scripts/test_*.py | the kit's unit tests: `python -B -m unittest discover -s skill/scripts -p 'test_*.py'` |

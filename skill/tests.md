@@ -44,19 +44,62 @@
    Through test.sh,
    prove base fails each new ID for its intended missing behavior and reference
    passes it. Execute each planned wrong-rule variant and every available materially
-   different valid alternative that challenges a pin. No numerical mutant quota:
+   different valid alternative that challenges a pin, always at least one besides the reference (owner
+   2026-11-15). No numerical mutant quota:
    class coverage and observed discriminators are the gate. A build/apply error,
-   erased mutation or unrelated timeout is not a killed wrong implementation.
+   erased mutation or unrelated timeout is not a caught wrong implementation.
 
 ## Pre-submit self-check, in priority order
 
 | Gate | Evidence required |
 |---|---|
 | Auto Review T1-T8 | Per-ID base/reference differential (T1); controlled timing/order/data (T2); meaningful counterexamples (T3); obligation/path map (T4); public grounding and capable fakes (T5); offline runs (T6); contract-relative output pins (T7); intact diagnostics (T8). Run harness.md too. |
-| False pass | No unexplained wrong-rule survivor; every available clean solver patch replayed; both auditors' grounded passer findings closed. Every reference fix inside a promise has a corresponding test. |
+| False pass | No unexplained wrong rule that still passes; every available clean solver patch replayed; both auditors' grounded passer findings closed. Every reference fix inside a promise has a corresponding test. |
 | Solution Quality | Tests cover every promised path/fault and reveal genuine regressions; their oracle is independent of the reference's algorithm. |
 | Task Quality | Each test has a fairness verdict with grounding, each obligation has coverage, valid alternatives pass both modes. Missing coverage is OPEN, not a reserve waiver. |
 
 When a valid alternative fails, repair the assertion/fake or the obsolete regression
 pin with a documented replacement. When a wrong design passes, add the smallest fair
 discriminator. Both changes must go through gates.md Repair before claiming closure.
+
+## Hard rules for every hidden test (owner 2026-11-20, from vet task 6)
+
+1. **Fair.** Every assertion passes the one-sentence test: "a correct implementation that satisfies every sentence
+   could still do X, and X fails this". Admit every reading the description allows. Never pin a value that common
+   readers of the format do not tell apart (JSON integers above 2^53), a field the description does not name, a
+   behaviour only because a solution review asked for it, or a count that a design walking a checkout of the base
+   would double (count only what only the head has).
+2. **Aligned with the prompt, both ways.** Each test names, in its comment, the description sentence it checks or the
+   existing repository behaviour at a touched site that the change must keep (file:line). Each description sentence,
+   split on its triggers (every / any / each, lists, "X or Y", "added or modified"), has tests. Nothing the
+   description excludes is tested.
+3. **Behavioural.** Assert what running the product produces: findings and their change labels, records, report and
+   saved-report contents, diagnostics a user sees, exit status. Where the repository has an ordinary path that must
+   agree, compare with it (the full scan of the same tree, the base code on the old input, the live scan against the
+   reloaded report) rather than with a typed literal.
+4. **No API-based tests.** No call into an unexported function or method; no hand-built internal state that a real
+   run never produces (vet 6: reachOf on a removed record marked local, a platform note); no exported name, field or
+   type that only the reference adds (the test file compiles on base and with any fair solution); no fake whose
+   signature constrains the design beyond the repository's existing interfaces.
+5. **Public behaviour only.** Enter through the public entry points (the CLI command, the engine's public run
+   options, the report readers) and check only what a user of the tool can observe.
+
+Hygiene the platform enforced on vet task 6:
+- T1 is per leaf. Per-case subtests, or deleting one assertion, can leave a leaf that passes on the clean base. Re-run
+  the base check after every test edit; loop axis members inside one leaf.
+- No skip in a new test. For a user-dependent input (chmod), compare with an oracle (as root both sides are 0, as uid
+  1000 both are N) and guard the presence check with `os.Geteuid() != 0`.
+- OS limits only where the OS has them: Linux follows 40 links and has PATH_MAX 4096, macOS 32 and 1024. Gate such
+  cases on `runtime.GOOS`.
+- A leaf that holds several scenarios names each scenario in its assertion messages; split it only when every part
+  still fails on base.
+- Existing behaviour at each touched site (counts, diagnostics, recorded fields) has a keeping test.
+- Every gap has a kept scripted wrong version (eval/wrong/kept/<name>.py with EDITS, KIND wrong | control | held and
+  EXPECT leaves; `tools/wrong_versions.py` runs them all; the fast check re-runs them on each final suite). A wrong
+  version meant to catch a design that differs in structure from the reference changes the structure too (vet 6: the
+  reference with its link limit raised passed, because its base never used the limit; the natural wrong design
+  resolves links on its own with no limit), and a control with the same structure and the right decision shows the
+  case isolates one decision. For every function that compares or copies a list of fields, one wrong version per
+  field, before the first paste.
+- Test files inside solution.patch are not graded (test.sh new runs only the hidden files): they are no coverage.
+- Before buying Test Quality, walk [tq-once.md](tq-once.md).

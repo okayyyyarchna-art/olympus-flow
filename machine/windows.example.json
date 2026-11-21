@@ -23,7 +23,7 @@
   "parallel": {
     "battery_workers": 2,
     "review_lanes": 2,
-    "solvers": 4,
+    "solvers": 6,
     "stability_parallel": false
   }
 }

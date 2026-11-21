@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # S0 when the user gives a repository: eligibility facts, clone at the tip and one shared brief. It prints the
-# Codex and claude2 lane commands; the coordinator starts them and the in-process lane at once, then decides
+# Codex and second-account lane commands; the coordinator starts them and the in-process lane at once, then decides
 # with hunt.md (part B).
 #   bash hunt.sh <github-url-or-owner/repo> ["already taken: one line per task to exclude"]
 # Output: $OLYMPUS_SEAMS_ROOT/work/<repo>-<yyyymmdd>/ (clone, brief.md, eval/facts.txt)
@@ -22,6 +22,9 @@ gh repo view "$src" --json stargazerCount,licenseInfo,pushedAt,defaultBranchRef,
   | tee "$W/eval/facts.txt"
 merged=$(gh api "search/issues?q=repo:$src+is:pr+is:merged+merged:>$(date -d '-1 year' +%F 2>/dev/null || date -v-1y +%F)&per_page=1" -q .total_count 2>/dev/null)
 echo "merged PRs last 12 months: ${merged:-?} (faust ~73; much higher = more novelty risk)" | tee -a "$W/eval/facts.txt"
+for l in DISALLOWED-REPOS.csv REJECTED-REPOS.md already_built_locally.md; do
+  [ -f "$OLYMPUS_SHARED_ROOT/$l" ] || echo "LIST MISSING: $OLYMPUS_SHARED_ROOT/$l (the platform's list from the owner, or your own owner/repo lines); the list rule is NOT checked" | tee -a "$W/eval/facts.txt"
+done
 grep -i -h "$src" "$OLYMPUS_SHARED_ROOT/DISALLOWED-REPOS.csv" "$OLYMPUS_SHARED_ROOT/REJECTED-REPOS.md" \
   "$OLYMPUS_SHARED_ROOT/already_built_locally.md" 2>/dev/null | sed 's/^/ON A LIST: /' | tee -a "$W/eval/facts.txt"
 
@@ -45,7 +48,7 @@ bash "$OLYMPUS_LIB/check_codex_brief.sh" "$W/brief.md" >/dev/null || { echo "bri
 rm -f "$W/eval/codex/hunt.md" "$W/eval/claude2/hunt-free.md"
 echo "prepared: $W (brief.md, eval/facts.txt, repo at $commit)"
 echo "start these two as separate tracked background calls, and the in-process lane (read-only) with the same brief:"
-echo "  bash \"$OLYMPUS_LIB/codex_job.sh\" \"$W\" hunt \"$W/brief.md\" high search   # -> $W/eval/codex/hunt.md"
+echo "  bash \"$OLYMPUS_LIB/codex_job.sh\" \"$W\" hunt \"$W/brief.md\" medium search   # -> $W/eval/codex/hunt.md"
 echo "  bash \"$OLYMPUS_LIB/claude2_run.sh\" free \"$W\" hunt \"$W/brief.md\" high       # -> $W/eval/claude2/hunt-free.md"
 echo "  in-process lane report -> $W/eval/inprocess-hunt.md"
 }

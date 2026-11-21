@@ -68,8 +68,13 @@ def sheet_path(task):
 def read_sheet(path):
     rows = {}
     for row in table_rows(path.read_text(encoding="utf-8")):
-        if len(row) == 7 and row[0] != "Rule":
-            rows[row[1]] = {"id": row[0], "status": row[4], "where": row[5], "note": row[6]}
+        if len(row) >= 2 and row[0] != "Rule":
+            # A stray | splits a cell: the row has more than 7 cells (BACKLOG 167). The check names the count; the
+            # sheet command folds the surplus back into Note and writes every | as \|.
+            values = (row[4:7] + ["", "", ""])[:3]
+            if len(row) > 7:
+                values[2] = " | ".join(row[6:])
+            rows[row[1]] = {"id": row[0], "status": values[0], "where": values[1], "note": values[2], "cells": len(row)}
     return rows
 
 
@@ -84,7 +89,7 @@ def make_sheet(task):
              "|---|---|---|---|---|---|---|"]
     found = rules(data.decode("utf-8"))
     for rule in found:
-        previous = old.get(key(rule), {})
+        previous = {k: v.replace("|", "\\|") for k, v in old.get(key(rule), {}).items() if isinstance(v, str)}
         summary = rule["text"][:100].replace("|", "\\|")
         lines.append(f"| {rule['id']} | {key(rule)} | {rule['section']} | {summary} | {previous.get('status', '')} "
                      f"| {previous.get('where', '')} | {previous.get('note', '')} |")
@@ -92,6 +97,9 @@ def make_sheet(task):
     with open(path, "w", encoding="utf-8", newline="") as f:
         f.write("\n".join(lines) + "\n")
     print(f"{path}: {len(found)} rules, {sum(key(r) in old for r in found)} kept from the earlier sheet")
+    blanked = [rule["id"] for rule in found if key(rule) not in old]
+    if old and blanked:
+        print("blank rows (rule text changed or rule new since the earlier sheet): " + ", ".join(blanked))
     return 0
 
 
@@ -124,6 +132,8 @@ def check_sheet(task, through):
         row = rows.get(key(rule))
         if row is None:
             problems.append(f"rule {rule['id']}: no row in the sheet")
+        elif row["cells"] != 7:
+            problems.append(f"row {rule['id']} has {row['cells']} cells, expected 7 (a | in a cell? write it as \\| or rerun the sheet command)")
         elif row["status"] == "NA":
             counts["NA"] += 1
             if len(row["note"]) < 15:

@@ -1,9 +1,16 @@
 #!/usr/bin/env bash
+# Test runner.
+#
+# Usage:
+#   ./test.sh [--output_path <junit.xml>] [--mode] <base|new>
+#
+#   base  runs the upstream tests of the packages that the change touches and of those that use them.
+#   new   runs the added tests only.
+#   The mode defaults to base. Without --output_path the JUnit report goes to a scratch file whose path is printed.
 set -uo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)" || exit 2
 exec /usr/local/bin/python - "$ROOT" "$@" <<'ADAPTER_PY'
 import argparse
-import base64
 import fnmatch
 import io
 import json
@@ -19,7 +26,9 @@ import tempfile
 import time
 from xml.etree import ElementTree as ET
 
-PROFILE = json.loads(base64.b64decode('{{profile_b64}}'))
+PROFILE = json.loads(r"""
+{{profile_json}}
+""")
 DEADLINE = None
 COMMAND_STATUSES = []
 
@@ -104,58 +113,63 @@ def prepare(root, scratch, env, mode="base"):
     status, text = command(['git', '-c', 'safe.directory=' + str(root), '-C', str(root),
                             'cat-file', '-e', commit + '^{commit}'], '/', env, 30, phase='restore.verify')
     if status:
-        raise RuntimeError('pristine base commit unavailable: ' + text)
+        raise RuntimeError('base commit unavailable in .git: ' + text)
     work = scratch / 'repo'
-    overlay_paths = PROFILE['hidden_paths'] if mode == 'new' else PROFILE.get('base_hidden_paths', [])
-    hidden = {name: ((root / name).read_bytes(), (root / name).stat().st_mode & 0o777) for name in overlay_paths}
-    all_overlays = set(PROFILE['hidden_paths'] + PROFILE.get('base_hidden_paths', []))
-    pristine = PROFILE['restore_paths']
-    if not pristine:
-        raise RuntimeError('pristine grading-path inventory is empty; refusing to restore production')
+    overlay_paths = PROFILE['overlay_paths'] if mode == 'new' else PROFILE.get('base_overlay_paths', [])
+    overlay = {name: ((root / name).read_bytes(), (root / name).stat().st_mode & 0o777) for name in overlay_paths}
+    all_overlays = set(PROFILE['overlay_paths'] + PROFILE.get('base_overlay_paths', []))
+    restore = PROFILE['restore_paths']
+    if not restore:
+        raise RuntimeError('restore_paths is empty; refusing to run without the pinned test files')
     test_roots = {n.split('/')[0] for n in PROFILE['tests'] if n.startswith(('tests/', 'test/', '__tests__/'))}
-    grade_roots = set(test_roots)
+    restore_roots = set(test_roots)
     for name in PROFILE.get('helpers', []):
         directory = Path(name).parent.as_posix()
         if directory != '.':
-            grade_roots.add(directory)
+            restore_roots.add(directory)
     for name in PROFILE.get('fixtures', []):
         parts = name.split('/')
         for index, part in enumerate(parts[:-1]):
             if part in ('testutil', 'testutils', 'testhelpers', '__mocks__', 'testdata', 'fixture', 'fixtures', '__snapshots__'):
-                grade_roots.add('/'.join(parts[:index + 1]))
+                restore_roots.add('/'.join(parts[:index + 1]))
                 break
     patterns = ('.git', '__pycache__', '*.pyc', '*.so', '*.pyd', '*.o', '*.a', '.pytest_cache', 'build', 'dist')
     if PROFILE['language'] == 'typescript':
         patterns += ('node_modules',)
     generated = shutil.ignore_patterns(*patterns)
+    # Tracked files of the pinned commit that match a generated-output pattern (a go:embed .o object) stay, with the
+    # directories above them.
+    keep = set(PROFILE.get('keep_tracked', []))
+    keep |= {'/'.join(k.split('/')[:i]) for k in keep for i in range(1, len(k.split('/')))}
     def ignore(directory, names):
         ignored = set(generated(directory, names))
+        ignored -= {entry for entry in names if (Path(directory) / entry).relative_to(root).as_posix() in keep}
         for entry in names:
             name = (Path(directory) / entry).relative_to(root).as_posix()
-            grading = (name in pristine or name in all_overlays or name in grade_roots or any(name.startswith(d + '/') for d in grade_roots) or
-                       bool(re.search(r'(^|/)(?:conftest\.py|pytest\.ini|(?:vitest|jest)\.config\.[cm]?[jt]s)$|(^|/)test_[^/]+\.py$|_test\.go$|\.(test|spec)\.[jt]sx?$', name)))
-            if grading:
+            pinned = (name in restore or name in all_overlays or name in restore_roots or any(name.startswith(d + '/') for d in restore_roots) or
+                      bool(re.search(r'(^|/)(?:conftest\.py|pytest\.ini|(?:vitest|jest)\.config\.[cm]?[jt]s)$|(^|/)test_[^/]+\.py$|_test\.go$|\.(test|spec)\.[jt]sx?$', name)))
+            if pinned:
                 ignored.add(entry)
         return ignored
     shutil.copytree(root, work, ignore=ignore)
     # Archive output stays binary; do not let text newline conversion corrupt fixtures.
     archive = subprocess.run(['git', '-c', 'safe.directory=' + str(root), '-C', str(root),
-                              'archive', commit, '--', *pristine], capture_output=True)
+                              'archive', commit, '--', *restore], capture_output=True)
     COMMAND_STATUSES.append({'phase': 'restore.archive', 'exit': archive.returncode})
     if archive.returncode:
-        raise RuntimeError('pristine archive failed: ' + archive.stderr.decode(errors='replace'))
+        raise RuntimeError('archive of the base commit failed: ' + archive.stderr.decode(errors='replace'))
     with tarfile.open(fileobj=io.BytesIO(archive.stdout)) as tar:
         for member in tar.getmembers():
             target = (work / member.name).resolve()
             if not target.is_relative_to(work.resolve()) or member.issym() or member.islnk():
-                raise RuntimeError('unsafe pristine archive member: ' + member.name)
+                raise RuntimeError('unsafe archive member: ' + member.name)
         tar.extractall(work, filter='data')
     for pyx in work.rglob('*.pyx'):
         pyx.with_suffix('.c').unlink(missing_ok=True)
-    for name, (data, permissions) in hidden.items():
+    for name, (data, permissions) in overlay.items():
         path = work / name
         if not path.resolve().is_relative_to(work.resolve()):
-            raise RuntimeError('hidden path escapes source')
+            raise RuntimeError('overlay path escapes the work tree')
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_bytes(data)
         path.chmod(permissions)
@@ -252,6 +266,22 @@ def pytest_collection_finish(session):
     raise RuntimeError('UNPROVEN adapter: qualify native test enumeration and reporter before execution')
 
 
+def go_text(log):
+    """The go test text output: the Output events of `go test -json` joined, other lines (build errors, timeout) as they are."""
+    text = []
+    events = []
+    for line in log.splitlines(keepends=True):
+        try:
+            event = json.loads(line)
+        except ValueError:
+            text.append(line)
+            continue
+        events.append(event)
+        if 'Output' in event:
+            text.append(event['Output'])
+    return ''.join(text), events
+
+
 def execute(work, scratch, env, selected, ids):
     cases = []
     diagnostics = []
@@ -263,15 +293,12 @@ def execute(work, scratch, env, selected, ids):
             regex = '^(?:' + '|'.join(re.escape(n) for n in names) + ')$'
             code, log = command(['go', 'test', '-json', '-count=1', '-timeout=360s', '-run', regex, package],
                                 work, env, PROFILE['timeout'], phase='test')
-            print(log, end='')
-            diagnostics.append(log)
+            text, events = go_text(log)
+            print(text, end='')
+            diagnostics.append(text)
             status = status or code
             outputs = {}
-            for line in log.splitlines():
-                try:
-                    event = json.loads(line)
-                except ValueError:
-                    continue
+            for event in events:
                 name = event.get('Test', '')
                 top = name.split('/')[0]
                 if top and 'Output' in event:
@@ -280,7 +307,7 @@ def execute(work, scratch, env, selected, ids):
                     case = ET.Element('testcase', classname=package, name=name, time=str(event.get('Elapsed', 0)))
                     tag = {'fail': 'failure', 'skip': 'skipped'}.get(event['Action'])
                     if tag:
-                        ET.SubElement(case, tag).text = outputs.get(name, log)
+                        ET.SubElement(case, tag).text = outputs.get(name, text)
                     ET.SubElement(case, 'system-out').text = outputs.get(name, '')
                     cases.append(case)
     elif PROFILE['language'] == 'typescript':
@@ -305,19 +332,29 @@ def execute(work, scratch, env, selected, ids):
 def main():
     global DEADLINE
     DEADLINE = time.monotonic() + PROFILE['timeout']
-    parser = argparse.ArgumentParser(allow_abbrev=False)
-    parser.add_argument('mode', choices=('base', 'new'))
-    parser.add_argument('--output_path', required=False)
+    parser = argparse.ArgumentParser(allow_abbrev=False, usage='%(prog)s [--output_path <junit.xml>] [--mode] <base|new>')
+    parser.add_argument('mode', nargs='?', choices=('base', 'new'))
+    parser.add_argument('--mode', dest='mode_option', choices=('base', 'new'))
+    parser.add_argument('--output_path', '--output-path', dest='output_path')
     parser.add_argument('--one')
     parser.add_argument('--list', action='store_true')
     parser.add_argument('--discover', action='store_true')
     args = parser.parse_args(sys.argv[2:])
-    if sum(a == '--output_path' or a.startswith('--output_path=') for a in sys.argv[2:]) > 1:
+    if sum(a in ('--output_path', '--output-path') or a.startswith(('--output_path=', '--output-path=')) for a in sys.argv[2:]) > 1:
         parser.error('--output_path given twice')
-    if not args.output_path and not (args.list or args.discover):
-        parser.error('--output_path is required')
-    output = str(Path(args.output_path).resolve()) if args.output_path else None
-    expected = PROFILE['expected'][args.mode]
+    if args.output_path is not None and not args.output_path:
+        parser.error('empty output path')
+    if args.mode and args.mode_option:
+        parser.error('mode given twice')
+    mode = args.mode or args.mode_option or 'base'
+    announce = None
+    if args.output_path:
+        output = str(Path(args.output_path).resolve())
+    elif args.list or args.discover:
+        output = None
+    else:
+        output = announce = str(Path(tempfile.mkdtemp(prefix='repo-adapter-junit-')) / (mode + '.xml'))
+    expected = PROFILE['expected'][mode]
     if args.one:
         if args.one not in expected:
             parser.error('--one must name an expected canonical ID')
@@ -334,7 +371,7 @@ def main():
            'GOTOOLCHAIN': 'local', 'GOWORK': 'off', 'GOPROXY': 'off', 'GOSUMDB': 'off',
            'GOFLAGS': '-buildvcs=false -trimpath', 'PYTHONDONTWRITEBYTECODE': '1',
            'PIP_NO_INDEX': '1', 'LANG': 'C.UTF-8', **PROFILE['env']}
-    env['ADAPTER_MODE'] = args.mode
+    env['ADAPTER_MODE'] = mode
     cases, diagnostic, status = [], '', 1
     try:
         Path(env['HOME']).mkdir()
@@ -344,7 +381,7 @@ def main():
                 raise RuntimeError('prepared Go cache is not writable; rebuild the generated Dockerfile')
         if not expected and not args.discover:
             raise RuntimeError('nonempty expected IDs required; qualification or new-test configuration is OPEN')
-        work = prepare(Path(sys.argv[1]), scratch, env, args.mode)
+        work = prepare(Path(sys.argv[1]), scratch, env, mode)
         for argv in PROFILE['setup_commands']:
             code, text = command(argv, work, env, PROFILE['timeout'], phase='setup.build')
             print(text, end='')
@@ -356,12 +393,12 @@ def main():
             diagnostic += text
             if code:
                 raise RuntimeError('compiled/import check failed: ' + text)
-        if not PROFILE['selectors'][args.mode]:
-            raise RuntimeError('zero selection: selectors.' + args.mode + ' is empty')
-        native_map = PROFILE.get('native_ids', {}) if args.mode == 'base' else PROFILE.get('new_native_ids', {})
+        if not PROFILE['selectors'][mode]:
+            raise RuntimeError('zero selection: selectors.' + mode + ' is empty')
+        native_map = PROFILE.get('native_ids', {}) if mode == 'base' else PROFILE.get('new_native_ids', {})
         if not args.discover and PROFILE['language'] == 'typescript' and not native_map:
             raise RuntimeError('Vitest native ID mapping is not qualified; discover on a successful source tree first')
-        ids = collect(work, scratch, env, args.mode) if args.discover or not native_map else native_map
+        ids = collect(work, scratch, env, mode) if args.discover or not native_map else native_map
         if not ids:
             raise RuntimeError('zero tests discovered')
         if args.discover:
@@ -386,7 +423,7 @@ def main():
         print('cannot emit named cases without a configured expected inventory', file=sys.stderr)
         return 2
     try:
-        return write_report(output, expected, cases, diagnostic, status, args.mode)
+        result = write_report(output, expected, cases, diagnostic, status, mode)
     except Exception as exc:
         from html import escape
         COMMAND_STATUSES.append({'phase': 'reporter.converter', 'exit': 1})
@@ -401,7 +438,10 @@ def main():
         fallback = '<testsuites><testsuite tests="' + str(len(expected)) + '" errors="' + str(len(expected)) + '\">' + ''.join(items) + '</testsuite></testsuites>'
         Path(output).parent.mkdir(parents=True, exist_ok=True)
         Path(output).write_text(fallback, encoding='utf-8')
-        return 1
+        result = 1
+    if announce:
+        print('JUnit report: ' + announce)
+    return result
 
 
 sys.exit(main())

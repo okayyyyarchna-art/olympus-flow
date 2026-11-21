@@ -1,0 +1,241 @@
+#!/usr/bin/env bash
+# Test runner.
+#
+# Usage:
+#   ./test.sh [--output_path <junit.xml>] <base|new>
+#
+#   base  builds vet and runs the existing tests of the packages that the change touches and of those that use them.
+#   new   runs the tests of what a pull request scan reports as changed.
+set -uo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+OUTPUT_PATH=""
+OUTPUT_SET=""
+MODE=""
+
+usage() { echo "usage: $0 [--output_path <junit.xml>] <base|new>" >&2; exit 2; }
+set_mode() {
+  case "$1" in base|new) ;; *) echo "unknown mode: $1" >&2; exit 2 ;; esac
+  if [ -n "$MODE" ]; then echo "mode given twice" >&2; exit 2; fi
+  MODE="$1"
+}
+set_output() {
+  if [ -z "$1" ]; then echo "empty output path" >&2; exit 2; fi
+  OUTPUT_PATH="$1"; OUTPUT_SET=1
+}
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --output_path|--output-path) [ $# -ge 2 ] || usage; set_output "$2"; shift 2 ;;
+    --output_path=*|--output-path=*) set_output "${1#*=}"; shift ;;
+    --mode) [ $# -ge 2 ] || usage; set_mode "$2"; shift 2 ;;
+    --mode=*) set_mode "${1#*=}"; shift ;;
+    base|new) set_mode "$1"; shift ;;
+    *) echo "unknown argument: $1" >&2; exit 2 ;;
+  esac
+done
+MODE="${MODE:-base}"
+case "$OUTPUT_PATH" in
+  ""|/*) ;;
+  *) OUTPUT_PATH="$PWD/$OUTPUT_PATH" ;;
+esac
+cd "$ROOT" || exit 2
+
+# Build the main module without go.work (GOWORK=off) unless the environment sets GOWORK.
+export GOWORK="${GOWORK:-off}"
+export GOFLAGS="${GOFLAGS:-}"
+case " $GOFLAGS " in *" -buildvcs="*) ;; *) GOFLAGS="$GOFLAGS -buildvcs=false" ;; esac
+# auto runs the installed Go toolchain when it is the one that go.mod names.
+case "${GOTOOLCHAIN:-}" in ""|local) GOTOOLCHAIN=auto ;; esac
+export GOTOOLCHAIN
+export GOCACHE="${GOCACHE:-/tmp/gocache}"
+if ! mkdir -p "$GOCACHE" 2>/dev/null || [ ! -w "$GOCACHE" ]; then
+  GOCACHE="$(mktemp -d)"; export GOCACHE
+fi
+# The toolchain, the modules and go-junit-report are under /opt/go. With no GOPATH, as in an empty environment,
+# go would try to download the toolchain.
+if [ -z "${GOPATH:-}" ] && [ -d /opt/go ]; then
+  export GOPATH=/opt/go
+fi
+GO_BIN_DIR="$(go env GOPATH 2>/dev/null)"
+for d in ${GO_BIN_DIR:+"$GO_BIN_DIR/bin"} /opt/go/bin; do
+  case ":$PATH:" in *":$d:"*) ;; *) PATH="$PATH:$d" ;; esac
+done
+export PATH
+
+# The test files of the pinned commit run (go -overlay): an edit to an existing test file does not count, a
+# test file that a change adds is left out, and a deleted one comes back.
+BASE_COMMIT=2eb6e8e0c85744411bf116d57a00eae400eff811
+TEST_FLAGS=()
+# new mode keeps the test files that this change adds; base mode drops every added test file
+KEEP=''
+# new mode leaves out the other test files of the packages it runs: the added tests use no helper of theirs, so a
+# test of the repository that no longer builds after a change to unexported code cannot stop the added tests
+HIDE=''
+# the test files and the test-only helper packages (gitbasetest, golden, plugintest) of the pinned commit
+PINNED='(_test[.]go|/gitbasetest/[^/]*[.]go|internal/golden/[^/]*[.]go|plugin/plugintest/[^/]*[.]go|test/acceptance/.*[.]go)$'
+# the acceptance script folders that base mode runs, as the pinned commit has them
+ACCEPT_DIRS=(test/acceptance/scripts/scan/pr-mode test/acceptance/scripts/controls/lockfile test/acceptance/scripts/controls/hygiene test/acceptance/scripts/controls/reputation test/acceptance/scripts/controls/cooldown test/acceptance/scripts/controls/agent-config test/acceptance/scripts/controls/hidden-code test/acceptance/scripts/ci/pr-comment test/acceptance/scripts/report/diff test/acceptance/scripts/report/schema)
+# restore_tests <file regex> <dir>...
+restore_tests() {
+  local pattern="$1"; shift
+  if ! git -C "$ROOT" cat-file -e "$BASE_COMMIT^{commit}" 2>/dev/null; then
+    echo "warning: $BASE_COMMIT is not in .git; the tests run as checked out" >&2
+    return 0
+  fi
+  local dir rel tmp sep="" ov
+  local keep; keep="$(mktemp -d)"
+  ov="$keep/overlay.json"
+  printf '{"Replace":{' > "$ov"
+  for dir in "$@"; do
+    local base_files; base_files="$(git -C "$ROOT" ls-tree -r --name-only "$BASE_COMMIT" -- "$dir" | grep -E "$pattern" || true)"
+    for rel in $base_files; do
+      if [ -n "$HIDE" ] && printf '%s\n' "$rel" | grep -qE "$HIDE"; then
+        printf '%s"%s":""' "$sep" "$ROOT/$rel" >> "$ov"; sep=","
+        continue
+      fi
+      tmp="$keep/$(printf '%s' "$rel" | tr '/' '_')"
+      git -C "$ROOT" show "$BASE_COMMIT:$rel" > "$tmp"
+      printf '%s"%s":"%s"' "$sep" "$ROOT/$rel" "$tmp" >> "$ov"; sep=","
+    done
+    while IFS= read -r rel; do
+      rel="${rel#"$ROOT"/}"
+      printf '%s\n' "$base_files" | grep -qxF "$rel" && continue
+      [ -n "$KEEP" ] && printf '%s\n' "$rel" | grep -qE "$KEEP" && continue
+      printf '%s"%s":""' "$sep" "$ROOT/$rel" >> "$ov"; sep=","
+    done < <(find "$ROOT/$dir" -type f | grep -E "$pattern" || true)
+  done
+  printf '}}' >> "$ov"
+  TEST_FLAGS=(-overlay "$ov")
+}
+# restore_fixtures <dir>...: the testdata files of the pinned commit, so a base test reads the input it was
+# written for.
+restore_fixtures() {
+  git -C "$ROOT" cat-file -e "$BASE_COMMIT^{commit}" 2>/dev/null || return 0
+  local files
+  files="$(git -C "$ROOT" ls-tree -r --name-only "$BASE_COMMIT" -- "$@" | grep '/testdata/' || true)"
+  [ -n "$files" ] || return 0
+  # shellcheck disable=SC2086
+  git -C "$ROOT" archive --format=tar "$BASE_COMMIT" $files | tar -x --no-overwrite-dir -C "$ROOT"
+  # shellcheck disable=SC2086
+  (cd "$ROOT" && chmod a+rw $files 2>/dev/null) || true
+}
+# restore_scripts <dir>...: the acceptance scripts of the pinned commit, so base mode runs them as written. A
+# script that the change adds stays on disk, and the acceptance step does not run it.
+restore_scripts() {
+  git -C "$ROOT" cat-file -e "$BASE_COMMIT^{commit}" 2>/dev/null || return 0
+  git -C "$ROOT" archive --format=tar "$BASE_COMMIT" "$@" | tar -x --no-overwrite-dir -C "$ROOT"
+  # The folders keep their own modes, and the restored files stay writable, so a later git apply by another user works.
+  (cd "$ROOT" && chmod -R a+rwX "$@" 2>/dev/null) || true
+}
+case "$MODE" in
+  base) restore_tests "$PINNED" internal/gitbase/gitbasetest internal/golden plugin/plugintest internal/engine internal/state internal/gitbase internal/overview internal/plugins/sinks internal/plugins/controls/lockfile internal/plugins/controls/hygiene internal/plugins/controls/reputation internal/plugins/controls/workflow internal/plugins/controls/hiddencode internal/plugins/controls/cooldown internal/plugins/controls internal/runner internal/archtest internal/plugins/extractors/lockfile/packagelockjson internal/plugins/extractors/scalibr internal/plugins/extractors/internal/graph internal/plugins/extractors/internal/lockmeta internal/cmd/report internal/view finding internal/cmd internal/cmd/doctor internal/endpoint/aitool internal/plugins/bitbucket internal/plugins/cloud/inventory internal/plugins/controls/license internal/plugins/controls/malware internal/plugins/controls/vuln internal/plugins/enrichers internal/plugins/enrichers/actionrefs internal/plugins/enrichers/codeusage internal/plugins/enrichers/insights internal/plugins/enrichers/internal/client internal/plugins/extractors internal/plugins/extractors/hiddencode internal/plugins/extractors/lockfile internal/plugins/extractors/lockfile/bunlock internal/plugins/extractors/lockfile/cargolock internal/plugins/extractors/lockfile/pnpmlock internal/plugins/extractors/lockfile/uvlock internal/plugins/extractors/lockfile/yarnlock internal/plugins/gitlab internal/plugins/internal/render internal/plugins/sinks/jsonl internal/plugins/sources/endpoint internal/plugins/sources/purl internal/policy internal/reportdoc internal/symbols plugin plugin/plugintest report model test/acceptance internal/plugins/cloud/report test/extraction test/reach
+        restore_scripts "${ACCEPT_DIRS[@]}" test/acceptance/stub/fixtures test/acceptance/catalog.yaml
+        restore_fixtures internal/gitbase/gitbasetest internal/golden plugin/plugintest internal/engine internal/state internal/gitbase internal/overview internal/plugins/sinks internal/plugins/controls/lockfile internal/plugins/controls/hygiene internal/plugins/controls/reputation internal/plugins/controls/workflow internal/plugins/controls/hiddencode internal/plugins/controls/cooldown internal/plugins/controls internal/runner internal/archtest internal/plugins/extractors/lockfile/packagelockjson internal/plugins/extractors/scalibr internal/plugins/extractors/internal/graph internal/plugins/extractors/internal/lockmeta internal/cmd/report internal/view finding internal/cmd internal/cmd/doctor internal/endpoint/aitool internal/plugins/bitbucket internal/plugins/cloud/inventory internal/plugins/controls/license internal/plugins/controls/malware internal/plugins/controls/vuln internal/plugins/enrichers internal/plugins/enrichers/actionrefs internal/plugins/enrichers/codeusage internal/plugins/enrichers/insights internal/plugins/enrichers/internal/client internal/plugins/extractors internal/plugins/extractors/hiddencode internal/plugins/extractors/lockfile internal/plugins/extractors/lockfile/bunlock internal/plugins/extractors/lockfile/cargolock internal/plugins/extractors/lockfile/pnpmlock internal/plugins/extractors/lockfile/uvlock internal/plugins/extractors/lockfile/yarnlock internal/plugins/gitlab internal/plugins/internal/render internal/plugins/sinks/jsonl internal/plugins/sources/endpoint internal/plugins/sources/purl internal/policy internal/reportdoc internal/symbols plugin plugin/plugintest report model internal/plugins/cloud/report test/extraction test/reach ;;
+  new) KEEP='prscan_prs9_test[.]go$'
+       HIDE='^(internal/engine|internal/overview|internal/plugins/sinks/cyclonedx|internal/cmd/report|internal/plugins/controls/lockfile)/[^/]*_test[.]go$'
+       restore_tests "$PINNED" internal/gitbase/gitbasetest internal/golden plugin/plugintest internal/engine internal/overview internal/plugins/sinks/cyclonedx internal/cmd/report internal/plugins/controls/lockfile ;;
+esac
+
+LOG="$(mktemp)"
+STATUS=0
+
+# fail_case <name> <file>: reports a failing test case carrying the file's contents.
+fail_case() {
+  { echo "=== RUN   $1"; sed 's/^/    /' "$2"; echo "--- FAIL: $1 (0.00s)"; } >> "$LOG"
+}
+
+# run_pkg <package dir> <name pattern|-> [go test flags...]
+# A package whose tests do not build is reported as one failing case per test it declares, with the compiler output.
+run_pkg() {
+  local dir="$1" pattern="$2"; shift 2
+  local build_log; build_log="$(mktemp)"
+  if go test "${TEST_FLAGS[@]}" -count=1 -run '^$' "$@" "./$dir" > "$build_log" 2>&1; then
+    local args=("${TEST_FLAGS[@]}" -count=1 -timeout 240s -v "$@")
+    [ "$pattern" != "-" ] && args+=(-run "$pattern")
+    go test "${args[@]}" "./$dir" >> "$LOG" 2>&1 || STATUS=1
+  else
+    STATUS=1
+    local import_path names
+    import_path="$(go list -e -f '{{.ImportPath}}' "./$dir" 2>/dev/null)"
+    [ -n "$import_path" ] || import_path="github.com/safedep/vet/v2/$dir"
+    names="$(grep -ho '^func Test[A-Za-z0-9_]*' "$dir"/*_test.go 2>/dev/null | sed 's/^func //' | grep -v '^TestMain$')"
+    # the -run pattern names subtests; the declared names are its top-level part
+    [ "$pattern" != "-" ] && names="$(printf '%s\n' "$names" | grep -xE "${pattern%%/*}")"
+    for n in $names; do
+      fail_case "$n" "$build_log"
+    done
+    printf 'FAIL\t%s\t0.000s\n' "$import_path" >> "$LOG"
+  fi
+}
+
+case "$MODE" in
+  base)
+    BUILD_LOG="$(mktemp)"
+    if ! go build "${TEST_FLAGS[@]}" ./cmd/vet ./internal/... > "$BUILD_LOG" 2>&1; then
+      STATUS=1
+      fail_case TestBuildVet "$BUILD_LOG"
+      printf 'FAIL	build	0.000s
+' >> "$LOG"
+    fi
+    BASE_PKGS=(internal/engine internal/state internal/gitbase internal/overview internal/plugins/sinks internal/plugins/sinks/cyclonedx internal/plugins/sinks/markdown internal/plugins/sinks/table internal/plugins/sinks/prcomment internal/plugins/controls/lockfile internal/plugins/controls/hygiene internal/plugins/controls/reputation internal/plugins/controls/workflow internal/plugins/controls/hiddencode internal/plugins/controls/cooldown internal/plugins/controls internal/runner internal/archtest internal/plugins/extractors/lockfile/packagelockjson internal/plugins/extractors/scalibr internal/plugins/extractors/internal/graph internal/plugins/extractors/internal/lockmeta internal/cmd/report internal/view finding internal/cmd internal/cmd/doctor internal/endpoint/aitool internal/plugins/bitbucket internal/plugins/cloud/inventory internal/plugins/controls/license internal/plugins/controls/malware internal/plugins/controls/vuln internal/plugins/enrichers internal/plugins/enrichers/actionrefs internal/plugins/enrichers/codeusage internal/plugins/enrichers/insights internal/plugins/enrichers/internal/client internal/plugins/extractors internal/plugins/extractors/hiddencode internal/plugins/extractors/lockfile internal/plugins/extractors/lockfile/bunlock internal/plugins/extractors/lockfile/cargolock internal/plugins/extractors/lockfile/pnpmlock internal/plugins/extractors/lockfile/uvlock internal/plugins/extractors/lockfile/yarnlock internal/plugins/gitlab internal/plugins/internal/render internal/plugins/sinks/jsonl internal/plugins/sources/endpoint internal/plugins/sources/purl internal/policy internal/reportdoc internal/symbols plugin plugin/plugintest report model internal/plugins/extractors/cargotoml internal/plugins/extractors/githubactions internal/plugins/extractors/gomod internal/plugins/extractors/packagejson internal/plugins/extractors/pyproject internal/plugins/extractors/terraform internal/plugins/cloud/report test/extraction test/reach)
+    # TestHomeUser (internal/plugins/sources/endpoint) needs a passwd record for the current user (user.Current).
+    # Base mode also runs as a user id that has none, where that test cannot pass whatever the code does.
+    # TestPrepareRunsWithTheNetworkEnrichers (internal/engine) bounds a scan by wall time (1.6 s for two enrichers of
+    # 1 s each); a busy machine exceeds it on the unchanged repository too.
+    BASE_SKIP='^(TestHomeUser|TestPrepareRunsWithTheNetworkEnrichers)$'
+    # One go test call builds and runs the packages in parallel. A package that does not build is found by the
+    # loop, one failing case per declared test.
+    if go test "${TEST_FLAGS[@]}" -count=1 -run '^$' "${BASE_PKGS[@]/#/./}" > "$BUILD_LOG" 2>&1; then
+      go test "${TEST_FLAGS[@]}" -count=1 -timeout 240s -v -skip "$BASE_SKIP" "${BASE_PKGS[@]/#/./}" >> "$LOG" 2>&1 || STATUS=1
+    else
+      for d in "${BASE_PKGS[@]}"; do
+        run_pkg "$d" - -skip "$BASE_SKIP"
+      done
+    fi
+    # The acceptance scripts of pull request mode, of the controls that read lockfile entries or linked folders, and of
+    # the outputs that show the change run vet end to end.
+    # Base mode runs the scripts that the pinned commit has in those folders, each by its full name, so a script that
+    # the change adds does not run. go test splits -run at each top-level | and at each slash.
+    ACCEPT_RUN='TestAcceptance/(scan|controls|ci|report)/(pr-mode|lockfile|hygiene|reputation|cooldown|agent-config|hidden-code|pr-comment|diff|schema)/'
+    BASE_SCRIPTS=""
+    if git -C "$ROOT" cat-file -e "$BASE_COMMIT^{commit}" 2>/dev/null; then
+      BASE_SCRIPTS="$(git -C "$ROOT" ls-tree -r --name-only "$BASE_COMMIT" -- "${ACCEPT_DIRS[@]}" | grep '[.]txtar$')"
+    fi
+    if [ -n "$BASE_SCRIPTS" ]; then
+      ACCEPT_RUN="$(printf '%s\n' "$BASE_SCRIPTS" | sed -e 's#^test/acceptance/scripts/##' -e 's#[.]txtar$##' \
+        -e 's#/#$/^#g' -e 's#^#^TestAcceptance$/^#' -e 's#$#$#' | paste -sd '|' -)"
+    fi
+    go test "${TEST_FLAGS[@]}" -tags acceptance -count=1 -timeout 240s -v ./test/acceptance/ -run "$ACCEPT_RUN" \
+      >> "$LOG" 2>&1 || STATUS=1
+    # Each script of the pinned commit in those folders must run: a catalog or filter that skips one fails here.
+    for script in $BASE_SCRIPTS; do
+      name="${script#test/acceptance/scripts/}"; name="${name%.txtar}"
+      if ! grep -qE -- "--- (PASS|FAIL): TestAcceptance/$name \(" "$LOG"; then
+        STATUS=1
+        missing="$(mktemp)"; echo "the acceptance script $script did not run" > "$missing"
+        fail_case "TestAcceptance/$name" "$missing"
+      fi
+    done
+    ;;
+  new)
+    for d in internal/engine internal/overview internal/plugins/sinks/cyclonedx internal/cmd/report internal/plugins/controls/lockfile; do
+      run_pkg "$d" '^Test.*Prs9$'
+    done
+    ;;
+esac
+
+cat "$LOG"
+if [ -n "$OUTPUT_SET" ]; then
+  if ! go-junit-report -set-exit-code -subtest-mode exclude-parents < "$LOG" > "$OUTPUT_PATH"; then
+    STATUS=1
+  fi
+  if ! grep -q '<testcase' "$OUTPUT_PATH" 2>/dev/null; then
+    echo "no test cases were reported" >&2
+    STATUS=1
+  fi
+fi
+if ! grep -qE '^(=== RUN|--- (PASS|FAIL|SKIP))' "$LOG"; then
+  echo "no tests ran" >&2
+  STATUS=1
+fi
+exit "$STATUS"

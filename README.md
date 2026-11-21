@@ -70,3 +70,9 @@ Use `--force --dry-run` to review an upgrade, then `--force` to apply it. `insta
 --home /scratch/home` supports an isolated installation check. Installing the product
 does not copy or migrate existing task repositories, shared lists, memory or CLI
 credentials.
+
+## Current flow (2026-11-21)
+The kit targets the platform's rollout criteria as written on the platform (`skill/platform.md`): Nova 0, Orion 1 of 4
+with a passing run of 256K+ tokens (designed for 300K+ and measured by a local Codex spike before the lock), Vega at most
+25%. Start at [GETTING-STARTED.md](GETTING-STARTED.md); the stage order is [skill/PIPELINE.md](skill/PIPELINE.md).
+Older build logs, hand-overs and superseded card versions are under [history/](history/).

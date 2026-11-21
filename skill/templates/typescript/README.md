@@ -3,10 +3,16 @@
 Derived from H1-H6/E1-E5 construction cards only. No task has proved this template
 on the platform. Keep this status until a real task passes and records its identity.
 
-Template markers: `platform`, `toolchain_version`, `package_manager_install`,
-`fetch_command`, `development_install`, `profile_b64`. Select a currently allowed
-platform base and verify its exact Node/Python runtime. The proposed node base
-name is NOT VERIFIED. The runner requires Python at /usr/local/bin/python.
+Template markers: `toolchain_version`, `package_manager_install`,
+`fetch_command`, `development_install` (Dockerfile) and `profile_json` (test.sh:
+a readable, indented JSON object; the older `profile_b64` marker is no longer
+read). The Dockerfile starts with the bare
+`FROM public.ecr.aws/d3j8x8q7/olympus-base:latest` (the platform's allowed list;
+no node image exists on it, so the Node runtime of that base is NOT VERIFIED)
+and ends with `chmod -R a+rwX /app`. test.sh accepts
+`[--output_path <junit.xml>] [--mode] <base|new>` in any order (mode default
+base, output path optional, exit 2 on a malformed argument) and prints Vitest's
+normal text. The runner requires Python at /usr/local/bin/python.
 
 The image executes `npm ci` or `pnpm install --frozen-lockfile` at build time and
 copies immutable installed dependencies outside /app so mounting candidate source

@@ -4,7 +4,7 @@
 #   <pkg-dir>      holds test.patch and solution.patch (the candidate you are about to paste)
 #   <clean-repo-dir> a git clone of the pinned commit (only read; copied inside the container)
 #   <image>        the package image (deps installed; network not needed)
-#   <patches-dir>  *.patch files from stage_agent_runs.py --out
+#   <patches-dir>  *.patch files staged by replay_plan.py --stage
 #   [mode]         test.sh mode to run: new (default) or base
 # Prints "<name>: <passed>/<total> new" plus the failing test names. Language-agnostic: parses the JUnit XML that
 # test.sh writes. Works from macOS bash and Windows Git Bash (MSYS_NO_PATHCONV + cygpath -m).

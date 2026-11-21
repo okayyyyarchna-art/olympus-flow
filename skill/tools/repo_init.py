@@ -1,12 +1,15 @@
 #!/usr/bin/env python3
 """Discover a pinned repository and render a fail-closed repository adapter.
 
-repo_init.py URL COMMIT TASK [--settings choices.json] [--render-only]
+repo_init.py URL COMMIT TASK [--settings choices.json] [--render-only [--force]]
+TASK is a folder name under the machine profile's paths.tasks_root, or a path (it holds a separator or is absolute).
 Settings are explicit author choices, never inferred facts. Run repo_check.py next.
 """
 import argparse
 import ast
 import base64
+import fnmatch
+import hashlib
 import json
 import os
 from pathlib import Path, PurePosixPath
@@ -15,13 +18,48 @@ import subprocess
 import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))  # python -I drops the script folder
-from machine import load, profile_path
+from machine import load, machine_dir, profile_path
 
 TEMPLATES = Path(__file__).resolve().parents[1] / "templates"
+FLAGGED_WORDS = Path(__file__).resolve().parent / "lib/check_codex_brief.sh"
+# The generated-output patterns the runner's candidate copy drops; a tracked file matching one is listed in
+# profile keep_tracked so the runner keeps it (BACKLOG 141: pmg tracks a go:embed .o object).
+GENERATED_PATTERNS = (".git", "__pycache__", "*.pyc", "*.so", "*.pyd", "*.o", "*.a", ".pytest_cache", "build", "dist", "node_modules")
 
 
 def git(repo, *args):
     return subprocess.check_output(["git", "-C", str(repo), *args], text=True, encoding="utf-8").strip()
+
+
+def task_dir(argument, machine):
+    """A bare TASK name lives under paths.tasks_root; a path (separator or absolute) is taken as given (BACKLOG 116/136)."""
+    if os.path.isabs(argument) or "/" in argument or "\\" in argument:
+        task = Path(argument).expanduser().resolve()
+    elif re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", argument) and argument not in (".", ".."):
+        task = (Path(machine["paths"]["tasks_root"]) / argument).resolve()
+    else:
+        raise ValueError(f"TASK {argument!r} is neither a folder name (letters, digits, . _ -) nor a path")
+    for root in (Path(__file__).resolve().parents[1], machine_dir().parent):
+        if task == root or root in task.parents:
+            raise ValueError(f"task folder {task} is inside the Olympus Flow folder {root}; "
+                             "use a name under paths.tasks_root or a path outside it")
+    return task
+
+
+def flagged_word(name):
+    """The word of NAME that lib/check_codex_brief.sh flags (Codex refuses briefs naming it), or None (BACKLOG 165)."""
+    match = re.search(r"^words='([^']+)'", FLAGGED_WORDS.read_text(encoding="utf-8"), re.M)
+    if not match:
+        raise ValueError(f"{FLAGGED_WORDS} has no words='...' list")
+    found = re.search(match[1], name, re.I)
+    return found[0] if found else None
+
+
+def go_imports(text):
+    found = set(re.findall(r'^\s*import\s+(?:[\w.]+\s+)?"([^"]+)"', text, re.M))
+    for block in re.findall(r"^\s*import\s*\((.*?)^\s*\)", text, re.M | re.S):
+        found.update(re.findall(r'"([^"]+)"', block))
+    return found
 
 
 def discover(repo):
@@ -42,7 +80,9 @@ def discover(repo):
                "hidden_paths": [], "base_hidden_paths": [], "setup_commands": [], "setup_imports": [],
                "env": {}, "reporter": "adapter-stdlib-1", "timeout": 420,
                "qualified": False, "tests": [], "fixtures": [], "config": [],
-               "production": [], "helpers": [], "compiled_twins": [], "dependency_manifests": [], "patterns": {}}
+               "production": [], "helpers": [], "compiled_twins": [], "dependency_manifests": [], "patterns": {},
+               "keep_tracked": sorted(n for n in names if any(fnmatch.fnmatchcase(part, pattern)
+                                                               for part in PurePosixPath(n).parts for pattern in GENERATED_PATTERNS))}
 
     def note(field, name, pattern):
         for number, line in enumerate(texts.get(name, "").splitlines(), 1):
@@ -126,6 +166,27 @@ def discover(repo):
             profile["helpers"] = [name for name in profile["helpers"] if name not in members]
             profile["production"].extend(members)
             unresolved("helpers.shared", f"{directory} is imported by production; preserve candidate source and design a grading authority boundary explicitly.")
+        # A package imported only by test code (outside its own directory) is a grading helper: pinned through
+        # restore_paths so a candidate cannot weaken the retained tests by editing it (BACKLOG 160/222).
+        module = profile["toolchain"]["module"]
+        imports = {name: go_imports(text) for name, text in texts.items() if name.endswith(".go")}
+        folder = lambda name: PurePosixPath(name).parent.as_posix()
+        helper_dirs = {folder(name) for name in profile["helpers"]}
+        moved = True
+        while moved:
+            moved = False
+            for package in sorted({folder(name) for name in profile["production"] if name.endswith(".go")}):
+                path = module + ("/" + package if package != "." else "")
+                importers = sorted(name for name, found in imports.items() if path in found and folder(name) != package)
+                if importers and all(name.endswith("_test.go") or folder(name) in helper_dirs for name in importers):
+                    members = [name for name in profile["production"] if folder(name) == package]
+                    profile["production"] = [name for name in profile["production"] if name not in members]
+                    profile["helpers"].extend(members)
+                    helper_dirs.add(package)
+                    line = next((i for i, text in enumerate(texts[importers[0]].splitlines(), 1) if '"' + path + '"' in text), 1)
+                    profile["evidence"].setdefault("helper_roles", []).append({"location": f"{importers[0]}:{line}",
+                        "text": f"{package} is imported only by test code ({', '.join(importers)}); pinned as a helper through restore_paths"})
+                    moved = True
         explicit = re.search(r"^toolchain go(\S+)", texts["go.mod"], re.M)
         if explicit:
             profile["toolchain"]["version"] = explicit[1]
@@ -254,7 +315,7 @@ def apply_settings(profile, settings):
     allowed.add("production_probe")
     allowed.add("reporter_versions")
     allowed.add("base_hidden_paths")
-    allowed.update(("helpers", "production", "config", "tests", "fixtures"))
+    allowed.update(("helpers", "production", "config", "tests", "fixtures", "keep_tracked"))
     unknown = set(settings) - allowed
     if unknown:
         raise ValueError("unknown settings: " + ", ".join(sorted(unknown)))
@@ -267,9 +328,54 @@ def apply_settings(profile, settings):
             profile[key] = value
 
 
-def render(task, profile):
+def derive_new_native_ids(profile):
+    """Map expected.new to native selectors (BACKLOG 146): Go ImportPath::Test -> [package, name]; Python canonical
+    IDs -> pytest node IDs through the hidden/test files; anything else stays OPEN under new_native_ids."""
+    expected = profile["expected"]["new"]
+    if not expected or "new_native_ids" in profile.get("author_overrides", []):
+        return
+    language, ids, unresolved = profile["language"], {}, []
+    files = set(profile.get("hidden_paths", [])) | set(profile["tests"])
+    for key in expected:
+        classname, sep, name = key.rpartition("::")
+        if language == "go" and classname:
+            ids[key] = [classname, name]
+        elif language == "python" and classname:
+            parts = classname.split(".")
+            cut = next((n for n in range(len(parts), 0, -1) if "/".join(parts[:n]) + ".py" in files), None)
+            if cut is None:
+                unresolved.append(key)
+            else:
+                ids[key] = "::".join(["/".join(parts[:cut]) + ".py", *parts[cut:], name])
+        else:
+            unresolved.append(key)
+    profile["open"] = [row for row in profile["open"] if row["field"] != "new_native_ids"]
+    if unresolved:
+        profile.pop("new_native_ids", None)  # a half-derived map would only move the failure into test.sh new
+        profile["open"].append({"field": "new_native_ids", "reason": f"{language}: no native selector derivable for "
+                                + ", ".join(unresolved[:5]) + "; set new_native_ids in --settings (Go: ID -> [package, name]; "
+                                "Python: ID -> pytest node ID; the hidden file must be in hidden_paths)."})
+    else:
+        profile["new_native_ids"] = ids
+
+
+def render(task, profile, force=False):
     init = task / "init"
     init.mkdir(exist_ok=True)
+    record = init / ".rendered.json"
+    rendered = json.loads(record.read_text(encoding="utf-8")) if record.exists() else {}
+
+    def emit(name, body):
+        # Never overwrite a file that differs from this renderer's own last output (BACKLOG 136): the author may
+        # have placed the platform-accepted Dockerfile or edited test.sh. --render-only --force rewrites it.
+        path, data = init / name, body.encode("utf-8")
+        if path.exists() and not force and hashlib.sha256(path.read_bytes()).hexdigest() != rendered.get(name):
+            print(f"kept hand-edited init/{name} (differs from the last render; repo_init.py --render-only --force rewrites it)", flush=True)
+            return
+        path.write_bytes(data)
+        rendered[name] = hashlib.sha256(data).hexdigest()
+        record.write_text(json.dumps(rendered, indent=2, sort_keys=True) + "\n", encoding="utf-8", newline="\n")
+
     profile["adapter"] = {"pristine_restore_source": "git archive " + profile["identity"]["commit"],
                           "hidden_overlay": "explicit hidden_paths after pristine restoration",
                           "rebuild": "discard generated binaries/C twins; run setup_commands and setup_imports against candidate scratch",
@@ -279,8 +385,8 @@ def render(task, profile):
     language = profile["language"]
     template = TEMPLATES / language
     if not template.is_dir():
-        (init / "Dockerfile").write_text("FROM {{qualified_language_adapter}}\n", encoding="utf-8", newline="\n")
-        (init / "test.sh").write_text("#!/bin/sh\necho 'unsupported adapter: see profile.json open list' >&2\nexit 2\n", newline="\n")
+        emit("Dockerfile", "FROM {{qualified_language_adapter}}\n")
+        emit("test.sh", "#!/bin/sh\necho 'unsupported adapter: see profile.json open list' >&2\nexit 2\n")
         return
     recipe_path = template / "recipe.json"
     recipe = json.loads(recipe_path.read_text()) if recipe_path.exists() else {}
@@ -311,6 +417,18 @@ def render(task, profile):
     ):
         if missing and not any(row["field"] == field for row in profile["open"]):
             profile["open"].append({"field": field, "reason": reason})
+    # The runner's adapter fields only; {{profile_json}} is the readable form, {{profile_b64}} the older template's.
+    embedded = {**{k: profile[k] for k in
+                   ("identity", "language", "toolchain", "tests", "restore_paths", "hidden_paths", "selectors",
+                    "expected", "skip_allowlist", "env", "setup_commands", "setup_imports", "timeout", "frameworks")},
+                "identity": {"commit": profile["identity"]["commit"]},
+                "native_ids": profile.get("native_ids", {}), "helpers": profile["helpers"],
+                "new_native_ids": profile.get("new_native_ids", {}),
+                "base_hidden_paths": profile.get("base_hidden_paths", []),
+                # The current runtime calls the overlays overlay_paths; the older one hidden_paths. Carry both.
+                "overlay_paths": profile["hidden_paths"], "base_overlay_paths": profile.get("base_hidden_paths", []),
+                "keep_tracked": profile.get("keep_tracked", []),
+                "fixtures": profile["fixtures"]}
     values = {"platform": profile["environment"]["platform"], "toolchain_version": version,
               "go_sha256": profile.get("go_sha256", "NOT_VERIFIED"),
               "dependency_install": profile.get("dependency_install", "echo 'dependency pins NOT VERIFIED' >&2 && exit 2"),
@@ -319,32 +437,40 @@ def render(task, profile):
               "build_environment": profile.get("build_environment", "ENV PIP_DISABLE_PIP_VERSION_CHECK=1"),
               "fetch_command": profile.get("commands", {}).get("fetch", "false"),
               "build_commands": profile.get("build_commands", "go build ./... && go list -deps -test ./... > /dev/null"),
-              "profile_b64": base64.b64encode(json.dumps({**{k: profile[k] for k in
-                  ("identity", "language", "toolchain", "tests", "restore_paths", "hidden_paths", "selectors",
-                   "expected", "skip_allowlist", "env", "setup_commands", "setup_imports", "timeout", "frameworks")},
-                   "identity": {"commit": profile["identity"]["commit"]},
-                   "native_ids": profile.get("native_ids", {}), "helpers": profile["helpers"],
-                   "new_native_ids": profile.get("new_native_ids", {}),
-                   "base_hidden_paths": profile.get("base_hidden_paths", []),
-                   "fixtures": profile["fixtures"]}, sort_keys=True).encode()).decode()}
+              # the readable profile carries the current runtime's key names only: "hidden_paths" is a process word
+              # that precheck.py flags in test.sh (#152); the older template still gets both spellings through base64
+              "profile_json": json.dumps({k: v for k, v in embedded.items()
+                                          if k not in ("hidden_paths", "base_hidden_paths")}, indent=2, sort_keys=True),
+              "profile_b64": base64.b64encode(json.dumps(embedded, sort_keys=True).encode()).decode()}
     def fill(body):
         return re.sub(r"\{\{([a-z0-9_]+)\}\}", lambda m: str(values[m[1]]), body)
     for name in ("Dockerfile", "test.sh"):
-        body = fill((template / name).read_text(encoding="utf-8"))
+        body = (template / name).read_text(encoding="utf-8")
+        if name == "Dockerfile":
+            # The platform's precheck wants the bare FROM line; proof.py passes --platform to docker build.
+            body = re.sub(r"^(\s*FROM\s+)--platform=\{\{platform\}\}\s+", r"\1", body, flags=re.M | re.I)
+        body = fill(body)
         if name == "Dockerfile":
             joined = re.sub(r"\\\s*\n", " ", body)
-            if any(line.lstrip().startswith("#") for line in body.splitlines()):
-                raise ValueError("generated Dockerfile contains comments")
+            # Owner rule (dockerfile.md E4, precheck.py): no comments except one reason block right above a RUN.
+            lines = body.splitlines()
+            for i, line in enumerate(lines):
+                comment = line.lstrip().startswith("#") and not line.lstrip().startswith("# syntax=")
+                if comment and not (i and lines[i - 1].lstrip().startswith("#")):
+                    after = next((k for k in range(i, len(lines)) if not lines[k].lstrip().startswith("#")), None)
+                    if after is None or not lines[after].lstrip().upper().startswith("RUN "):
+                        raise ValueError(f"generated Dockerfile line {i + 1}: a comment that is not a reason block right above a RUN")
             if re.search(r"(?:^RUN\s+|&&\s*|;\s*|\|\s*)(?:python[0-9.]*\s+-m\s+)?(?:go test|pytest|cargo test|npm test|vitest run|jest|tox)\b", joined, re.M):
                 raise ValueError("generated Dockerfile invokes a test runner in RUN")
-        (init / name).write_text(body, encoding="utf-8", newline="\n")
+        emit(name, body)
     (init / "test.sh").chmod(0o755)
     for mode in ("base", "new"):
         (init / (mode + "-ids.json")).write_text(json.dumps(profile["expected"][mode], indent=2) + "\n", encoding="utf-8")
 
 
-def save(task, profile):
-    render(task, profile)
+def save(task, profile, force=False):
+    derive_new_native_ids(profile)
+    render(task, profile, force)
     profile["environment"]["watchdog"] = f"NOT VERIFIED; local {profile['timeout']} seconds below proof.py's 688-second bound"
     (task / "profile.json").write_text(json.dumps(profile, indent=2) + "\n", encoding="utf-8")
 
@@ -356,7 +482,7 @@ def validate(profile):
         if not isinstance(ids, list) or any(not isinstance(key, str) or not key for key in ids) or len(set(ids)) != len(ids):
             raise ValueError("expected." + mode + " must contain unique nonempty ID strings")
     overlays = profile["hidden_paths"] + profile.get("base_hidden_paths", [])
-    for name in profile["restore_paths"] + overlays:
+    for name in profile["restore_paths"] + overlays + profile.get("keep_tracked", []):
         path = PurePosixPath(name)
         if path.is_absolute() or ".." in path.parts or ".git" in path.parts or "\\" in name or re.match(r"^[A-Za-z]:", name):
             raise ValueError("grading path escapes repository: " + name)
@@ -371,13 +497,18 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("url")
     parser.add_argument("commit")
-    parser.add_argument("task", type=Path)
+    parser.add_argument("task", help="folder name under the machine profile's paths.tasks_root, or a path")
     parser.add_argument("--settings", type=Path)
     parser.add_argument("--render-only", action="store_true")
+    parser.add_argument("--force", action="store_true", help="with --render-only: rewrite a hand-edited init/Dockerfile or init/test.sh")
     args = parser.parse_args()
     try:
         machine = load()
-        task = args.task.resolve()
+        task = task_dir(args.task, machine)
+        flagged = flagged_word(task.name)
+        if flagged:
+            raise ValueError(f"task name {task.name!r} contains {flagged!r}, a word lib/check_codex_brief.sh flags: "
+                             "every replica brief names the task path and Codex refuses it; choose another name")
         task.mkdir(parents=True, exist_ok=True)
         base = task / "base"
         if not re.fullmatch(r"[0-9a-fA-F]{40}", args.commit):
@@ -417,8 +548,8 @@ def main():
             apply_settings(profile, settings)
         if profile["language"] == "go":
             profile["env"].setdefault("GOMAXPROCS", str(machine["parallel"]["battery_workers"]))
-        save(task, profile)
-        print(f"profile: {task / 'profile.json'}; language: {profile['language']}; open: {len(profile['open'])}")
+        save(task, profile, args.force)
+        print(f"task: {task}\nprofile: {task / 'profile.json'}; language: {profile['language']}; open: {len(profile['open'])}")
         return 0
     except (OSError, ValueError, subprocess.CalledProcessError) as exc:
         print(f"repo_init: {exc}", file=sys.stderr)

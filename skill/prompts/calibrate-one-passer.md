@@ -1,8 +1,8 @@
 # Calibrate a too-easy task down to exactly one passer
 
-Use when a rollout has too many deserved passes. Target: exactly one model family solves, at 25% or less of its runs,
-the other two at 0%, with Fair task, No environment blockers, Solvable, No cheating, No false positives and
-Auto Review 3/3/3 all green, on the EXISTING rollout through a re-eval.
+Use when a rollout has too many deserved passes. Target: Orion solves at least one run and at most 25% with its passing runs averaging 256K+ tokens, Vega at most 25%,
+Nova 0 (platform.md), with Fair task, No environment blockers, Solvable, No cheating, No false positives and
+every platform quality check passing, on the EXISTING rollout through a re-eval.
 
 Do not use it when every run fails (use near-miss-release.md). "vet2:" lines are evidence from one task, not guarantees.
 
@@ -15,7 +15,7 @@ test that depends on a reading the description does not settle.
 - No Dockerfile change: it loses the re-eval.
 - Keep a platform-approved reference. Change it only under Lever F, and re-run Solution Quality if you do.
 - Everything a test, name or comment says must be true. Nothing may mislead a judge about what the test does.
-- Lanes: in-process plus claude2. Codex only if the owner names it, or both lanes found nothing.
+- Lanes: in-process plus the second Claude account. Codex only if the owner names it, or both lanes found nothing.
 - Pull platform checks and runs before every paste and every status claim. Nothing is pasted without the owner's go.
 - Never retire the task. If stuck, name the one blocker and the smallest redesign.
 - Report measured numbers only. Mark anything not run as NOT VERIFIED.
@@ -31,7 +31,7 @@ test that depends on a reading the description does not settle.
 ## Step 2: Search for differences. Run ALL levers: which one works differs per task.
 Every candidate becomes a cell run on base, reference and every passer.
 Order for speed: first I and J (one reading of each passer; they found both vet3 splits), then C, F and H in
-parallel lanes, then A, B, D, E, G. Time-box each grid lever: vet3's 424-cell grid and 13 line rows found no split.
+parallel lanes, then K and L (edge cases and round trip), then A, B, D, E, G. Time-box each grid lever: vet3's 424-cell grid and 13 line rows found no split.
 Every lever runs on the passers AND the near-passers (runs failing one or two tests): a near-passer's failure must be
 an agent miss, never a task blame (vet3: three runs failing only a hand-built helper were blamed on the task).
 
@@ -83,6 +83,23 @@ split; leave it and record it.
   vet2: npm, pnpm, bun and poetry local packages are looked up on the reference and all 8 runs: no split.
   vet3: a second stop before the analysis was a reference gap (one call moved); a partial registry batch was a breach
   every run shares: recorded, no split.
+
+Lever K. Edge-case matrix and behavioural cells (owner 2026-11-13, moved here from the build 2026-11-16). For each
+sentence, list every axis that can vary and give each a cell through the public entry point (the CLI command or public
+API a user runs), asserting the user-visible output: the boundary on each side; empty, none and nothing-to-do;
+multiplicity with different answers in both orders and the wrong item sorting first; the same entity under two names;
+each exception's neighbour states (unknown, missing, failed, partial, older); the repeated trigger; kept results by
+value; every inventory and reserve row the text covers (difficulty.md sections 1 and 5). Parametrized cases keep the
+function count small. Run every cell on all passers and near-passers; the cells that split them go through Step 3.
+
+Lever L. Round trip (owner 2026-11-13 and 2026-11-15, moved here from the build 2026-11-16). For each value the
+feature writes or changes, a cell for each of: (a) live -> save -> reload through every real reader and every command
+that reads the saved form (report show, a policy on a saved scan, resume), asserted through that command's output, not
+the struct; (b) the not-set / empty state survives as not-set (absent stays absent, empty stays empty); (c) reload ->
+continue or resume -> save again -> reload keeps the value and its not-set cases; (d) a file of the older shape
+without the field reads as not-set, never as an error or a zero value; (e) the reloaded value is used, not recomputed
+(change the inputs it was computed from before the reload, where the repo allows it). Passers that recompute, drop the
+not-set state or break on an older file fall out here; Step 3 still decides which cells ship.
 
 Lever G. Reverse split: a cell the keeper passes and others fail on the opposite expected result, if a sentence supports it.
 
@@ -144,8 +161,9 @@ metadata no sentence names; a case where all runs behave alike (removed manifest
 6. Local judges are a warning, not a stop.
 
 ## Step 7: Paste and run in this order
-Pull state, paste test.patch only, confirm the download matches, start the watcher. Owner runs: Test Quality, re-eval,
-then Auto Review (before the re-eval it only reports no eligible runs), then the FP panel.
+Pull state, paste test.patch only, confirm the download matches, start the watcher. Owner runs: the checks a test
+change reopens in platform.md's order (Verify Tests, Verify Flakiness, Reward Hacking, Test Quality last), then the
+re-eval, then the FP checks; Auto Review is advisory and reports no eligible runs before the re-eval.
 
 ## Step 8: Read each label before changing anything
 | Result | Check first | Action |

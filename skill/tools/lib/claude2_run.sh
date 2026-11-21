@@ -5,10 +5,10 @@
 #   bash tools/lib/claude2_run.sh <role> <task-dir> <pkg> [brief.md] [effort]
 #
 # roles (agent definitions in ~/.claude/agents, shared):
-#   tq     olympus-tq-judge       (Test Quality judge, T1-T8)            default effort high (user 2026-10-17)
-#   sq     olympus-sq-judge       (Solution Quality judge, S1-S4)        default effort high
-#   ar     olympus-auto-reviewer  (Auto Review T1-T8 + S1-S4, Pass C)    default effort high
-#   fp     olympus-fp-auditor     (FP panel on the passers)              default effort high
+#   tq     olympus-tq-judge       (Test Quality judge, T1-T8)            default effort medium
+#   sq     olympus-sq-judge       (Solution Quality judge, S1-S4)        default effort medium
+#   ar     olympus-auto-reviewer  (Auto Review T1-T8 + S1-S4, Pass C)    default effort medium
+#   fp     olympus-fp-auditor     (FP panel on the passers)              default effort medium
 #   agentA / agentB               (full-review Agent A / Agent B)        default effort high
 #   cold   cold reader: clean checkout + description only, lists ambiguities and its own design (no agent file)
 #   free   any job: the brief is the whole instruction (repo hunt lane, gap analysis, probes)
@@ -25,8 +25,9 @@ case "$role" in
   tq) agent=olympus-tq-judge ;; sq) agent=olympus-sq-judge ;; ar) agent=olympus-auto-reviewer ;;
   fp) agent=olympus-fp-auditor ;; cold|free|agentA|agentB) agent="" ;; *) echo "unknown role $role" >&2; exit 2 ;;
 esac
-# effort (user 2026-10-17, final after trying max): high for every role unless given (max only when asked, e.g. studies)
-[ -n "$effort" ] || effort=high
+# effort: the reviewer roles (tq, sq, ar, fp) run Opus 5.5 at medium (owner 2026-10-28; SKILL.md fixed rules); other
+# jobs (cold reader, free briefs, solves) at high unless the caller gives one
+if [ -z "$effort" ]; then case "$role" in tq|sq|ar|fp) effort=medium ;; *) effort=high ;; esac; fi
 [ -f "$brief" ] || { echo "brief not found: $brief" >&2; exit 2; }
 # optional C2_SUFFIX=<tag> keeps parallel runs of one role apart (e.g. 2 FP auditors on one package)
 out="$T/eval/claude2"; mkdir -p "$out"; tag="$pkg-$role${C2_SUFFIX:+-$C2_SUFFIX}"
@@ -63,12 +64,8 @@ build, a study or a hunt - not necessarily a review): $brief" ;;
 esac
 # Independence (review roles only): write your own verdict BEFORE reading earlier reviews or triage tables named in the
 # brief; then add a section "Against earlier decisions" (HOLD/CONCEDE per earlier row you disagree with).
-# Shared learning (user 2026-10-17): every role except the cold reader reads the coordinator's memory first.
-mem="$OLYMPUS_MEMORY_DIR"
-[ ! -f "$mem/MEMORY.md" ] || case "$role" in cold) ;; *) task="Before anything else read $mem/MEMORY.md and every lesson file it lists that concerns
-your role (test quality, solution quality, auto review, FP/passers, hints/calibration, reviewers); they are the
-team's accumulated rules and outweigh your defaults.
-$task" ;; esac
+# No memory notes: a reviewer lane reads only its agent file, the kit's replicas/ prompts and the inputs the brief names
+# (2026-11-21; the method lives in the kit so every machine behaves the same).
 case "$role" in free) ;; *) task="$task
 Independence: form and write your own verdict first, from the package itself. Only then read earlier reviews/triage
 tables the brief points to, and add a section 'Against earlier decisions' listing each earlier decision you disagree with." ;; esac
@@ -79,14 +76,13 @@ rm -f "$report"
 args=(-p "$prompt" --effort "$effort" --permission-mode acceptEdits
       --allowedTools "Bash,Read,Grep,Glob,Write,Edit,Agent" --add-dir "$T" --add-dir "$OLYMPUS_CLAUDE_CONFIG_DIR/skills")
 [ -n "$agent" ] && args+=(--agent "$agent")
-# optional model override, e.g. CLAUDE2_MODEL=sonnet (default: the agent file's model, else the CLI default)
-# default model (user rule 2026-10-28): Opus 5.5 high for every split job; FP auditors pass Sonnet explicitly
+# optional model override, e.g. CLAUDE2_MODEL=claude-sonnet-5-5 (default Opus 5.5; reviewer roles run it at medium)
 args+=(--model "${CLAUDE2_MODEL:-claude-opus-5-5}")
 echo "claude2 $role ($agent, effort $effort) on $pkg -> $report"
-# Reviews and studies run from ~/OSS so they load the SAME project memory (MEMORY.md + lesson files) as the
-# coordinator; the task folder comes in through --add-dir and absolute paths. (Blind solves never use this script:
-# they run from their own clean checkout via claude2_solve.sh, so they see no memory.)
-wd="$OLYMPUS_COORDINATOR_ROOT"; [ "$role" = cold ] && { wd="$out/cold-cwd"; mkdir -p "$wd"; }  # cold reader: no memory
+# Reviews and studies run from the coordinator root (a stable working folder of the machine profile); the task folder
+# comes in through --add-dir and absolute paths. The cold reader gets an empty folder so it sees only what the brief
+# names. Blind solves never use this script: solvers.sh runs them in their own clean clones.
+wd="$OLYMPUS_COORDINATOR_ROOT"; [ "$role" = cold ] && { wd="$out/cold-cwd"; mkdir -p "$wd"; }
 cd "$wd" && CLAUDE_CONFIG_DIR="$(machine_config "${CLAUDE2_CONFIG_DIR:-$OLYMPUS_CLAUDE2_CONFIG_DIR}")" OLYMPUS_WORKER=cli "$OLYMPUS_CLAUDE_BIN" "${args[@]}" \
   < /dev/null > "$log" 2>&1
 rc=$?

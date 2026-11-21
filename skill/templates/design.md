@@ -1,11 +1,18 @@
 # design: <task name>
 
-## Header (S0)
+## Header (stage 0)
 - repo / tip sha:
 - seam (one sentence, user words):
 - kind: bugfix | feature_request
-- novelty searches (query -> result): 
-- production files expected (2-4):
+- novelty searches (query -> result):
+- production files expected (3-30, the value's real path; about 15-20 changed):
+- depth trace (file:line chain the solver must follow):
+- length design: files to read before the first correct edit (count, packages) | files to change | layers crossed |
+  the repository loop that keeps failing | estimate (8K + 20K per code-changing requirement + 18% + 15%):
+- test-grid budget: decision points | universal words x axis members | within budget:
+- repo hints checked (none may state the fix):
+- fair designs (>= 2):
+- length spike result (stage 2): solve 1 windows/peaks/sequence | solve 2 | mean | compacted both: yes/no
 
 ## Inventory (S1.1)
 | Shape / mode / driver / kind | IN or OUT | If OUT: base behaviour measured (command + result) | Where stated (setup line / scope sentence) |

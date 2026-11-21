@@ -18,6 +18,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import traceback
 import uuid
 from xml.etree import ElementTree as ET
 
@@ -26,7 +27,7 @@ from machine import load
 from repo_init import git, save
 
 MARK = "=====REPO-CHECK-XML====="
-STEPS = ("native-discovery", "build-and-offline-base", "single-id-and-relative-spaced-output",
+STEPS = ("open-build-inputs", "native-discovery", "build-and-offline-base", "single-id-and-relative-spaced-output",
          "listed-ids-match-junit", "production-error-named-diagnostics", "test-skip-restored",
          "production-not-restored", "uid-env-cwd-readonly-offline", "test-build-after-restore",
          "zero-selection", "watchdog-timeout", "absent-report", "empty-report", "malformed-report",
@@ -102,8 +103,10 @@ class Check:
         self.lock = Path(__file__).resolve().parent / "lib/dockrun.py"
         self.counter = 0
 
-    def record(self, name, good, detail):
+    def record(self, name, good, detail, trace=None):
         row = {"step": name, "result": "PASS" if good else "FAIL", "detail": detail}
+        if trace:
+            row["traceback"] = trace
         self.results.append(row)
         print(f"{row['result']} {name}: {detail}", flush=True)
         (self.out / "results.json").write_text(json.dumps(self.results, indent=2) + "\n", encoding="utf-8")
@@ -191,10 +194,28 @@ class Check:
             raise ValueError("JUnit IDs differ from expected inventory")
         return values
 
+    def open_build_inputs(self):
+        """Name every unresolved build input before any Docker call, as the cause (BACKLOG 138)."""
+        problems = []
+        for name, pattern in (("Dockerfile", r"\{\{[a-z0-9_]+\}\}|NOT[_ ]VERIFIED"), ("test.sh", r"\{\{[a-z0-9_]+\}\}")):
+            for number, line in enumerate((self.task / "init" / name).read_text(encoding="utf-8").splitlines(), 1):
+                for token in re.findall(pattern, line):
+                    problems.append(f"init/{name}:{number} holds {token}")
+        if self.profile["language"] == "go" and not re.fullmatch(r"[0-9a-f]{64}", str(self.profile.get("go_sha256", ""))):
+            problems.append("profile go_sha256 is not a verified 64-hex checksum")
+        if problems:
+            problems += [f"profile.open {row['field']}: {row['reason']}" for row in self.profile.get("open", [])
+                         if row["field"] in ("go_sha256", "toolchain.version", "dependencies")]
+        return problems
+
     def build(self):
         import proof
-        if re.search(r"\{\{|NOT_VERIFIED", (self.task / "init/Dockerfile").read_text()):
-            raise ValueError("Dockerfile has unresolved build inputs; resolve profile.open first")
+        problems = self.open_build_inputs()
+        self.record("open-build-inputs", not problems,
+                    "; ".join(problems) + "; resolve them (--settings, then repo_init.py --render-only) before the build"
+                    if problems else "Dockerfile and test.sh have no placeholder or NOT_VERIFIED input")
+        if problems:
+            return False
         provisional = self.profile["expected"]["base"]
         if not provisional:
             raise ValueError("no provisional IDs: configure expected.base or qualify an unsupported adapter first")
@@ -202,8 +223,9 @@ class Check:
         old_args = sys.argv
         old_env = os.environ.get("DOCKRUN_SLOTS")
         os.environ["DOCKRUN_SLOTS"] = "1"
-        # proof --build-only also executes base/base. Qualify IDs after its build,
-        # before that execution. Disable its otherwise automatic builder prune.
+        # proof --base-only builds or reuses the image and then runs only base/base through proof.run, which
+        # qualify() below replaces: native IDs are discovered after the build, before that execution
+        # (BACKLOG 140/164). Disable proof's otherwise automatic builder prune.
         proof.cleanup_build_cache = lambda: None
         proof.docker = self.docker
 
@@ -255,17 +277,13 @@ class Check:
 
         proof.run = qualify
         patch_runner(self.task)
-        # proof validates both files before build-only. New-feature inventory is
-        # deliberately OPEN: this invocation executes only the base mode.
-        bootstrap_ids = self.out / "build-only-unused-new-ids.json"
-        bootstrap_ids.write_text(json.dumps(provisional), encoding="utf-8")
+        # New-feature inventory is deliberately OPEN: --base-only needs no new IDs and executes only base mode.
         skips = self.out / "base-skips.json"
         # Exact parametrized skip IDs may not exist in the provisional static map.
         # The qualification callback validates them against native discovery first.
         skips.write_text("[]\n", encoding="utf-8")
         sys.argv = [str(Path(proof.__file__)), str(self.task / "base"), str(self.task / "init"),
-                    "--base-ids", str(self.task / "init/base-ids.json"),
-                    "--new-ids", str(bootstrap_ids), "--build-only", "--final",
+                    "--base-ids", str(self.task / "init/base-ids.json"), "--base-only", "--final",
                     "--base-skips", str(skips),
                     "--work-root", str(self.out), "--timeout", str(self.timeout)]
         captured = io.StringIO()
@@ -281,7 +299,7 @@ class Check:
                 os.environ["DOCKRUN_SLOTS"] = old_env
             (self.out / "build-proof.log").write_text(captured.getvalue(), encoding="utf-8")
             print(captured.getvalue(), end="", flush=True)
-        self.record("build-and-offline-base", code == 0, "proof.py --build-only, cleanup disabled; build-proof.log")
+        self.record("build-and-offline-base", code == 0, "proof.py --base-only, cleanup disabled; build-proof.log")
         if self.image:
             (self.out / "image.txt").write_text(self.image + "\n", encoding="utf-8")
             image_id = self.docker("image", "inspect", "--format", "{{.Id}}", self.image)
@@ -422,7 +440,7 @@ def main():
     check = None
     try:
         if not 0 < args.timeout < 688:
-            raise ValueError("timeout must be positive and below the platform bound")
+            raise ValueError(f"--timeout {args.timeout} must be positive and below 688 seconds, the platform watchdog bound proof.py enforces")
         check = Check(args.task.resolve(), args.timeout)
         if git(check.task / "base", "status", "--porcelain"):
             raise ValueError("base checkout is dirty")
@@ -432,10 +450,12 @@ def main():
         if check.build():
             check.probes()
     except Exception as exc:
+        trace = traceback.format_exc()
         if check:
-            check.record("self-check", False, f"{type(exc).__name__}: {exc}")
+            check.record("self-check", False, f"{type(exc).__name__}: {exc}", trace)
         else:
-            print(f"FAIL self-check: {exc}", file=sys.stderr)
+            # Before a Check exists there is no results.json: a usage error stays one line, a crash keeps its trace.
+            print(f"FAIL self-check: {exc}" + ("" if isinstance(exc, ValueError) else f"\n{trace}"), file=sys.stderr)
             return 1
     completed = {row["step"] for row in check.results}
     for name in STEPS:

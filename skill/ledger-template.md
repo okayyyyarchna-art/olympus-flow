@@ -32,13 +32,22 @@ of unreachability. No untested in-scope row may become OUT or a reserve waiver.
 | New selectors / expected base-ID and new-ID JSON paths | Fill | NOT VERIFIED |
 | uid/gid / passwd absence / PATH / HOME / cwd / mounts / network / watchdog | Fill | NOT VERIFIED |
 
-## Difficulty (difficulty.md; fill at stage 0, spike at stage 2, reserve used at stage 8)
+## Difficulty (difficulty.md; fill at stage 0, solver runs after the lock, reserve used at stage 8)
 
-| Decision | Nearest helper (file:line) and what it decides | Right/wrong (separating input) | Kind | Fair route | Right answer near/far |
+| Decision | Nearest helper (file:line) and what it decides | Right/wrong (separating input) | Kind | Fair route | Stated fix leads to it? |
 |---|---|---|---|---|---|
 | Fill | | | | | |
 
-Inventory author (fresh reader): Fill. V-OBVIOUS: decisions it fails (needs 2): Fill. Fallback used (runner-up / widen): Fill.
+Inventory author (fresh reader): Fill.
+
+| Length (problem-design.md section 2; difficulty.md section 2) | Value/evidence |
+|---|---|
+| Stage-0 estimate: files to read before the first correct edit (count, packages); files to change; layers crossed; the repository loop that keeps failing; estimate in K | Fill |
+| Test-grid budget: decision points; universal words x axis members; within budget | Fill |
+| Length spike on the draft (2 Codex GPT Sol 6.1 xhigh solves): windows and peaks, requests, sequence length (platform count: input + output per window peak) per solve; mean (gate >= 300K, none under 250K); separators missed | NOT VERIFIED |
+| Deepening applied after a short spike (what layer, which sentence) | none |
+
+Solver runs (difficulty.md section 3): local 3 Opus + 3 GPT, platform 2 Orion + 2 Vega; graded passers, FP audits, keeper: Fill.
 
 | Reserve probe | Input -> expected | Grounding | Probe command | Passers that fail it (stage 8) |
 |---|---|---|---|---|
@@ -63,9 +72,9 @@ Mechanical count method/result and actual description/precheck results stay sepa
 ## Blueprint (fill before any code; tools/checklist_gate.py checks it)
 
 One row per combination that differs, for every contract row not OUT. Write n/a for an axis that cannot vary.
-"Copy or data state" includes the round-trip states of build-checklist.md section 3 item 2 (live, saved and
-reloaded per reader, reloaded then resumed, older shape); "Lifecycle edge" includes the repeated trigger. The
-edge-case matrix of section 4 lands here as cells too.
+"Copy or data state" includes live -> saved -> reloaded through the real reader (build-checklist.md section 3
+item 2); "Lifecycle edge" includes the repeated trigger. The full round-trip set and the edge-case matrix are
+calibration levers (prompts/calibrate-one-passer.md Levers K and L, owner 2026-11-16), not Blueprint cells.
 Disposition is one of: `TESTED <test name>`, `OUT "<exact description sentence>"`, `OUT unreachable <file:line>`,
 `SAME <cell> <why it behaves the same>`.
 
@@ -105,9 +114,10 @@ Disposition is one of: `TESTED <test name>`, `OUT "<exact description sentence>"
 |---|---|---|---|---|
 | F01 | Fill | NOT VERIFIED | Fill | OPEN |
 
-Track samples separately: reading A/B; sweep 1 A/B, sweep 2 A/B (only on its trigger);
-replica batches (3 samples each); FP auditor A (+B on demand) **for each passing run**. A sample records its own inputs,
-independence and findings. Identical hashes never turn one sample into two.
+Track samples separately: reading A/B; the length spike (2 solves); the stage-7 replica round (fairness, sq, dq,
+ar, verify) with its fix batch and the one verification round; the repair loop of each platform finding (kept wrong
+version or executed input, class sweep, fast check); FP auditor A (+B on demand) **for each passing run**. A sample
+records its own inputs, independence and findings. Identical hashes never turn one sample into two.
 
 ## Run pool and hand-over
 
@@ -115,9 +125,11 @@ independence and findings. Identical hashes never turn one sample into two.
 |---|---|---|---|---|
 | Fill | Fill | NOT VERIFIED | NOT VERIFIED | No until qualified |
 
-| Family | Current eligible unique attempts N | Genuine passes | Rate | Required minimum / sequence criterion / source | Result |
-|---|---|---|---|---|---|
-| Fill each required family | 0 | 0 | undefined | NOT VERIFIED | NOT VERIFIED |
+| Family | Current eligible unique attempts N | Genuine passes | Rate | Criterion (platform.md): Orion 1 <= passes <= N/4 and passing runs average >= 256K; Vega <= N/4; Nova 0; N >= 4 | Passing runs' sequence lengths, compacted | Result |
+|---|---|---|---|---|---|---|
+| Orion | 0 | 0 | undefined | NOT VERIFIED | NOT VERIFIED | NOT VERIFIED |
+| Vega | 0 | 0 | undefined | NOT VERIFIED | n/a | NOT VERIFIED |
+| Nova | 0 | 0 | undefined | NOT VERIFIED | n/a | NOT VERIFIED |
 
 Hand-over: repo URL/full pin; title/category/language; exact four artifact hashes;
 final runtime/stability and G1-G4 evidence; remaining human actions; no open grounded

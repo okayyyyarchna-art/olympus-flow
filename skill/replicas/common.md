@@ -22,7 +22,10 @@ Evidence rules (the site works this way; do the same):
    it against the code. Keep the finding only if the disproof fails. Report the disproof you tried.
 4. Read the real code path end to end (callers, every enabled driver/backend/mode, compiled twins, lifecycle start
    and stop). Do not judge from the diff alone.
-5. Do not run Docker, network calls or long builds. Small read-only scripts (grep, Python one-liners) are fine.
+5. No network calls and no image builds. Where your check file says to execute (the fairness check's wrong solutions,
+   the solution-quality check's break attempts), run the task's existing image through the launcher's dockrun.py
+   command, one container at a time, inside your time box; small read-only scripts (grep, Python one-liners) are
+   always fine. A static trace is a hypothesis, not a result.
 6. Judge only what the description states or what an expert can discover from the repository. Behaviour the
    description leaves open is never a defect of the tests and never required of the solution.
 

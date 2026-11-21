@@ -22,13 +22,18 @@ for x in r:
         os.makedirs(os.path.join(sys.argv[2], x["id"]), exist_ok=True)
         with open(os.path.join(sys.argv[2], x["id"], "output.json"), "w", encoding="utf-8") as f:
             json.dump(x.get("output") or {}, f, indent=2)
-        print("\t".join(str(v or "") for v in (x["id"], x.get("taskAgentCodename"), verdict,
-                                                x.get("label"), x.get("batchTag"))))
+        o = x.get("output") or {}
+        # sequenceLength (sum of window peaks) and compacted (one compaction = the 256K bar) per run, "-" when absent
+        # every empty value prints "-": `IFS=$'\t' read` below collapses consecutive tabs, so an empty verdict (a run
+        # still in progress) would shift the later columns into the wrong variables
+        print("\t".join("-" if v in (None, "") else str(v) for v in (x["id"], x.get("taskAgentCodename"), verdict,
+                                                                     x.get("label"), x.get("batchTag")))
+              + "\t" + "\t".join("-" if o.get(k) is None else str(o.get(k)) for k in ("sequenceLength", "compacted")))
 EOF
   # Folders are keyed by run id: labels such as "Orion #6" repeat across batches (vet task 3).
-  while IFS=$'\t' read -r rid fam verdict label batch; do
+  while IFS=$'\t' read -r rid fam verdict label batch seqlen compacted; do
     d="$out/runs/$rid"; mkdir -p "$d"
-    printf '%s %s\nlabel: %s\nbatch: %s\n' "$fam" "$verdict" "$label" "$batch" > "$d/verdict.txt"
+    printf '%s %s\nlabel: %s\nbatch: %s\nsequenceLength: %s\ncompacted: %s\n' "$fam" "$verdict" "$label" "$batch" "$seqlen" "$compacted" > "$d/verdict.txt"
     olympus runs artifact "$id" "$rid" --key solutionPatch > "$d/solution.patch" 2>/dev/null
     # The evaluator's verdict file: its agent_blame_unfair decides the Fair task and environment-blocker gates.
     olympus runs artifact "$id" "$rid" --key evalResult > "$d/evalResult.json" 2>/dev/null

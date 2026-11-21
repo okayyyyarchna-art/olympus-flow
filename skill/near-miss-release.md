@@ -115,10 +115,25 @@ A reference alignment is allowed only when every point holds:
 3. The reference change is a removal or narrowing of a single rule (a few lines). Every stated requirement stays
    tested and passing.
 4. The test is relaxed, not deleted: the input stays, and the assertions every design shares stay.
-5. The other runs still fail first on a line before every changed line, so exactly one family lands in (0, 25%].
-6. Before the paste: the SQ replica twice and the AR replica on the alternative reference, plus the proof.
-7. Quality floor after the paste: SQ verdict PASS, Code Quality 3/3, AR 3/3/3. If any of these drops, revert to the
-   old reference and take the "more runs" path.
+5. The other runs still fail first on a line before every changed line, so the criteria hold after the re-eval
+   (Orion 1 <= passes <= N/4 with the passing runs averaging 256K+, Vega <= N/4, Nova 0; platform.md).
+6. Before the paste: the SQ replica twice and the AR replica on the alternative reference, plus the fast check.
+7. Quality floor after the paste: SQ 0 blocking, AR clean. If either drops, revert to the old reference and take the
+   "more runs" path.
+8. A removed cell is replaced, not deleted (vet 6, 2026-11-20): write the natural wrong design for its code path (the
+   reference minus one check), find an input where that design fails and the near miss passes, add it as a case of
+   the same test with a kept wrong version. Dry-run every candidate input against the near miss's own code first
+   (read its code for that path; the grader's one-line summary is not enough: vet 6's kept-folder case failed the
+   near miss in the quick check). When every covering input fails the near miss, the path is the near miss's own
+   variant: hold it, record it, and show the owner the hole before the paste.
+9. For every probe that separates the near miss from the reference, three columns before any verdict: the
+   description sentence; the behaviour before the change on that input (run or read upstream); the origin of the
+   reference's rule (a platform finding, a stated sentence, or our own review round). A rule that is ours alone,
+   unstated and untested is an alignment candidate for the owner (vet 6: the reference's dev-mark rule was our own
+   addition and upstream agreed with the run); a rule a sentence states or the platform asked for is not.
+10. Local FP auditors are stricter than the platform's panel on implied cases (they skip the reference replay): a
+   local NOT_DESERVED on an implied case is "risky", not "dead"; the adjudicator replays each judge's probe on the
+   reference and drops the ones the reference also fails.
 
 ## 8. If every run fails and there is one near-miss: chances of a platform pass
 

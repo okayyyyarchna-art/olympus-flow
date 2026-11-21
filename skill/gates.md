@@ -16,12 +16,19 @@ the intended missing feature, base/reference PASS, new/reference PASS. Missing n
 APIs may cause a verified feature-related compiler error; incidental setup failures
 do not prove T1. Keep those reasons distinct. All new IDs must appear without skips;
 base skips are exact, predeclared, justified and unchanged across candidate runs.
+Before every paste run `tools/fastcheck.sh <task> <image> <tag>`: it repeats only the parts whose inputs changed
+(test.sh -> the root baseline snapshot; test.sh + solution -> the after run as uid 1000; hidden tests -> new mode, T1 per
+leaf, lint, the kept wrong versions) and ends with the verifySolution set verdict (`tools/junit_sets.py`); a kept wrong
+version whose edit no longer applies fails it. The platform-identity cells of proof.py (`--root-base --two-user
+--plain-new`) are the same check inside the full proof.
 
-## G1 - Auto Review, first priority
+## G1 - Auto Review rubric, the local structure check
 
-The numbered map follows the archived platform rubric; verify current criteria when
-starting a task. D = deterministic evidence, J = semantic judgment by the builder
-and the scheduled independent confirmation (not an extra model call per row).
+Auto Review left the platform's readiness list on 2026-11-17 (its report still exists and mirrors Solution Quality);
+the checks that block a task today are Test Quality (verifyFairness) and Solution Quality, and both execute inputs.
+T1-T8 and S1-S4 stay the best local rubric for the shape of the package: walk them first, then close G2-G4 by
+execution (tq-once.md, sq-once.md, `tools/fastcheck.sh`) before any model review. D = deterministic evidence, J =
+semantic judgment by the builder and the scheduled independent confirmation (not an extra model call per row).
 
 | Rule | Exact local self-check | Kind |
 |---|---|---|
@@ -50,6 +57,10 @@ clean solver patch on current tests. Grade pristine base tests too. Record APPLI
 RESTORED_AWAY, APPLY_ERROR, BUILD_ERROR, HARNESS_ERROR, TIMEOUT or EXECUTED separately.
 Only the intended behavioral failure proves a discriminator. For each survivor,
 either establish it is valid, cite a real exclusion/unreachability proof, or keep OPEN.
+Every gap has a kept wrong version (eval/wrong/kept: EDITS, KIND, EXPECT) that `tools/wrong_versions.py` re-runs on
+the final suite, each wrong one failing exactly its leaves and each control passing; `tools/mutants.py gen` and `run`
+sweep the reference's added lines (neg, drop, del, flip, true, false, swap), once with and once without the coverage
+filter, and every survivor gets a test or a written reason checked against the three sources.
 
 One independent auditor (a second when it says NOT_DESERVED or is unclear) inspects every current passing **run**, its actual production
 patch and the literal contract. They give a per-obligation design trace and attempt
@@ -74,6 +85,8 @@ as residuals because base has the same behavior. Do not alter locked text to exc
 Test world vs real world: list what the harness simplifies (retention, time between steps, transactions and buffering,
 crashes and fencing, one clock or node, modes no test sets) and trace the reference against production code and default
 configuration for each. Mutants only break code the reference has (faust window: 2 Auto Review Highs past 60+ mutants).
+Gate before every Solution Quality purchase: sq-once.md section 8 walked on the exact bytes (executed inputs on the
+normal path, the timing at 1x and 2x, every note fixed or declined in writing).
 
 ## G4 - Task Quality, fourth priority
 
@@ -114,8 +127,9 @@ are different API checks; neither is inferred from the other's PASS.
    applicable semantic scope; D changes rederive all meaning and fresh solve evidence.
    Include fixtures, expected IDs, selectors and tool sources. Unrestricted reviews
    depend on everything they could read. Refresh final stability if its inputs changed.
-6. Close affected G1 -> G2 -> G3 -> G4 on exact repaired bytes with deterministic evidence now: the proof, the
-   variant corpus, the finding's own probe (fails on the wrong design, passes on the reference) and the linters.
+6. Close affected G1 -> G2 -> G3 -> G4 on exact repaired bytes with deterministic evidence now: the fast check
+   (`tools/fastcheck.sh`: cells, two-user replay, kept wrong versions, lint), the variant corpus, the finding's own
+   kept wrong version or executed input (fails on the wrong design, passes on the reference) and the linters.
    Semantic records that step 5 marks stale are refreshed at the next point of PIPELINE.md "Review schedule", never
    by a review round started for this fix. Required independent samples have different IDs even on identical
    inputs; do not reuse one as another. No open/stale required record at hand-over. If repair cannot satisfy locked meaning,
@@ -127,10 +141,12 @@ are different API checks; neither is inferred from the other's PASS.
 Use current, complete, unhinted, eligible platform runs and their actual task family
 (not the evaluator's family). Keep scratched/stale/incomplete/contaminated attempts
 visible but outside the eligible denominator per current platform policy. Re-evaluating
-one trajectory never increases N. One family must satisfy `0 < passed/N <= .25`, all
-others zero, with the required minimum runs and current long-horizon criteria met.
-Resolve FP and environment/fairness caveats before claiming the band. Historical/local
-rates and an unchanged patch replay after new wording cannot certify that target.
+one trajectory never increases N. The criteria (platform.md, 2026-11-21): N >= 4 per family; Orion
+`1 <= passed <= N/4`; Vega `passed <= N/4`; Nova `passed = 0`; the passing Orion runs average >= 256K tokens of
+sequence length; no unfair/broken flag, cheat rate < 20%, no environment blocker. Resolve FP and
+environment/fairness caveats before claiming the criteria. Historical/local rates, a local replay of a platform run
+and an unchanged patch replay after new wording cannot certify them (`tools/rollout_report.py` prints the table
+from the platform's own run data).
 
 Tools (Python standard library + Git for package diff syntax; no Docker/model/network):
 

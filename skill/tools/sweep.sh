@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Tracked: sweep.sh <task> <tag> --lane ar|sq|ref-a|ref-b (one blocking job and report).
+# Tracked: sweep.sh <task> <tag> --lane ar|sq|ref-a|ref-b (one blocking job and report). Runs only at the owner's request
+# for a platform finding the repair loop cannot place (PIPELINE.md Review schedule); reviewer lanes at medium effort.
 # Convenience aggregate: sweep.sh <task> [tag] runs all lanes serially and waits for every child.
 set -uo pipefail
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/machine.sh" || exit 2
@@ -30,7 +31,7 @@ main() {
     case "$lane" in
       ar|sq)
         report="$T/eval/claude2/pkg-$lane-sweep-$tag.md"; rm -f "$report"
-        C2_SUFFIX="sweep-$tag" bash "$OLYMPUS_LIB/claude2_run.sh" "$lane" "$T" pkg "$brief" high > "$T/eval/claude2/sweep-$tag-$lane.log" 2>&1
+        C2_SUFFIX="sweep-$tag" bash "$OLYMPUS_LIB/claude2_run.sh" "$lane" "$T" pkg "$brief" medium > "$T/eval/claude2/sweep-$tag-$lane.log" 2>&1
         rc=$?;;
       ref-*)
         report="$T/eval/replica/ref-audit-sw${tag}${lane#ref-}.json"; rm -f "$report"

@@ -32,7 +32,17 @@ defensive code.
   mode, a shape) and still passes, that is a tests High (T3/T4): name the graded case that would fail it.
 - For FAILING runs: if several runs converge on the same valid design that a test rejects, the test is unfair (T5).
   If they converge on a stated requirement, that is fair difficulty.
-- Gate: exactly one of the three model families solves more than 0% and at most 25% of its runs, the other two 0%.
+- Gate line (report, do not grade the package on it): per family present in `runs/`, runs and passes; the site's
+  criteria are Orion at least one pass and at most 25%, Vega at most 25%, Nova 0, at least 4 runs each, and the
+  passing Orion runs averaging at least 256K tokens of sequence length. A family without runs is not counted against
+  the package.
+
+## Alone mode (the brief says "run alone")
+When the brief gives no fairness, solution-quality or description replica outputs, do their parts yourself from the
+package and the repository: the coverage of each stated requirement by a discriminating test (T3/T4), the promises of
+the solution on every real path (S1) and the description rules (P1-P6). The brief may give the site's own check
+results as files; read them as evidence, not as verdicts. The site no longer lists Auto Review in its readiness
+(2026-11-17); the report is advisory, so write it as a reviewer would still read it.
 
 ## Issue schema
 Each kept issue: `{category: "T1".."T8" | "S1".."S4" | "P1".."P6", severity: "high|medium|low", claim,

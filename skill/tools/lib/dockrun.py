@@ -1,6 +1,6 @@
 """Run docker within the machine profile's shared slot limit.
 
-usage: MSYS_NO_PATHCONV=1 python eval/dockrun.py run --rm ... <image> <cmd...>
+usage: MSYS_NO_PATHCONV=1 python tools/lib/dockrun.py run --rm ... <image> <cmd...>
 Waits for a free slot (DOCKRUN_SLOTS, default from machine profile; set 1 while solvers run), then runs ``docker <args>``.
 DOCKRUN_TIMEOUT (seconds) limits the command itself, not the wait for a slot; exit 124 when it runs out.
 Slot 0 is the byte the earlier one-slot version locked, so a run still waiting from that version keeps its turn.
