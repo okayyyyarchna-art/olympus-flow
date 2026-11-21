@@ -11,6 +11,19 @@ read and trace a lot of code before its first correct edit, and its own runs mus
 still wrong (problem-design.md section 2). Width (more rules) multiplies test cells instead (vet task 6: 8 rules
 across 27 files, 20+ review rounds, and Orion runs of 215-238K that never compacted).
 
+**The 256K Orion plan (owner, 2026-11-21): apply it in part A and part B.**
+1. **Pick fan-out repos.** Generators and multi-backend libraries where one contract change touches every output
+   flavour plus committed generated fixtures. Start list: orval, openapi-typescript, progenitor, typify, prost,
+   openapi-python-client, mockery; new directions: oapi-codegen, ogen, gqlgen, sqlc, ent, goa, quicktype, utoipa.
+2. **Size by edit-and-verify sites, 25+.** Count the places where the solver must edit, regenerate, run a suite and read
+   the diff. That fills the window; lines of code do not.
+3. **Gate at blind calibration: 150K mean, 170K best.** Short reads mean widen the surface (more fan-out sites), never
+   add rules.
+4. **Keep the band:** Nova 0, Orion 1-25%, Vega at most 25%. The fan-out shape blocks short lucky solves.
+5. **Buy Orion last:** Vega and Nova rollouts first to confirm difficulty, then Orion (16 tokens a run).
+- No scope-ups of old drafts: the cliff is confirmed; only unit-triangular and vm-state-snapshots run as they are.
+- Recalibrate the 150K/170K gate after 2-3 fresh problems have Orion data.
+
 ## A. No repository given: find one
 1. **Platform repo rules (a fail drops the repo):** public; 500+ stars; a commit within the last 12 months;
    production-level code; permissive licence; an allowed language; not archived; not on

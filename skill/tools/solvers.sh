@@ -8,7 +8,7 @@
 #                                           python tools/seqlen.py <task-dir>/solves/s7 <task-dir>/solves/s8
 # Each solve's Codex session log (rollout-*.jsonl, copied next to meta.txt when found) carries the token counts.
 # Each solver gets a fresh clone of <task-dir>/base (pinned, clean) OUTSIDE the task folder and only
-# "# <title>\n\n<description>" (pkg/description.md). No Docker slot is held. SOLVE_PATH=<dir> puts a toolchain (a venv's
+# "# <title>\n\n<description>" (pkg/description.md, or DESC=<file> for a draft). No Docker slot is held. SOLVE_PATH=<dir> puts a toolchain (a venv's
 # Scripts/bin) first on PATH so solvers can run the repo's tests; SOLVE_TIMEOUT_MIN caps each run (default 90).
 # Output: <task-dir>/solves/s<n>/{agent.patch,prod_only.patch,meta.txt}. Grade at S4:
 #   bash tools/lib/replay_patches.sh <task>/pkg <task>/base <image> <task>/solves/patches
@@ -22,7 +22,7 @@ if [ "${2:-}" = spike ]; then mode=spike; set -- "$1"; SOLVERS="${SOLVERS:-7 8}"
 title="${2:-$(head -1 "$T/pkg/title.txt" 2>/dev/null | tr -d '\r')}"
 [ -n "$title" ] || title="$(basename "$T")"
 name="$(basename "$T")"; mkdir -p "$T/solves/patches"
-prompt="$(printf '# %s\n\n%s\n' "$title" "$(tr -d '\r' < "$T/pkg/description.md")")"
+prompt="$(printf '# %s\n\n%s\n' "$title" "$(tr -d '\r' < "${DESC:-$T/pkg/description.md}")")"
 cap="${SOLVE_TIMEOUT_MIN:-90}"; RUN="$(date +%m%d%H%M%S)"
 CLAUDE_BIN="$OLYMPUS_CLAUDE_BIN"
 C2DIR="${CLAUDE2_CONFIG_DIR:-${OLYMPUS_CLAUDE2_CONFIG_DIR:-}}"

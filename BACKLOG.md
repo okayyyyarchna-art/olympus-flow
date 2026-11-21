@@ -1002,3 +1002,70 @@ Fixed: an EXPECT entry is caught by a failing leaf that equals it, starts with i
 leaves are listed as "also fails". Re-judged from the run's log: 17/17 wrong caught, control passes, 2 held reported,
 1 stale script (terraform-json-unpaired, a vet 6 task fix). The kit's proof tools are now smoke-tested end to end on a
 real package; the only open fastcheck item is commands.lint from repo_init.
+
+## #231 A replica wrong-output item is never declined for calibration; a passer sets the alignment target (vet 6, 2026-11-21)
+Platform Solution Quality on vet 6 solution ae495ed10d24 blocked twice: (1) .terraform.lock.hcl paired with *.tf only,
+so a change to a *.tf.json and the lock file read as a lockfile-only change; (2) a package finding that its control left
+with no change was kept but reported with an empty change. Item (1) had been raised by our own sq replica at fx31 and
+declined for calibration ("a test fails every run, untested it is a visible TQ gap"). Both reproduced on the real
+command (eval/sq42/probe.txt); the passing Orion run already did both right, so the fix aligned the reference with the
+passer and the new tests keep it a passer.
+Rules for the kit (sq-once.md section 4 and the repair loop):
+- A wrong-output item from any lane, inside a stated sentence, is fixed in the reference; calibration never declines it.
+  When a passer exists, run the passer on the same executed inputs first: where the passer is right, align the reference
+  and add the test (the passer must pass it); where the passer is wrong, the owner decides (a test turns it into a
+  failer, no test leaves a false-pass risk).
+- "No chance of a false pass" for a passer = a differential of the passer against the reference on every Auto Review,
+  FP-audit and SQ layout, by the real command; align the reference wherever the passer is right or the behaviour is
+  open; list each remaining difference where the passer is wrong for the owner.
+- Before following a site note that renames a function, grep the upstream tests for it: vet 6's kindOf is called by the
+  upstream TestKindOf, so "export kindOf as KindOf" would have broken a test that must pass untouched; a constructor with
+  a purpose (scalibr.EmptyLockfile) removed the wrapper instead.
+- fastcheck.sh reads the package from <task>/pkg: a candidate goes into pkg/ (the pasted package backed up) before the
+  fast check; the kept wrong versions need eval/wrong/kept/cmd.txt or the light step spends about 40 minutes.
+
+## #232 A held wrong version is an open Test Quality item; a pairing aligned with a passer brings in its documented layouts (vet 6, 2026-11-21)
+Platform Test Quality on vet 6 fx42d (it had passed fx40 with 0 blocking) blocked 3 times, all from the fx42c/fx42d
+changes: (1) the reference newly paired packages.lock.json with a Directory.Packages.props in the same folder (added in a
+class sweep because the passer does it), with one test row; Test Quality asked for NuGet's documented layout (the props
+file at the repository root; MSBuild takes the nearest one in the project folder or a parent), which the reference and
+the passer both miss, so a test would fail the only passer: the owner chose to drop the pairing (the fx40 rule; the
+description never names central versions). (2) and (3) were two reference fixes kept as "held" wrong versions with no
+test: the dev mark of a package that loses its last runtime copy (upstream behaviour; the passer agrees) and the copy
+order of two controls (Go map order; the wrong version shows the other change on about 15% of scans). Both were
+testable without touching the passer: (2) folded into an existing leaf that fails on base, (3) one scan repeated 40
+times that wants the same changes every time (eval/tq43/probe.txt measured the split first).
+Rules for the kit (tq-once.md, wrong_versions.py):
+- A held kept wrong version is an open Test Quality item, not a closure. Before a test.patch paste each held version
+  gets a test or a written reason of a kind the platform has accepted (pinning judged unfair, out of scope).
+  "The catch is probabilistic" is no reason: measure the wrong version's split, then repeat the scan until a run misses
+  it less than 0.5% of the time.
+- When a class sweep adds a member to a reference table (a pair, an ecosystem, a format) to align with a passer, run the
+  member's documented layouts on the passer first. If the passer handles only some of them, do not add the member: the
+  untested part is a Test Quality item and a test fails the passer. Give it to the owner as a decision instead.
+- A regression check that upstream already passes goes into an existing leaf that fails on base (T1), with its own
+  message, never into a new leaf.
+
+## #233 The 256K Orion plan goes into hunt.md (owner, 2026-11-21)
+Owner asked to keep the plan of action for the 256K Orion bar in the hunting workflow. hunt.md now carries it right
+after the "what the pick must give" paragraph, for part A (repository search) and part B (seam): fan-out repositories
+(generators, multi-backend libraries with committed generated fixtures; start list and new directions named), sizing by
+25+ edit-and-verify sites instead of lines of code, a blind-calibration gate of 150K mean / 170K best (short reads widen
+the surface, never add rules), the band (Nova 0, Orion 1-25%, Vega at most 25%), Orion rollouts bought last after Vega
+and Nova, no scope-ups of old drafts (only unit-triangular and vm-state-snapshots run as they are), and a recalibration
+of the 150K/170K gate after 2-3 fresh problems have Orion data.
+
+## #234 Strictness pass for length added to description.md 5b (owner method, 2026-11-21)
+Owner method for a passing Orion run that stays short: add about 15 strict words ("must", "every", "all", "never",
+"definitely") to rules the description already states and a hidden test already checks; no new requirement, no file or
+function name, no fix location; same length and style; old/new text shown paragraph by paragraph; then one local Codex
+gpt-6-astra (high) run with title + new text in a clean checkout, reporting sequence length and whether it still
+solves (goal 256K+ and solving). Saved as a 5b bullet (owner-asked change only); no run made yet (owner: "dont start
+new"). Draft on vet 6: eval/desc-strict/description.md.
+
+## #235 prompts/raise-solve-length.md: the vet 6 path to 256K as a general prompt (owner, 2026-11-21)
+The steps that took vet 6 from 205-230K runs without compaction to a 283K local and a 331K hosted compacted run, as one
+reusable prompt: measure and attribute the length; a casual "existing tests must still pass" sentence (local 205K ->
+283K); a clause the reference already meets that sends runs into an unread subsystem (policy, +3-5K); plain words for
+wall cases; a code-changing requirement kept in reserve (17-22K); the strictness pass (#234, unmeasured). Each step
+measured with one local gpt-6-astra high solve; owner approves every wording; every clause has its hidden test.

@@ -31,6 +31,7 @@ Read each card right before its stage; the cards are construction instructions, 
 | 6-7 Executed closure, one replica round | [gates.md](gates.md), [tq-once.md](tq-once.md), [sq-once.md](sq-once.md), [replicas/](replicas/) |
 | 8 Rollout results | [rollout.md](rollout.md), [platform.md](platform.md), [difficulty.md](difficulty.md) section 6 (reserve), [profiles.md](profiles.md), [near-miss-release.md](near-miss-release.md) (owner decision) |
 | A trigger with a known answer, or stuck, looping, unsure which fix path | [situations.md](situations.md) |
+| Runs too short for the 256K Orion bar (design right, length short) | [prompts/raise-solve-length.md](prompts/raise-solve-length.md) |
 
 Fixed rules:
 - I paste, the owner runs: platform checks, rollouts, lock and submit are the owner's (platform.md). Never paste while

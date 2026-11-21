@@ -222,6 +222,17 @@ only from the owner asking: the builder never proposes, drafts or lists a change
 - **A change for length** (a passing Orion run that stays under 256K) adds the layer the solver must trace (a
   second entry path, a saved state read back, a caller context), stated as one requirement; a clause the solution
   already meets adds 3-7K per run, a code-changing requirement about 20K (problem-design.md section 2).
+- **A strictness pass for length (owner method, 2026-11-21; no measured result yet):** when the owner asks, rewrite
+  the description so the solver checks every case instead of stopping early, without changing what it asks for. Add
+  about 15 strict words ("must", "every", "all", "never", "definitely") only to rules the text already states, and
+  only to rules a hidden test already checks (name the test for each). Add no requirement, no file or function name and
+  no hint about where the fix goes; keep the length (within about 10 words) and the style (plain paragraphs, no
+  lists). Show the owner the old and new text paragraph by paragraph. Then test it with one local run: Codex on
+  gpt-6-astra, reasoning high, given only the title and the new text, in a clean checkout of the repository
+  (`DESC=<draft> SOLVERS=4 CODEX_ONE_OFF_MODEL=gpt-6-astra CODEX_ONE_OFF_EFFORT=high bash tools/solvers.sh <task>`).
+  Report its sequence length (`python tools/seqlen.py <task>/solves/s4`) and whether it still solves (replay on the
+  hidden tests). Goal: 256K or more and still solving; if it stays short or stops solving, the old text stays.
+  Example draft: vet 6, 16 strict words, 245 to 251 words.
 
 ## 6. Rollout levers, description side (the order of use is rollout.md)
 - First classify the evidence (rollout.md step 1): eligible runs only, per-family denominators; a re-evaluation of one
