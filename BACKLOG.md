@@ -985,3 +985,12 @@ invalid, 1 survived (delta.go:162 `if !wanted(rel, f.Size) && !declaresDependenc
 pool item to triage by the three sources, not a kit defect); fastcheck.sh first run failed before any container on a
 Git Bash to Windows path (dockrun.py and junit_sets.py received /c/... with MSYS_NO_PATHCONV=1 set): fixed with
 machine_host on every path Python gets; second run recorded below.
+Addendum #230 (fastcheck smoke, second run on vet 6, 2026-11-21 06:07-06:36): baseline snapshot reused; two-user step OK
+in 282 s (uid 1000 applies the solution, new mode 121/121, saved after run reused); new mode as uid 12345 OK in 219 s;
+T1 on the clean repository: 121/121 fail, none skipped; junit sets PASS (all five sets empty); the light container was
+stopped by the 1200 s per-container timeout while running the 20 kept wrong versions with the default command
+(test.sh new per script). Fix: the light step gets a 3600 s budget and a note when eval/wrong/kept/cmd.txt is absent
+(the task-level fix: a cmd.txt with the five-package go test command). Third run (light step only) recorded below.
+Also pushed the product as a new private repository: https://github.com/okayyyyarchna-art/olympus-flow (master, blind
+solver clones excluded); verified from a fresh clone: install.sh into an isolated home (140 files), the machine profile
+loads, 125 unit tests pass.

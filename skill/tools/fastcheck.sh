@@ -51,8 +51,12 @@ fi
 NEED_AFTER=1; [ -f "$OUT/after-$TS-$SOL.xml" ] && NEED_AFTER=0
 step "two-user (uid 1000 applies the solution after root's run; new mode$([ $NEED_AFTER = 1 ] && echo ', after run' || echo '; after run saved'))" \
   "${DR[@]}" run --rm --network none "${MOUNTS[@]}" "$SNAP" bash $IN twouser "$TAG" "$TS" "$SOL" "$NEED_AFTER"
+# the light step runs T1 plus every kept wrong version: with the default command (test.sh new per script, 1-2 min each)
+# 20 scripts need about 40 minutes, so this container gets a 3600 s budget; eval/wrong/kept/cmd.txt names a faster
+# test command (go test on the touched packages) and is the normal way to keep it short
+[ -f "$TASK/eval/wrong/kept/cmd.txt" ] || echo "   note: no eval/wrong/kept/cmd.txt; the kept versions run test.sh new each (slow); add a go test command there"
 step "light (T1 on the clean repository, lint, kept wrong versions; uid 1000)" \
-  "${DR[@]}" run --rm --network none --user 1000:1000 -e HOME=/tmp "${MOUNTS[@]}" "$IMG" bash $IN light "$TAG"
+  env DOCKRUN_TIMEOUT=3600 "${DR[@]}" run --rm --network none --user 1000:1000 -e HOME=/tmp "${MOUNTS[@]}" "$IMG" bash $IN light "$TAG"
 step "new mode with the solution as uid 12345 (no passwd entry)" \
   "${DR[@]}" run --rm --network none --user 12345:12345 -e HOME=/tmp "${MOUNTS[@]}" "$IMG" bash $IN odduid "$TAG"
 if [ -f "$OUT/after-$TS-$SOL.xml" ]; then
