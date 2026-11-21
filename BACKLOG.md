@@ -994,3 +994,11 @@ stopped by the 1200 s per-container timeout while running the 20 kept wrong vers
 Also pushed the product as a new private repository: https://github.com/okayyyyarchna-art/olympus-flow (master, blind
 solver clones excluded); verified from a fresh clone: install.sh into an isolated home (140 files), the machine profile
 loads, 125 unit tests pass.
+Addendum #230 (third fastcheck run on vet 6, 06:37-07:2x): two-user OK (new 121/121 as uid 1000), T1 121/121 fail on the
+clean repository, uid 12345 OK, junit sets PASS, kept step ran all 20 scripts within the new budget. It exposed a
+wrong_versions.py matcher defect: the kept scripts name EXPECT by a prefix of the leaf ("…/a_chain_of_links") and mean
+"this cell catches it", while the tool required exact names and no other failing leaf, so 9 caught versions read BAD.
+Fixed: an EXPECT entry is caught by a failing leaf that equals it, starts with it or sits below it; other failing
+leaves are listed as "also fails". Re-judged from the run's log: 17/17 wrong caught, control passes, 2 held reported,
+1 stale script (terraform-json-unpaired, a vet 6 task fix). The kit's proof tools are now smoke-tested end to end on a
+real package; the only open fastcheck item is commands.lint from repo_init.

@@ -6,14 +6,15 @@ usage: wrong_versions.py <kept-dir> <tree> [--cmd COMMAND] [--tests NAME,...] [-
 <kept-dir> holds one Python script per kept version (eval/wrong/kept/<name>.py) that defines
   EDITS = [(path, old, new), ...]  exact-text edits of the repository, each matching once (LF kept)
   KIND = 'wrong' | 'control' | 'held'
-  EXPECT = 'TestName' or 'TestName/leaf', or a list of them: the leaves that fail on a wrong version
+  EXPECT = 'TestName' or 'TestName/leaf' (a leaf name or a prefix of it), or a list: the cells that must catch it
 Each script's edits are applied to one copy of <tree>, COMMAND runs in that copy, then the edited files are restored.
 COMMAND (default: ./test.sh new --output_path {junit}) runs through the shell in the copy. `{junit}` is replaced by
 a report path that is read afterwards; `{tests}` by a quoted regex of the top-level test names of EXPECT (or of
 --tests), empty for a control, so a repository command can run only them, for example
   --cmd "go test -count=1 -run {tests} ./internal/engine/"
 Without {junit} the failing names are read from Go test output (--- FAIL: lines).
-Verdicts: wrong -> every EXPECT leaf fails and no other leaf does; control -> everything passes (exit 0); held ->
+Verdicts: wrong -> every EXPECT entry is matched by a failing leaf (other failing leaves are listed as "also fails");
+control -> everything passes (exit 0); held ->
 reported only. An edit that no longer matches once fails its step. One summary table; exit 1 on any mismatch.
 Re-running only the versions a test edit can affect (BACKLOG #179) is not built: every script runs each time.
 """
@@ -131,18 +132,20 @@ def verdict(kind, leaves, code, failing):
         return "BAD", "no report written"
     if kind == "control":
         return ("ok", "") if code == 0 and not failing else ("BAD", "a control fails")
-    missing = [leaf for leaf in leaves if not any(f == leaf or f.startswith(leaf + "/") for f in failing)]
-    extra = sorted(f for f in failing if not any(f == leaf or f.startswith(leaf + "/") or leaf.startswith(f + "/")
-                                                 for leaf in leaves))
+    # An EXPECT entry names a leaf exactly or by a prefix of its name (subtest names are long): it is caught when a
+    # failing leaf equals it, sits below it, or starts with it. Other failing leaves are reported, not a mismatch:
+    # a wrong version may break several cells, and the gate is that its own cell catches it.
+    def hit(leaf, f):
+        return f == leaf or f.startswith(leaf) or leaf.startswith(f + "/")
+    missing = [leaf for leaf in leaves if not any(hit(leaf, f) for f in failing)]
+    extra = sorted(f for f in failing if not any(hit(leaf, f) for leaf in leaves))
     if kind == "held":
         return "held", ("not caught: " + ", ".join(missing)) if missing else "caught"
     if missing:
         return "BAD", "not caught: " + ", ".join(missing)
-    if extra:
-        return "BAD", "other leaves fail: " + ", ".join(extra[:5])
     if code == 0:
         return "BAD", "exit 0 although the leaves fail"
-    return "ok", ""
+    return "ok", ("also fails: " + ", ".join(extra[:3]) + (" ..." if len(extra) > 3 else "")) if extra else ""
 
 
 def main(argv=None):
